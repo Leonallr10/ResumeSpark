@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 28% 97%;
+    --foreground: 220 23% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 23% 13%;
+    --primary: 173 80% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 48 96% 53%;
+    --secondary-foreground: 220 23% 13%;
+    --muted: 205 18% 88%;
+    --muted-foreground: 219 12% 39%;
+    --accent: 355 84% 61%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 18% 81%;
+    --input: 210 18% 81%;
+    --ring: 173 80% 30%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply text-foreground;
+  }
+}
+
+@layer components {
+  .resume-page {
+    margin-inline: auto;
+    background: white;
+    color: #172033;
+    box-shadow: 0 18px 55px rgba(15, 23, 42, 0.12);
+  }
+
+  .resume-page-positioned {
+    position: relative;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .resume-preview-page {
+    min-height: 1056px;
+    width: min(100%, 816px);
+    color: #111827;
+    font-family: "Times New Roman", Times, serif;
+    line-height: 1.35;
+    background: #ffffff;
+  }
+
+  .resume-export {
+    box-shadow: none !important;
+  }
+
+  .resume-export .no-print {
+    display: none !important;
+  }
+
+  .editable-line:focus {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  .changed-line {
+    background-color: rgba(254, 240, 138, 0.82) !important;
+    box-shadow: 0 0 0 1px rgba(202, 138, 4, 0.28);
+  }
+
+  .changed-line-insert {
+    background-color: rgba(187, 247, 208, 0.82) !important;
+    box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.28);
+  }
+
+  .resume-export .changed-line {
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .resume-page {
+    box-shadow: none;
+    min-height: auto;
+  }
+
+  .changed-line {
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+  }
+}
