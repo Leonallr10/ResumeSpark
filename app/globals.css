@@ -48,8 +48,6 @@
   }
 
   .resume-preview-page {
-    min-height: 1056px;
-    width: min(100%, 816px);
     color: #111827;
     font-family: "Times New Roman", Times, serif;
     line-height: 1.35;

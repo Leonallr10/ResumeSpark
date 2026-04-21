@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   try {
     await mkdir(workdir, { recursive: true });
-    await writeFile(sourcePath, parsedRequest.data.latex, "utf8");
+    await writeFile(sourcePath, normalizeLatexForPdf(parsedRequest.data.latex), "utf8");
 
     const firstRun = await runCompiler(engine, sourcePath, workdir);
 
@@ -188,4 +188,31 @@ async function readCompilerLog(logPath: string, fallback: string) {
 
 function trimLog(log: string) {
   return log.split("\n").slice(-80).join("\n").trim();
+}
+
+function normalizeLatexForPdf(source: string) {
+  let latex = source;
+
+  // Users sometimes add "\ https://..." in header lines.
+  latex = latex.replace(/\\\s+(?=https?:\/\/)/g, "");
+
+  // Ensure plain URLs are clickable in generated PDF.
+  latex = wrapBareUrlsWithLatexUrl(latex);
+
+  return latex;
+}
+
+function wrapBareUrlsWithLatexUrl(source: string) {
+  const urlPattern = /https?:\/\/[^\s}]+/g;
+
+  return source.replace(urlPattern, (url, offset, whole) => {
+    const contextBefore = whole.slice(Math.max(0, offset - 40), offset);
+
+    // Skip URLs that are already inside \url{...} or \href{...}
+    if (/\\(?:url|href)\{[^}]*$/u.test(contextBefore)) {
+      return url;
+    }
+
+    return `\\url{${url}}`;
+  });
 }
