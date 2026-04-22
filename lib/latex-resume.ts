@@ -197,17 +197,23 @@ export function canInsertProject(project: ProjectDraft) {
   );
 }
 
-export function buildProjectLatexBlock(project: ProjectDraft) {
+export function buildProjectLatexBlock(
+  project: ProjectDraft,
+  options?: { useTechStackCommand?: boolean },
+) {
   const heading = escapeLatexText(project.heading.trim());
   const explanation = escapeLatexText(project.explanation.trim());
-  const techStack = escapeLatexText(project.techStack.trim());
+  const techStack = escapeLatexText(stripTechStackLabel(project.techStack));
   const dateRange = escapeLatexText(formatProjectDateRange(project));
+  const techStackLine = options?.useTechStackCommand
+    ? `  \\techstack{${techStack}}`
+    : `    \\resumeItem{\\textbf{Tech Stack:} ${techStack}}`;
 
   return [
     `  \\resumeProjectHeading{${heading}}{${dateRange}}`,
     "  \\resumeItemListStart",
     `    \\resumeItem{${explanation}}`,
-    `    \\resumeItem{\\textbf{Tech Stack:} ${techStack}}`,
+    techStackLine,
     "  \\resumeItemListEnd",
   ].join("\n");
 }
@@ -217,9 +223,10 @@ export function insertProjectIntoLatex(latex: string, project: ProjectDraft) {
 }
 
 export function insertProjectsIntoLatex(latex: string, projects: ProjectDraft[]) {
+  const useTechStackCommand = shouldUseTechStackCommand(latex);
   const blocks = projects
     .filter(canInsertProject)
-    .map((project) => buildProjectLatexBlock(project));
+    .map((project) => buildProjectLatexBlock(project, { useTechStackCommand }));
 
   if (blocks.length === 0) {
     return latex;
@@ -286,6 +293,7 @@ export function applySuggestionToLatex(
   }
 
   const lines = latex.replace(/\r\n/g, "\n").split("\n");
+  const useTechStackCommand = shouldUseTechStackCommand(latex);
   const targetIndex = targetLine.sourceLine;
   const targetEndIndex = targetLine.sourceEndLine ?? targetIndex;
   const targetLength = Math.max(1, targetEndIndex - targetIndex + 1);
@@ -303,7 +311,11 @@ export function applySuggestionToLatex(
     lines.splice(
       targetIndex,
       targetLength,
-      replaceVisibleLatexLine(targetLine.sourceText ?? lines[targetIndex], suggestion.suggestedText),
+      replaceVisibleLatexLine(
+        targetLine.sourceText ?? lines[targetIndex],
+        suggestion.suggestedText,
+        { useTechStackCommand },
+      ),
     );
     return lines.join("\n");
   }
@@ -315,6 +327,7 @@ export function applySuggestionToLatex(
     lines[targetIndex],
     suggestion.suggestedText,
     targetSection?.title,
+    { useTechStackCommand },
   );
   const insertionIndex =
     targetSection?.title.toLowerCase().includes("project") &&
@@ -645,11 +658,16 @@ function isLikelyDefinitionText(line: string) {
   return /^\\[a-zA-Z]+/.test(line) && cleanLatexText(line).length === 0;
 }
 
-function replaceVisibleLatexLine(source: string, suggestedText: string) {
+function replaceVisibleLatexLine(
+  source: string,
+  suggestedText: string,
+  options?: { useTechStackCommand?: boolean },
+) {
   const indent = source.match(/^\s*/)?.[0] ?? "";
   const trimmed = source.trim();
   const cleanSuggestion = stripSuggestionBullet(suggestedText);
   const text = escapeLatexText(cleanSuggestion);
+  const normalizedTechStack = escapeLatexText(stripTechStackLabel(cleanSuggestion));
   const projectHeading = parseCommand(trimmed, "resumeProjectHeading");
 
   if (projectHeading) {
@@ -687,7 +705,25 @@ function replaceVisibleLatexLine(source: string, suggestedText: string) {
     return `${indent}\\resumeItemNoBullet{${text}}`;
   }
 
+  if (parseCommand(trimmed, "techstack")) {
+    return `${indent}\\techstack{${normalizedTechStack}}`;
+  }
+
   if (parseCommand(trimmed, "resumeItem")) {
+    const resumeItem = parseCommand(trimmed, "resumeItem");
+    const isTechStackLine = (resumeItem?.args[0] ?? "")
+      .replace(/\\textbf\{([^{}]*)\}/g, "$1")
+      .toLowerCase()
+      .includes("tech stack");
+
+    if (isTechStackLine && options?.useTechStackCommand) {
+      return `${indent}\\techstack{${normalizedTechStack}}`;
+    }
+
+    if (isTechStackLine) {
+      return `${indent}\\resumeItem{\\textbf{Tech Stack:} ${normalizedTechStack}}`;
+    }
+
     return `${indent}\\resumeItem{${text}}`;
   }
 
@@ -702,6 +738,7 @@ function createInsertedLatexLine(
   source: string,
   suggestedText: string,
   sectionTitle?: string,
+  options?: { useTechStackCommand?: boolean },
 ) {
   const indent = source.match(/^\s*/)?.[0] ?? "";
   const trimmed = source.trim();
@@ -715,7 +752,11 @@ function createInsertedLatexLine(
       techStack: projectSuggestion.tech,
       fromDate: projectSuggestion.dates,
       toDate: "",
-    });
+    }, options);
+  }
+
+  if (options?.useTechStackCommand && /^tech stack\s*:/i.test(strippedText)) {
+    return `${indent}\\techstack{${escapeLatexText(stripTechStackLabel(strippedText))}}`;
   }
 
   const text = escapeLatexText(strippedText);
@@ -793,6 +834,14 @@ function parseProjectSuggestion(value: string) {
     tech: fields.tech,
     detail: fields.detail,
   };
+}
+
+function stripTechStackLabel(value: string) {
+  return value.replace(/^tech stack\s*:\s*/i, "").trim();
+}
+
+function shouldUseTechStackCommand(latex: string) {
+  return /\\(?:re)?newcommand\{\\techstack\}/.test(latex) || /\\techstack\{/.test(latex);
 }
 
 function formatProjectDateRange(project: ProjectDraft) {

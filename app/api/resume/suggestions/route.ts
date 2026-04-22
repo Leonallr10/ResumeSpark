@@ -9,6 +9,12 @@ import {
 import { getResumeText } from "@/lib/resume";
 
 export const runtime = "nodejs";
+const GEMINI_SUGGESTION_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-flash-latest",
+  "gemini-2.0-flash",
+  "gemini-flash-lite-latest",
+] as const;
 
 export async function POST(request: Request) {
   const parsedRequest = suggestionRequestSchema.safeParse(await request.json());
@@ -33,16 +39,7 @@ export async function POST(request: Request) {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const prompt = buildResumeTailorPrompt(parsedRequest.data);
-
-    const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseJsonSchema: suggestionResponseJsonSchema,
-        temperature: 0.25,
-      },
-    });
+    const result = await generateWithRetry(ai, prompt);
 
     const parsedGemini = parseGeminiJson(result.text ?? "");
     const validatedResponse = suggestionResponseSchema.parse(parsedGemini);
@@ -50,9 +47,16 @@ export async function POST(request: Request) {
 
     return NextResponse.json(safeResponse);
   } catch (error) {
+    const quotaError = isQuotaGeminiError(error);
+    const retryableError = isRetryableGeminiError(error);
+    const retryAfterSeconds = getRetryAfterSeconds(error);
     const message =
       error instanceof z.ZodError
         ? "Gemini returned an invalid response shape."
+        : quotaError
+          ? "Gemini quota limit reached. Please retry shortly or check Gemini billing/quota."
+        : retryableError
+          ? "Gemini is busy right now. Please retry in a moment."
         : "Unable to generate resume suggestions.";
 
     return NextResponse.json(
@@ -60,7 +64,15 @@ export async function POST(request: Request) {
         error: message,
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      {
+        status: quotaError ? 429 : retryableError ? 503 : 500,
+        headers:
+          quotaError || retryableError
+            ? {
+                "Retry-After": String(retryAfterSeconds ?? 4),
+              }
+            : undefined,
+      },
     );
   }
 }
@@ -230,6 +242,110 @@ function looksLikeBulletText(value: string) {
       text,
     )
   );
+}
+
+async function generateWithRetry(ai: GoogleGenAI, prompt: string) {
+  const delaysMs = [1200, 2500];
+  let lastRetryableOrQuotaError: unknown;
+
+  for (const model of GEMINI_SUGGESTION_MODELS) {
+    for (let attempt = 0; attempt <= delaysMs.length; attempt += 1) {
+      try {
+        return await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseJsonSchema: suggestionResponseJsonSchema,
+            temperature: 0.25,
+          },
+        });
+      } catch (error) {
+        if (isUnsupportedModelError(error)) {
+          // Skip models unavailable for this account/version and continue fallback.
+          break;
+        }
+
+        if (isQuotaGeminiError(error)) {
+          // Quota can be model-specific, so try the next fallback model immediately.
+          lastRetryableOrQuotaError = error;
+          break;
+        }
+
+        if (!isRetryableGeminiError(error)) {
+          throw error;
+        }
+
+        lastRetryableOrQuotaError = error;
+
+        if (attempt < delaysMs.length) {
+          await delay(delaysMs[attempt]);
+        }
+      }
+    }
+  }
+
+  throw lastRetryableOrQuotaError ?? new Error("Gemini returned a retryable failure.");
+}
+
+function isRetryableGeminiError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return (
+    message.includes('"code":503') ||
+    message.includes("503") ||
+    message.includes("UNAVAILABLE") ||
+    message.toLowerCase().includes("high demand")
+  );
+}
+
+function isQuotaGeminiError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  return (
+    message.includes('"code":429') ||
+    message.includes("429") ||
+    message.includes("RESOURCE_EXHAUSTED") ||
+    normalized.includes("quota exceeded") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("exceeded your current quota")
+  );
+}
+
+function isUnsupportedModelError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  return (
+    message.includes('"code":404') ||
+    message.includes("NOT_FOUND") ||
+    normalized.includes("not supported for generatecontent") ||
+    normalized.includes("model is not found")
+  );
+}
+
+function getRetryAfterSeconds(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const retryDelayMatch = message.match(/"retryDelay"\s*:\s*"(\d+)s"/i);
+
+  if (retryDelayMatch) {
+    return Number.parseInt(retryDelayMatch[1], 10);
+  }
+
+  const retryInMatch = message.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+
+  if (retryInMatch) {
+    return Math.max(1, Math.ceil(Number.parseFloat(retryInMatch[1])));
+  }
+
+  return undefined;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 const suggestionResponseJsonSchema = {
