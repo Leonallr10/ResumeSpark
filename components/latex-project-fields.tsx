@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Save, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,6 +127,16 @@ export function LatexProjectFields({
     setJsonError(null);
   }
 
+  function goToPreviousProject() {
+    setSelectedProjectIndex((current) => Math.max(0, current - 1));
+  }
+
+  function goToNextProject() {
+    setSelectedProjectIndex((current) =>
+      Math.min(activeProjects.length - 1, current + 1),
+    );
+  }
+
   const projectLength = formatProjectsInput(activeProjects).length;
   const insertProjectCount = activeProjects.filter(canInsertProject).length;
   const canSaveProjects = activeProjects.some(hasProjectDraftContent);
@@ -187,20 +197,49 @@ export function LatexProjectFields({
 
       {inputMode === "form" ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start gap-2">
             {activeProjects.length > 1 ? (
-              <select
-                value={selectedProjectIndex}
-                onChange={(event) => setSelectedProjectIndex(Number(event.target.value))}
-                className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                aria-label="Select project"
-              >
-                {activeProjects.map((currentProject, index) => (
-                  <option key={`${currentProject.heading}-${index}`} value={index}>
-                    {currentProject.heading.trim() || `Project ${index + 1}`}
-                  </option>
-                ))}
-              </select>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={goToPreviousProject}
+                  disabled={selectedProjectIndex === 0}
+                  aria-label="Go to previous project"
+                  className="h-9 w-9 shrink-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="min-w-0 flex-1">
+                  <select
+                    value={selectedProjectIndex}
+                    onChange={(event) => setSelectedProjectIndex(Number(event.target.value))}
+                    className="h-9 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    aria-label="Select project"
+                  >
+                    {activeProjects.map((currentProject, index) => (
+                      <option key={`${currentProject.heading}-${index}`} value={index}>
+                        {currentProject.heading.trim() || `Project ${index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={goToNextProject}
+                  disabled={selectedProjectIndex >= activeProjects.length - 1}
+                  aria-label="Go to next project"
+                  className="h-9 w-9 shrink-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {selectedProjectIndex + 1} / {activeProjects.length}
+                </p>
+              </div>
             ) : (
               <p className="min-w-0 flex-1 text-xs text-muted-foreground">
                 Editing {selectedProject.heading.trim() || "Project 1"}

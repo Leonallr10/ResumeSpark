@@ -49,6 +49,7 @@ import {
   derivePreviewLayoutFromLatex,
   paginateResumeSections,
   ResumePreview,
+  type ResumePreviewSelection,
 } from "@/components/latex-resume-preview";
 import {
   applySuggestionToLatex,
@@ -61,7 +62,7 @@ import {
   type ProjectDraft,
 } from "@/lib/latex-resume";
 import { getDownloadFilename, sanitizeFilename } from "@/lib/resume";
-import type { EditorView } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 import type {
   AiSuggestion,
   ResumeSection,
@@ -175,6 +176,46 @@ export function LatexResumeTailorApp() {
       scrollToPreviewPage(nextPage);
     },
     [previewPageCount, scrollToPreviewPage],
+  );
+
+  const focusEditorAtSourceLine = useCallback((zeroBasedLineNumber: number) => {
+    const view = editorViewRef.current;
+
+    if (!view) {
+      return;
+    }
+
+    const oneBasedLineNumber = Math.min(
+      Math.max(zeroBasedLineNumber + 1, 1),
+      view.state.doc.lines,
+    );
+    const targetLine = view.state.doc.line(oneBasedLineNumber);
+
+    view.dispatch({
+      selection: { anchor: targetLine.from },
+      effects: EditorView.scrollIntoView(targetLine.from, { y: "center" }),
+    });
+    view.focus();
+  }, []);
+
+  const navigateFromPreviewToSource = useCallback(
+    (selection: ResumePreviewSelection) => {
+      const sourceLine =
+        selection.line?.sourceLine ??
+        selection.line?.sourceEndLine ??
+        selection.section.lines[0]?.sourceLine ??
+        selection.section.lines[0]?.sourceEndLine;
+
+      if (typeof sourceLine !== "number") {
+        return;
+      }
+
+      goToPreviewPage(selection.page);
+      window.requestAnimationFrame(() => {
+        focusEditorAtSourceLine(sourceLine);
+      });
+    },
+    [focusEditorAtSourceLine, goToPreviewPage],
   );
 
   const canSubmit =
@@ -892,6 +933,7 @@ export function LatexResumeTailorApp() {
                         pages={previewPages}
                         layout={previewLayout}
                         zoom={previewZoom}
+                        onNavigateToSource={navigateFromPreviewToSource}
                       />
                     </div>
                   )}

@@ -15,10 +15,17 @@ type ResumePreviewProps = {
   pages: PaginatedPreviewPage[];
   layout: PreviewLayoutProfile;
   zoom: number;
+  onNavigateToSource?: (selection: ResumePreviewSelection) => void;
+};
+
+export type ResumePreviewSelection = {
+  line?: ResumeLine;
+  section: ResumeSection;
+  page: number;
 };
 
 export const ResumePreview = forwardRef<HTMLDivElement, ResumePreviewProps>(
-  function ResumePreviewInner({ pages, layout, zoom }, ref) {
+  function ResumePreviewInner({ pages, layout, zoom, onNavigateToSource }, ref) {
     const zoomScale = zoom / 100;
 
     return (
@@ -53,6 +60,8 @@ export const ResumePreview = forwardRef<HTMLDivElement, ResumePreviewProps>(
                       key={section.id}
                       section={section}
                       showHeading={section.showHeading}
+                      pageNumber={index + 1}
+                      onNavigateToSource={onNavigateToSource}
                     />
                   ))}
                 </div>
@@ -70,10 +79,20 @@ ResumePreview.displayName = "ResumePreview";
 function PreviewSection({
   section,
   showHeading = true,
+  pageNumber,
+  onNavigateToSource,
 }: {
   section: ResumeSection;
   showHeading?: boolean;
+  pageNumber: number;
+  onNavigateToSource?: (selection: ResumePreviewSelection) => void;
 }) {
+  const firstLine = section.lines[0];
+  const canNavigateToSection =
+    Boolean(onNavigateToSource) &&
+    Boolean(firstLine) &&
+    (typeof firstLine?.sourceLine === "number" || typeof firstLine?.sourceEndLine === "number");
+
   if (section.title === "Header") {
     const [nameLine, locationLine, ...contactLines] = section.lines;
     const contacts = contactLines
@@ -110,52 +129,105 @@ function PreviewSection({
     <section className="mb-3 break-inside-avoid">
       {showHeading ? (
         <div className="mb-1.5 flex items-center gap-2 border-b border-slate-900 pb-[2px]">
-          <h2 className="text-[0.69rem] font-bold uppercase tracking-normal">
-            {section.title}
-          </h2>
+          {canNavigateToSection ? (
+            <button
+              type="button"
+              className="rounded-sm text-[0.69rem] font-bold uppercase tracking-normal hover:text-slate-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-500"
+              onClick={() =>
+                onNavigateToSource?.({
+                  line: firstLine,
+                  section,
+                  page: pageNumber,
+                })
+              }
+              title="Jump to this section in LaTeX source"
+            >
+              {section.title}
+            </button>
+          ) : (
+            <h2 className="text-[0.69rem] font-bold uppercase tracking-normal">
+              {section.title}
+            </h2>
+          )}
         </div>
       ) : null}
       <div className="space-y-1">
         {section.lines.map((line) => (
-          <PreviewLine key={line.id} line={line} />
+          <PreviewLine
+            key={line.id}
+            line={line}
+            section={section}
+            pageNumber={pageNumber}
+            onNavigateToSource={onNavigateToSource}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function PreviewLine({ line }: { line: ResumeLine }) {
+function PreviewLine({
+  line,
+  section,
+  pageNumber,
+  onNavigateToSource,
+}: {
+  line: ResumeLine;
+  section: ResumeSection;
+  pageNumber: number;
+  onNavigateToSource?: (selection: ResumePreviewSelection) => void;
+}) {
   const labelValue = splitLabelValue(line.text);
+  const canNavigate =
+    Boolean(onNavigateToSource) &&
+    (typeof line.sourceLine === "number" || typeof line.sourceEndLine === "number");
+  const content =
+    line.kind === "projectHeading" || line.kind === "subheading" ? (
+      <div>
+        <div className="flex items-start justify-between gap-4 text-[0.64rem]">
+          <strong>{line.text}</strong>
+          {line.rightText ? (
+            <span className="shrink-0 text-right text-[10px] font-semibold text-slate-700">
+              {line.rightText}
+            </span>
+          ) : null}
+        </div>
+        {line.secondaryText ? (
+          <p className="text-[10px] italic leading-[1.2] text-slate-700">{line.secondaryText}</p>
+        ) : null}
+      </div>
+    ) : line.kind === "bullet" ? (
+      <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-1 text-[11px] leading-[1.3]">
+        <span className="pt-[1px]">-</span>
+        <p>{line.text}</p>
+      </div>
+    ) : labelValue ? (
+      <p className="text-[11px] leading-[1.3]">
+        <strong>{labelValue.label}:</strong> {labelValue.value}
+      </p>
+    ) : (
+      <p className="text-[11px] leading-[1.3]">{line.text}</p>
+    );
 
   return (
     <div className="break-inside-avoid">
-      {line.kind === "projectHeading" || line.kind === "subheading" ? (
-        <div>
-          <div className="flex items-start justify-between gap-4 text-[0.64rem]">
-            <strong>{line.text}</strong>
-            {line.rightText ? (
-              <span className="shrink-0 text-right text-[10px] font-semibold text-slate-700">
-                {line.rightText}
-              </span>
-            ) : null}
-          </div>
-          {line.secondaryText ? (
-            <p className="text-[10px] italic leading-[1.2] text-slate-700">
-              {line.secondaryText}
-            </p>
-          ) : null}
-        </div>
-      ) : line.kind === "bullet" ? (
-        <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-1 text-[11px] leading-[1.3]">
-          <span className="pt-[1px]">-</span>
-          <p>{line.text}</p>
-        </div>
-      ) : labelValue ? (
-        <p className="text-[11px] leading-[1.3]">
-          <strong>{labelValue.label}:</strong> {labelValue.value}
-        </p>
+      {canNavigate ? (
+        <button
+          type="button"
+          className="w-full rounded-sm text-left hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-500"
+          onClick={() =>
+            onNavigateToSource?.({
+              line,
+              section,
+              page: pageNumber,
+            })
+          }
+          title="Jump to this line in LaTeX source"
+        >
+          {content}
+        </button>
       ) : (
-        <p className="text-[11px] leading-[1.3]">{line.text}</p>
+        content
       )}
     </div>
   );
