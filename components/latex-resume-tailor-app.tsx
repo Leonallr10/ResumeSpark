@@ -210,12 +210,15 @@ export function LatexResumeTailorApp() {
         return;
       }
 
-      goToPreviewPage(selection.page);
+      // Keep the current preview scroll position stable on click.
+      // Only update page indicator + jump the editor to source.
+      setPreviewPage(selection.page);
+      setPreviewPageInput(String(selection.page));
       window.requestAnimationFrame(() => {
         focusEditorAtSourceLine(sourceLine);
       });
     },
-    [focusEditorAtSourceLine, goToPreviewPage],
+    [focusEditorAtSourceLine],
   );
 
   const canSubmit =

@@ -129,26 +129,39 @@ function PreviewSection({
     <section className="mb-3 break-inside-avoid">
       {showHeading ? (
         <div className="mb-1.5 flex items-center gap-2 border-b border-slate-900 pb-[2px]">
-          {canNavigateToSection ? (
-            <button
-              type="button"
-              className="rounded-sm text-[0.69rem] font-bold uppercase tracking-normal hover:text-slate-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-500"
-              onClick={() =>
+          <h2
+            className={`text-[0.69rem] font-bold uppercase tracking-normal ${
+              canNavigateToSection ? "cursor-pointer" : ""
+            }`}
+            onClick={() =>
+              canNavigateToSection
+                ? onNavigateToSource?.({
+                    line: firstLine,
+                    section,
+                    page: pageNumber,
+                  })
+                : undefined
+            }
+            onKeyDown={(event) => {
+              if (!canNavigateToSection) {
+                return;
+              }
+
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
                 onNavigateToSource?.({
                   line: firstLine,
                   section,
                   page: pageNumber,
-                })
+                });
               }
-              title="Jump to this section in LaTeX source"
-            >
-              {section.title}
-            </button>
-          ) : (
-            <h2 className="text-[0.69rem] font-bold uppercase tracking-normal">
-              {section.title}
-            </h2>
-          )}
+            }}
+            tabIndex={canNavigateToSection ? 0 : undefined}
+            role={canNavigateToSection ? "button" : undefined}
+            title={canNavigateToSection ? "Jump to this section in LaTeX source" : undefined}
+          >
+            {section.title}
+          </h2>
         </div>
       ) : null}
       <div className="space-y-1">
@@ -210,25 +223,36 @@ function PreviewLine({
     );
 
   return (
-    <div className="break-inside-avoid">
-      {canNavigate ? (
-        <button
-          type="button"
-          className="w-full rounded-sm text-left hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-500"
-          onClick={() =>
-            onNavigateToSource?.({
+    <div
+      className={`break-inside-avoid ${canNavigate ? "cursor-pointer" : ""}`}
+      onClick={() =>
+        canNavigate
+          ? onNavigateToSource?.({
               line,
               section,
               page: pageNumber,
             })
-          }
-          title="Jump to this line in LaTeX source"
-        >
-          {content}
-        </button>
-      ) : (
-        content
-      )}
+          : undefined
+      }
+      onKeyDown={(event) => {
+        if (!canNavigate) {
+          return;
+        }
+
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onNavigateToSource?.({
+            line,
+            section,
+            page: pageNumber,
+          });
+        }
+      }}
+      tabIndex={canNavigate ? 0 : undefined}
+      role={canNavigate ? "button" : undefined}
+      title={canNavigate ? "Jump to this line in LaTeX source" : undefined}
+    >
+      {content}
     </div>
   );
 }
