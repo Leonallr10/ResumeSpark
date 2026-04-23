@@ -556,16 +556,26 @@ export function LatexResumeTailorApp() {
     const pageWrappers = Array.from(
       exportRoot.querySelectorAll<HTMLDivElement>("[data-preview-page]"),
     );
-    const pageCards = Array.from(exportRoot.querySelectorAll<HTMLDivElement>(".resume-preview-page"));
+    const pageCards = Array.from(
+      exportRoot.querySelectorAll<HTMLDivElement>(".resume-preview-page"),
+    );
+    const printablePages = pageWrappers.filter(hasRenderablePageContent);
+    const exportPageWidthPx = Math.floor(previewLayout.pageWidthPx);
+    const exportPageHeightPx = Math.floor(previewLayout.pageHeightPx);
+
+    if (printablePages.length === 0) {
+      throw new Error("Preview does not contain any printable content.");
+    }
 
     // Remove preview layout classes so export sizing stays deterministic.
     exportRoot.className = "";
     exportRoot.classList.add("resume-export");
-    exportRoot.style.width = `${previewLayout.pageWidthPx}px`;
-    exportRoot.style.minWidth = `${previewLayout.pageWidthPx}px`;
-    exportRoot.style.maxWidth = `${previewLayout.pageWidthPx}px`;
-    exportRoot.style.margin = "0 auto";
+    exportRoot.style.width = `${exportPageWidthPx}px`;
+    exportRoot.style.minWidth = `${exportPageWidthPx}px`;
+    exportRoot.style.maxWidth = `${exportPageWidthPx}px`;
+    exportRoot.style.margin = "0";
     exportRoot.style.padding = "0";
+    exportRoot.style.overflow = "hidden";
     exportRoot.style.background = "#ffffff";
     exportRoot.style.boxSizing = "border-box";
 
@@ -577,23 +587,28 @@ export function LatexResumeTailorApp() {
       pagesContainer.style.padding = "0";
     }
 
-    pageWrappers.forEach((page, index) => {
-      page.style.width = `${previewLayout.pageWidthPx}px`;
-      page.style.height = `${previewLayout.pageHeightPx}px`;
+    pageWrappers
+      .filter((page) => !printablePages.includes(page))
+      .forEach((page) => page.remove());
+
+    printablePages.forEach((page, index) => {
+      page.style.width = `${exportPageWidthPx}px`;
+      page.style.height = `${exportPageHeightPx}px`;
+      page.style.display = "block";
       page.style.margin = "0";
       page.style.padding = "0";
       page.style.overflow = "hidden";
       page.style.pageBreakInside = "avoid";
       page.style.breakInside = "avoid";
-      page.style.pageBreakAfter = index === pageWrappers.length - 1 ? "auto" : "always";
-      page.style.breakAfter = index === pageWrappers.length - 1 ? "auto" : "page";
+      page.style.pageBreakAfter = index === printablePages.length - 1 ? "auto" : "always";
+      page.style.breakAfter = index === printablePages.length - 1 ? "auto" : "page";
     });
 
     pageCards.forEach((page) => {
       page.style.transform = "none";
       page.style.transformOrigin = "top center";
-      page.style.width = `${previewLayout.pageWidthPx}px`;
-      page.style.height = `${previewLayout.pageHeightPx}px`;
+      page.style.width = `${exportPageWidthPx}px`;
+      page.style.height = `${exportPageHeightPx}px`;
       page.style.boxShadow = "none";
       page.style.margin = "0";
       page.style.background = "#ffffff";
@@ -618,7 +633,7 @@ export function LatexResumeTailorApp() {
             format: "a4",
             orientation: "portrait",
           },
-          pagebreak: { mode: ["css"] },
+          pagebreak: { mode: [] },
         })
         .from(exportRoot)
         .save();
@@ -1051,6 +1066,16 @@ export function LatexResumeTailorApp() {
       </div>
     </main>
   );
+}
+
+function hasRenderablePageContent(page: HTMLDivElement) {
+  const text = (page.textContent ?? "").replace(/\s+/g, " ").trim();
+
+  if (text.length > 0) {
+    return true;
+  }
+
+  return Boolean(page.querySelector("img,svg,canvas,table"));
 }
 
 function stripMetadataForGemini(sections: ResumeSection[]): ResumeSection[] {

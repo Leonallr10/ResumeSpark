@@ -128,9 +128,9 @@ function PreviewSection({
   return (
     <section className="mb-3 break-inside-avoid">
       {showHeading ? (
-        <div className="mb-1.5 flex items-center gap-2 border-b border-slate-900 pb-[2px]">
+        <div className="mb-1.5 flex items-center gap-3 pb-[2px]">
           <h2
-            className={`text-[0.69rem] font-bold uppercase tracking-normal ${
+            className={`shrink-0 text-[0.69rem] font-bold uppercase leading-none tracking-normal ${
               canNavigateToSection ? "cursor-pointer" : ""
             }`}
             onClick={() =>
@@ -162,6 +162,7 @@ function PreviewSection({
           >
             {section.title}
           </h2>
+          <span className="h-px min-w-6 flex-1 bg-slate-900" aria-hidden />
         </div>
       ) : null}
       <div className="space-y-1">
