@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import {
+  CheckCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -25,10 +26,10 @@ import {
   Plus,
   Sparkles,
   Upload,
+  X,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,6 @@ import { createLatexSuggestionExtension } from "@/components/latex-editor-sugges
 import {
   emptyProjectDraft,
   LatexProjectFields,
-  PROJECT_LIMIT,
 } from "@/components/latex-project-fields";
 import {
   clampPdfZoom,
@@ -116,6 +116,7 @@ export function LatexResumeTailorApp() {
   const editorViewRef = useRef<EditorView | null>(null);
   const [editorPaneWidth, setEditorPaneWidth] = useState(54);
   const [isPaneResizing, setIsPaneResizing] = useState(false);
+  const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
 
   const resumeSections = useMemo(() => parseLatexResume(latexCode), [latexCode]);
   const previewLayout = useMemo(() => derivePreviewLayoutFromLatex(latexCode), [latexCode]);
@@ -228,7 +229,6 @@ export function LatexResumeTailorApp() {
     companyRole.length <= COMPANY_ROLE_LIMIT &&
     jd.trim().length > 0 &&
     jd.length <= JD_LIMIT &&
-    projectForPrompt.length <= PROJECT_LIMIT &&
     !suggesting;
   const canCompilePdf = resumeSections.length > 0 && latexCode.trim().length > 0;
 
@@ -241,6 +241,44 @@ export function LatexResumeTailorApp() {
       return acc;
     }, {});
   }, [suggestions]);
+  const sourceLineById = useMemo(
+    () =>
+      new Map(
+        resumeSections.flatMap((section) =>
+          section.lines.map((line) => [line.id, line.sourceLine] as const),
+        ),
+      ),
+    [resumeSections],
+  );
+  const sourceEndLineById = useMemo(
+    () =>
+      new Map(
+        resumeSections.flatMap((section) =>
+          section.lines.map(
+            (line) => [line.id, line.sourceEndLine ?? line.sourceLine] as const,
+          ),
+        ),
+      ),
+    [resumeSections],
+  );
+  const orderedSuggestions = useMemo(
+    () =>
+      suggestions
+        .map((suggestion) => ({
+          suggestion,
+          sourceLine: sourceLineById.get(suggestion.targetLineId),
+        }))
+        .filter(
+          (entry): entry is { suggestion: AiSuggestion; sourceLine: number } =>
+            typeof entry.sourceLine === "number",
+        )
+        .sort((a, b) => a.sourceLine - b.sourceLine),
+    [sourceLineById, suggestions],
+  );
+  const activeSuggestionIndex = useMemo(
+    () => orderedSuggestions.findIndex((entry) => entry.suggestion.id === activeSuggestionId),
+    [activeSuggestionId, orderedSuggestions],
+  );
 
   const latexSuggestionExtension = useMemo(
     () =>
@@ -250,8 +288,33 @@ export function LatexResumeTailorApp() {
         onAcceptSuggestion: acceptSuggestion,
         onDeclineSuggestion: declineSuggestion,
       }),
-    [resumeSections, suggestionsByLine],
+    [acceptSuggestion, declineSuggestion, resumeSections, suggestionsByLine],
   );
+
+  useEffect(() => {
+    if (orderedSuggestions.length === 0) {
+      setActiveSuggestionId(null);
+      return;
+    }
+
+    if (!orderedSuggestions.some((entry) => entry.suggestion.id === activeSuggestionId)) {
+      setActiveSuggestionId(orderedSuggestions[0].suggestion.id);
+    }
+  }, [activeSuggestionId, orderedSuggestions]);
+
+  useEffect(() => {
+    const activeSuggestion = orderedSuggestions.find(
+      (entry) => entry.suggestion.id === activeSuggestionId,
+    );
+
+    if (!activeSuggestion) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      focusEditorAtSourceLine(activeSuggestion.sourceLine);
+    });
+  }, [activeSuggestionId, focusEditorAtSourceLine, orderedSuggestions]);
 
   const revokePdfPreview = useCallback(() => {
     setPdfFullscreen(false);
@@ -433,43 +496,82 @@ export function LatexResumeTailorApp() {
   }
 
   function acceptSuggestion(suggestion: AiSuggestion) {
-    const restoreEditorView = captureEditorViewPosition(editorViewRef.current);
-    setLatexCode((current) =>
-      applySuggestionToLatex(current, resumeSections, suggestion),
+    const currentIndex = orderedSuggestions.findIndex(
+      (entry) => entry.suggestion.id === suggestion.id,
     );
-    setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+    const nextSuggestion =
+      orderedSuggestions[currentIndex + 1]?.suggestion ??
+      orderedSuggestions[currentIndex - 1]?.suggestion;
+    const sourceLine = sourceLineById.get(suggestion.targetLineId);
+    const sourceEndLine =
+      sourceEndLineById.get(suggestion.targetLineId) ?? sourceLine;
+    const nextLatex = applySuggestionToLatex(latexCode, resumeSections, suggestion);
+    const lineDelta = countLatexLines(nextLatex) - countLatexLines(latexCode);
+
+    setLatexCode(nextLatex);
+    setSuggestions((current) =>
+      retargetSuggestionsAfterAccepted(
+        current,
+        suggestion,
+        typeof sourceLine === "number" && typeof sourceEndLine === "number"
+          ? { sourceLine, sourceEndLine }
+          : undefined,
+        lineDelta,
+      ),
+    );
+    setActiveSuggestionId(nextSuggestion?.id ?? null);
     revokePdfPreview();
-    restoreEditorView();
   }
 
   function declineSuggestion(suggestionId: string) {
-    const restoreEditorView = captureEditorViewPosition(editorViewRef.current);
+    const currentIndex = orderedSuggestions.findIndex(
+      (entry) => entry.suggestion.id === suggestionId,
+    );
+    const nextSuggestion =
+      orderedSuggestions[currentIndex + 1]?.suggestion ??
+      orderedSuggestions[currentIndex - 1]?.suggestion;
+
     setSuggestions((current) => current.filter((item) => item.id !== suggestionId));
-    restoreEditorView();
+    setActiveSuggestionId(nextSuggestion?.id ?? null);
   }
 
-  function acceptAllInSection(sectionId: string) {
-    const sectionSuggestions = suggestions.filter(
-      (suggestion) => suggestion.sectionId === sectionId,
-    );
-
+  function acceptAllSuggestions() {
+    if (orderedSuggestions.length === 0) {
+      return;
+    }
     setLatexCode((current) =>
-      sectionSuggestions.reduce(
+      [...orderedSuggestions].sort((left, right) => right.sourceLine - left.sourceLine).reduce(
         (nextLatex, suggestion) =>
-          applySuggestionToLatex(nextLatex, parseLatexResume(nextLatex), suggestion),
+          applySuggestionToLatex(
+            nextLatex,
+            parseLatexResume(nextLatex),
+            suggestion.suggestion,
+          ),
         current,
       ),
     );
-    setSuggestions((current) =>
-      current.filter((suggestion) => suggestion.sectionId !== sectionId),
-    );
+    setSuggestions([]);
+    setSectionReviews([]);
+    setActiveSuggestionId(null);
     revokePdfPreview();
   }
 
-  function declineAllInSection(sectionId: string) {
-    setSuggestions((current) =>
-      current.filter((suggestion) => suggestion.sectionId !== sectionId),
-    );
+  function declineAllSuggestions() {
+    setSuggestions([]);
+    setSectionReviews([]);
+    setActiveSuggestionId(null);
+  }
+
+  function focusSuggestionAtIndex(index: number) {
+    if (orderedSuggestions.length === 0) {
+      return;
+    }
+
+    const nextIndex =
+      (index + orderedSuggestions.length) % orderedSuggestions.length;
+    const nextSuggestion = orderedSuggestions[nextIndex];
+
+    setActiveSuggestionId(nextSuggestion.suggestion.id);
   }
 
   function updateProjectDraft(project: ProjectDraft) {
@@ -799,21 +901,68 @@ export function LatexResumeTailorApp() {
               } as CSSProperties
             }
           >
-            <div className="min-h-0 border-b lg:h-[var(--workspace-pane-height)] lg:border-b-0 lg:border-r">
-              <div className="flex min-h-[57px] items-center justify-between gap-3 border-b bg-white px-4 py-2">
+            <div className="flex min-h-0 flex-col border-b lg:h-[var(--workspace-pane-height)] lg:border-b-0 lg:border-r">
+              <div className="flex min-h-[57px] flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold">LaTeX source</h2>
                   <p className="truncate text-xs text-muted-foreground">
-                    Edit the .tex content used for preview and export.
+                    {orderedSuggestions.length === 0
+                      ? "No suggested changes"
+                      : `Suggestion ${Math.max(activeSuggestionIndex + 1, 1)} of ${orderedSuggestions.length}`}
                   </p>
                 </div>
-                <Badge variant="secondary" className="shrink-0">
-                  Source
-                </Badge>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8"
+                    onClick={() => focusSuggestionAtIndex(activeSuggestionIndex - 1)}
+                    disabled={orderedSuggestions.length === 0}
+                    aria-label="Previous suggested change"
+                    title="Previous suggested change"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8"
+                    onClick={() => focusSuggestionAtIndex(activeSuggestionIndex + 1)}
+                    disabled={orderedSuggestions.length === 0}
+                    aria-label="Next suggested change"
+                    title="Next suggested change"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                  <span className="mx-1 hidden h-6 w-px bg-border sm:block" />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 px-2.5"
+                    onClick={acceptAllSuggestions}
+                    disabled={orderedSuggestions.length === 0}
+                  >
+                    <CheckCheck className="h-4 w-4" />
+                    Accept all
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2.5"
+                    onClick={declineAllSuggestions}
+                    disabled={orderedSuggestions.length === 0}
+                  >
+                    <X className="h-4 w-4" />
+                    Decline all
+                  </Button>
+                </div>
               </div>
               <CodeMirror
                 value={latexCode}
-                height="calc(var(--workspace-pane-height) - 57px)"
+                height="100%"
                 extensions={[latexLanguage, latexSuggestionExtension]}
                 onCreateEditor={(view) => {
                   editorViewRef.current = view;
@@ -825,7 +974,7 @@ export function LatexResumeTailorApp() {
                   highlightSelectionMatches: true,
                 }}
                 onChange={updateLatex}
-                className="text-sm"
+                className="min-h-0 flex-1 text-sm [&_.cm-editor]:h-full"
               />
             </div>
 
@@ -1243,6 +1392,7 @@ function normalizeProjectDraft(project: unknown): ProjectDraft | undefined {
     heading: normalizeProjectField(record.heading),
     explanation: normalizeProjectField(record.explanation),
     techStack: normalizeProjectField(record.techStack),
+    link: normalizeProjectField(record.link),
     fromDate: normalizeProjectField(record.fromDate),
     toDate: normalizeProjectField(record.toDate),
   };
@@ -1260,29 +1410,65 @@ function isProjectDraftWithContent(
   return Boolean(project);
 }
 
-function captureEditorViewPosition(view: EditorView | null) {
-  if (!view) {
-    return () => {};
-  }
-
-  const selectionHead = view.state.selection.main.head;
-  const scrollTop = view.scrollDOM.scrollTop;
-  const scrollLeft = view.scrollDOM.scrollLeft;
-
-  return () => {
-    window.requestAnimationFrame(() => {
-      const activeView = view;
-
-      if (!activeView) {
-        return;
-      }
-
-      activeView.dispatch({
-        selection: { anchor: Math.min(selectionHead, activeView.state.doc.length) },
-      });
-      activeView.scrollDOM.scrollTop = scrollTop;
-      activeView.scrollDOM.scrollLeft = scrollLeft;
-      activeView.focus();
-    });
-  };
+function countLatexLines(latex: string) {
+  return latex.replace(/\r\n/g, "\n").split("\n").length;
 }
+
+function retargetSuggestionsAfterAccepted(
+  suggestions: AiSuggestion[],
+  acceptedSuggestion: AiSuggestion,
+  acceptedLocation:
+    | {
+        sourceLine: number;
+        sourceEndLine: number;
+      }
+    | undefined,
+  lineDelta: number,
+) {
+  return suggestions.flatMap((suggestion) => {
+    if (suggestion.id === acceptedSuggestion.id) {
+      return [];
+    }
+
+    if (!acceptedLocation || lineDelta === 0) {
+      return [suggestion];
+    }
+
+    const targetSourceLine = getSourceLineFromSuggestionId(suggestion.targetLineId);
+
+    if (typeof targetSourceLine !== "number") {
+      return [suggestion];
+    }
+
+    if (
+      acceptedSuggestion.action === "delete" &&
+      targetSourceLine >= acceptedLocation.sourceLine &&
+      targetSourceLine <= acceptedLocation.sourceEndLine
+    ) {
+      return [];
+    }
+
+    const affectedStartLine =
+      acceptedSuggestion.action === "insert_before"
+        ? acceptedLocation.sourceLine
+        : acceptedLocation.sourceEndLine + 1;
+
+    if (targetSourceLine < affectedStartLine) {
+      return [suggestion];
+    }
+
+    return [
+      {
+        ...suggestion,
+        targetLineId: `line-${Math.max(0, targetSourceLine + lineDelta)}`,
+      },
+    ];
+  });
+}
+
+function getSourceLineFromSuggestionId(targetLineId: string) {
+  const match = targetLineId.match(/^line-(\d+)$/);
+
+  return match ? Number.parseInt(match[1], 10) : undefined;
+}
+

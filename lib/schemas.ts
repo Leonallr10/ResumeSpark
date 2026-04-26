@@ -44,7 +44,7 @@ export const resumeSectionSchema = z.object({
 
 export const suggestionRequestSchema = z.object({
   resumeSections: z.array(resumeSectionSchema).min(1),
-  project: z.string().min(1).max(12000),
+  project: z.string().min(1),
   companyRole: z.string().min(1).max(300),
   jd: z.string().min(1).max(20000),
 });

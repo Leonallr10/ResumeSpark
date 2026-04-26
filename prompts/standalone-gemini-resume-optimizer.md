@@ -23,52 +23,39 @@ Core constraints:
 - Prefer standard ATS-friendly headings and plain bullet formatting.
 - Avoid keyword stuffing, fancy symbols, tables, columns, and decorative formatting.
 
-Step 1: JD Analysis
-- Identify the role type: Frontend, Backend, Fullstack, AI/ML, Data, DevOps, Mobile, Security, or another clear category.
-- Extract and categorize:
-  - Required skills
-  - Preferred skills
-  - Tools and technologies
-  - Experience expectations
-  - Important ATS keywords
+Step 1: Read the JD deeply
+- Extract the core requirements: must-have skills, preferred skills, role type (e.g. ops vs dev vs AI).
+- Identify keywords the recruiter/ATS will scan for.
+- Determine the tone of the company (enterprise, startup, etc.).
 
-Step 2: Gap Analysis
-- Compare the resume and additional projects against the JD.
-- Identify:
-  - Missing skills that are not supported by the provided material
-  - Weakly represented but supported skills
-  - Irrelevant or low-value resume content
-  - ATS keyword gaps that can be truthfully addressed
+Step 2: Audit existing resume
+- Check what is currently present, what is missing, what is misaligned, and what is buried.
+- Look for strong matches that are placed too low and need to be surfaced.
 
-Step 3: Resume Optimization
-- Rewrite the resume as a full one-page version.
-- Prioritize JD-relevant content near the top.
-- Use strong action verbs and STAR-style bullets: situation or scope, action, technical method, result.
-- Improve technical depth, scalability, performance, reliability, product impact, and system-design signal where supported.
-- Keep bullets concise and resume-ready.
+Step 3: Map JD requirements to experience
+- Create an internal mental matrix mapping each JD requirement to where it exists in the candidate's profile (resume and additional projects).
 
-Skills section rules:
-- Reorder skills to match JD priority.
-- Group skills into:
-  Languages | Frameworks | Tools | Databases | AI/ML
-- Omit empty groups.
-- Do not add skills unsupported by the resume or additional projects.
+Step 4: Identify gaps
+- Find things the JD needs that aren't explicitly in the resume, but are supported by the tech stack or context.
+- Do not fabricate—find where the candidate actually did the work but didn't mention it, and surface it.
 
-Experience section rules:
-- Preserve real company names, roles, dates, and locations.
-- Rewrite bullets for clarity, technical specificity, and JD alignment.
-- Add measurable impact only when supported by the input.
-- If a bullet cannot be made relevant or strong, remove or down-prioritize it.
+Step 5: Decide what to keep, cut, reorder, reframe
+- Reorder experience and skills so the strongest JD match comes first.
+- Reframe bullets using JD language (e.g., "incident resolution" instead of "bug fix").
+- Cut anything irrelevant to the role.
+- Replace projects with ones closer to the role domain using the additional project input, if available and stronger.
+
+Step 6: Rewrite with JD keywords embedded
+- Every bullet must answer: "Does this prove I can do what the JD asks?"
+- Weave JD keywords (like SLA, SOP, incident management, fault tolerance) in naturally—do not stuff.
+- Keep bullets concise, using strong action verbs and STAR-style formatting.
+
+Step 7: Single page + no whitespace check
+- Compile the final resume ensuring it fits exactly one dense page.
+- Trim or compress until there are no half-filled lines or dead space.
+- Prefer standard ATS-friendly headings and plain bullet formatting. Avoid decorative formatting.
 
 Projects section rules:
-- Select the most JD-relevant projects.
-- If additional projects are provided, replace weaker resume projects only when the additional project is a stronger JD match.
-- Each project must show:
-  - Problem statement
-  - Tech stack
-  - What the candidate built
-  - Impact, scale, or innovation when supported
-- Do not create fake completed projects.
 - Keep project formatting consistent with this LaTeX template and update all edited/new project entries in the same style:
   - Preferred (for project title + date):
     \resumeProjectHeading{Project Name}{Start -- End}
@@ -86,26 +73,12 @@ Projects section rules:
   - Do not output project bullets outside \resumeItemListStart / \resumeItemListEnd.
   - Preserve existing macro style in the same resume file (if it uses \resumeItemNoBullet, keep using it for projects).
 
-Step 4: Project Enhancement or Suggestions
-- If the JD requires skills not covered by the resume or projects, suggest 1-2 realistic high-impact projects.
-- Label them clearly as suggested future projects, not resume-ready completed work.
-- Include the problem, recommended tech stack, core features, and why it maps to the JD.
-- Prefer enhancing existing projects when that is more truthful than proposing a new one.
-
-Step 5: ATS Optimization
-- Inject JD keywords naturally where evidence supports them.
-- Use standard section headings:
-  Summary, Skills, Experience, Projects, Education, Certifications
-- Keep formatting clean, readable, and ATS-friendly.
-- If the resume output is in LaTeX, preserve existing custom commands/macros and keep project blocks syntactically valid.
-
 Return output in this exact structure:
 
-1. JD Analysis
-2. Gap Analysis
-3. Optimized Resume
-4. Suggested / Replaced Projects
-5. Key Improvements Summary
+1. JD Analysis (Step 1 findings)
+2. Audit & Gap Analysis (Steps 2-4 findings)
+3. Optimized Resume (Step 7 compiled output)
+4. Key Improvements Summary (Explanation of cuts, reorders, and reframes)
 
 When writing "3. Optimized Resume":
 - If input resume is LaTeX, return the optimized resume in LaTeX.

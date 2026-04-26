@@ -105,12 +105,14 @@ function buildResumeTailorPrompt(input: SuggestionRequest) {
   return `
 You are an expert Technical Recruiter, Senior Software Engineer, and Resume Strategist. Tailor the uploaded resume for the target company, role, and job description while keeping the output compatible with this app's inline LaTeX suggestion workflow.
 
-Work internally before writing JSON:
-1. Classify the role type such as Frontend, Backend, Fullstack, AI/ML, Data, DevOps, Mobile, or Security.
-2. Extract required skills, preferred skills, tools, technologies, seniority expectations, and ATS keywords from the JD.
-3. Compare those requirements against the resume and extra project input.
-4. Select only high-impact edits that improve ATS match, recruiter readability, technical specificity, project relevance, or concision.
-5. Convert that analysis into line-level suggestions only. Do not include the analysis, a full rewritten resume, markdown, explanations outside JSON, or any extra response fields.
+Work internally using this 7-step logic before writing JSON:
+Step 1: Read the JD deeply to extract core requirements (must-have skills, preferred skills, role type, keywords, tone).
+Step 2: Audit existing resume to check what's present, missing, misaligned, or buried.
+Step 3: Map JD requirements to experience by creating a mental matrix of where JD needs exist in the profile.
+Step 4: Identify gaps by finding where the candidate actually did the required work but didn't mention it (no fabricating).
+Step 5: Decide what to keep, cut, reorder, or reframe (e.g., reframing bullets using JD language, cutting irrelevant info, replacing projects).
+Step 6: Rewrite with JD keywords embedded naturally so every edit proves the candidate can do what the JD asks.
+Step 7: Compress and finalize into concise line-level suggestions only, favoring one-page density and lines that use the full row naturally. Do not include the analysis, a full rewritten resume, markdown, explanations outside JSON, or any extra response fields.
 
 Truthfulness and evidence rules:
 - Return valid JSON only. Do not wrap it in markdown.
@@ -127,6 +129,7 @@ Suggestion quality rules:
 - Prioritize JD-critical content near the top of the resume when the existing structure allows it.
 - Prefer strong action verbs and STAR-style impact: action, technical method, result.
 - Keep each bullet focused on one achievement, system, feature, or measurable outcome.
+- For one-page resumes, avoid half-empty generic lines. Merge short supported details into fuller one-line or two-line bullets without making them bloated.
 - Prefer concrete engineering language over generic recruiter phrases.
 - Reorder skill text to match JD priority when editing a skills row.
 - Remove or replace duplicated, vague, or low-relevance content when a stronger supported line exists.
@@ -149,6 +152,8 @@ App compatibility rules:
   PROJECT | heading: Project Name | dates: Jan 2026 -- Apr 2026 | tech: React, Node.js | detail: One concise resume bullet
 - Do not use the PROJECT format outside the Projects section.
 - For projects, keep current projects if they fit. If not, add a project only from the extra project input.
+- To replace a weak project with a stronger JD-matched project, target a bullet inside the weaker Projects entry with action replace and use the PROJECT format above. Choose replacements from extra project input only.
+- Prefer project replacements when the JD asks for backend APIs, relational databases, Django/Flask/FastAPI, authentication, testing, Docker, Kubernetes, or distributed systems and the existing project is less relevant than a supported extra project.
 - sectionReviews must include only sections that have actionable suggestions. Do not return "strong" reviews for unchanged sections.
 - Keep reason and jdMatchReason short, specific, and useful. reason explains resume quality impact; jdMatchReason names the JD requirement or keyword match.
 
@@ -225,7 +230,8 @@ function filterInvalidTargets(response: SuggestionResponse, input: SuggestionReq
       (suggestion.action === "delete" ||
         suggestion.action === "insert_before" ||
         suggestion.action === "insert_after" ||
-        looksLikeBulletText(suggestion.suggestedText))
+        (looksLikeBulletText(suggestion.suggestedText) &&
+          !looksLikeProjectSuggestion(suggestion.suggestedText)))
     ) {
       return false;
     }
@@ -252,6 +258,10 @@ function filterInvalidTargets(response: SuggestionResponse, input: SuggestionReq
       return suggestedSections.has(review.sectionId);
     }),
   };
+}
+
+function looksLikeProjectSuggestion(value: string) {
+  return value.trim().toLowerCase().startsWith("project |");
 }
 
 function looksLikeBulletText(value: string) {

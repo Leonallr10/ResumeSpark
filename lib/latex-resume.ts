@@ -5,6 +5,7 @@ export type ProjectDraft = {
   heading: string;
   explanation: string;
   techStack: string;
+  link: string;
   fromDate: string;
   toDate: string;
 };
@@ -165,6 +166,7 @@ export function formatProjectInput(project: ProjectDraft) {
       ? `Project explanation: ${project.explanation.trim()}`
       : "",
     project.techStack.trim() ? `Tech stack: ${project.techStack.trim()}` : "",
+    project.link.trim() ? `Link: ${project.link.trim()}` : "",
     project.fromDate.trim() || project.toDate.trim()
       ? `Dates: ${formatProjectDateRange(project)}`
       : "",
@@ -205,9 +207,24 @@ export function buildProjectLatexBlock(
   const explanation = escapeLatexText(project.explanation.trim());
   const techStack = escapeLatexText(stripTechStackLabel(project.techStack));
   const dateRange = escapeLatexText(formatProjectDateRange(project));
+  const link = normalizeProjectLink(project.link);
+  const headingWithLink = buildHeadingWithLink(heading, link);
   const techStackLine = options?.useTechStackCommand
     ? `  \\techstack{${techStack}}`
     : `    \\resumeItem{\\textbf{Tech Stack:} ${techStack}}`;
+
+  if (link) {
+    const subheadingTechStack = options?.useTechStackCommand
+      ? `\\techstack{${techStack}}`
+      : `Tech Stack: ${techStack}`;
+
+    return [
+      `  \\resumeSubheading{${headingWithLink}}{${dateRange}}{${subheadingTechStack}}{}`,
+      "  \\resumeItemListStart",
+      `    \\resumeItemNoBullet{${explanation}}`,
+      "  \\resumeItemListEnd",
+    ].join("\n");
+  }
 
   return [
     `  \\resumeProjectHeading{${heading}}{${dateRange}}`,
@@ -308,6 +325,19 @@ export function applySuggestionToLatex(
   }
 
   if (suggestion.action === "replace") {
+    const targetSection = sections.find((section) =>
+      section.lines.some((line) => line.id === suggestion.targetLineId),
+    );
+    const projectSuggestion = parseProjectSuggestion(
+      stripSuggestionBullet(suggestion.suggestedText),
+    );
+
+    if (targetSection?.title.toLowerCase().includes("project") && projectSuggestion) {
+      return replaceProjectBlockInLatex(lines, targetIndex, projectSuggestion, {
+        useTechStackCommand,
+      }).join("\n");
+    }
+
     lines.splice(
       targetIndex,
       targetLength,
@@ -628,6 +658,7 @@ function cleanLatexText(value: string) {
     .replace(/\\\\/g, " | ")
     .replace(/\$?\s*\|\s*\$?/g, " | ")
     .replace(/\\href(?:\[[^\]]*\])?\{[^}]*\}\{([^}]*)\}/g, "$1")
+    .replace(/\\textcolor\{[^{}]*\}\{([^{}]*)\}/g, "$1")
     .replace(/\\(?:textbf|textit|emph|small|large|Large|LARGE|huge|Huge|techstack)\{([^{}]*)\}/g, "$1")
     .replace(/\\(?:textbackslash|textasciitilde|textasciicircum)\{\}/g, "")
     .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?/g, "")
@@ -750,6 +781,7 @@ function createInsertedLatexLine(
       heading: projectSuggestion.heading,
       explanation: projectSuggestion.detail,
       techStack: projectSuggestion.tech,
+      link: "",
       fromDate: projectSuggestion.dates,
       toDate: "",
     }, options);
@@ -840,6 +872,25 @@ function stripTechStackLabel(value: string) {
   return value.replace(/^tech stack\s*:\s*/i, "").trim();
 }
 
+function normalizeProjectLink(value: string) {
+  const normalized = value.trim().replace(/\s+/g, "");
+  return normalized;
+}
+
+function buildHeadingWithLink(heading: string, link: string) {
+  if (!link) {
+    return heading;
+  }
+
+  const escapedUrl = escapeLatexHref(link);
+
+  return `${heading}\\hspace{0.1cm} \\textcolor{blue}{\\href{${escapedUrl}}{Demo}}`;
+}
+
+function escapeLatexHref(value: string) {
+  return value.replace(/\\/g, "/").replace(/([%#{}])/g, "\\$1");
+}
+
 function shouldUseTechStackCommand(latex: string) {
   return /\\(?:re)?newcommand\{\\techstack\}/.test(latex) || /\\techstack\{/.test(latex);
 }
@@ -889,6 +940,87 @@ function findProjectInsertionIndex(lines: string[], targetIndex: number) {
   }
 
   return targetIndex + 1;
+}
+
+function replaceProjectBlockInLatex(
+  lines: string[],
+  targetIndex: number,
+  projectSuggestion: NonNullable<ReturnType<typeof parseProjectSuggestion>>,
+  options?: { useTechStackCommand?: boolean },
+) {
+  const projectStartIndex = findProjectBlockStart(lines, targetIndex);
+
+  if (projectStartIndex === -1) {
+    lines.splice(
+      targetIndex,
+      1,
+      buildProjectLatexBlock(
+        {
+          heading: projectSuggestion.heading,
+          explanation: projectSuggestion.detail,
+          techStack: projectSuggestion.tech,
+          link: "",
+          fromDate: projectSuggestion.dates,
+          toDate: "",
+        },
+        options,
+      ),
+    );
+    return lines;
+  }
+
+  const projectEndIndex = findProjectBlockEnd(lines, projectStartIndex);
+  const replacementBlock = buildProjectLatexBlock(
+    {
+      heading: projectSuggestion.heading,
+      explanation: projectSuggestion.detail,
+      techStack: projectSuggestion.tech,
+      link: "",
+      fromDate: projectSuggestion.dates,
+      toDate: "",
+    },
+    options,
+  );
+
+  lines.splice(
+    projectStartIndex,
+    Math.max(1, projectEndIndex - projectStartIndex),
+    replacementBlock,
+  );
+
+  return lines;
+}
+
+function findProjectBlockStart(lines: string[], targetIndex: number) {
+  for (let index = targetIndex; index >= 0; index -= 1) {
+    const trimmed = lines[index].trim();
+
+    if (/^\\section\*?\{/.test(trimmed)) {
+      return -1;
+    }
+
+    if (/^\\(?:resumeSubheading|resumeProjectHeading)\b/.test(trimmed)) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function findProjectBlockEnd(lines: string[], projectStartIndex: number) {
+  for (let index = projectStartIndex + 1; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+
+    if (
+      /^\\(?:resumeSubheading|resumeProjectHeading)\b/.test(trimmed) ||
+      /^\\section\*?\{/.test(trimmed) ||
+      trimmed === "\\resumeSubHeadingListEnd"
+    ) {
+      return index;
+    }
+  }
+
+  return lines.length;
 }
 
 function slugify(value: string) {

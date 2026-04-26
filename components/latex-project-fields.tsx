@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Save, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,11 @@ import {
   type ProjectDraft,
 } from "@/lib/latex-resume";
 
-export const PROJECT_LIMIT = 12000;
-
 export const emptyProjectDraft: ProjectDraft = {
   heading: "",
   explanation: "",
   techStack: "",
+  link: "",
   fromDate: "",
   toDate: "",
 };
@@ -50,7 +49,10 @@ export function LatexProjectFields({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
 
-  const activeProjects = projects.length > 0 ? projects : [project];
+  const activeProjects = useMemo(
+    () => (projects.length > 0 ? projects : [project]),
+    [projects, project],
+  );
   const selectedProject = activeProjects[selectedProjectIndex] ?? emptyProjectDraft;
 
   useEffect(() => {
@@ -137,7 +139,6 @@ export function LatexProjectFields({
     );
   }
 
-  const projectLength = formatProjectsInput(activeProjects).length;
   const insertProjectCount = activeProjects.filter(canInsertProject).length;
   const canSaveProjects = activeProjects.some(hasProjectDraftContent);
   const canDeleteProject =
@@ -266,6 +267,11 @@ export function LatexProjectFields({
             onChange={(event) => updateField("techStack", event.target.value)}
             placeholder="Tech stack, for example React, Node.js, MongoDB"
           />
+          <Input
+            value={selectedProject.link}
+            onChange={(event) => updateField("link", event.target.value)}
+            placeholder="Project link (optional)"
+          />
           <div className="grid grid-cols-2 gap-2">
             <Input
               value={selectedProject.fromDate}
@@ -293,6 +299,7 @@ export function LatexProjectFields({
       "heading": "AI Resume Analyzer",
       "explanation": "Built a resume scoring workflow with LLM feedback and keyword matching.",
       "techStack": "Next.js, TypeScript, FastAPI, PostgreSQL",
+      "link": "https://github.com/example/ai-resume-analyzer",
       "fromDate": "Jan 2026",
       "toDate": "Apr 2026"
     },
@@ -300,6 +307,7 @@ export function LatexProjectFields({
       "heading": "Portfolio CMS",
       "explanation": "Built a content dashboard for publishing case studies and project pages.",
       "techStack": "Next.js, MongoDB, Tailwind CSS",
+      "link": "https://portfolio.example.com",
       "fromDate": "May 2026",
       "toDate": "Jun 2026"
     }
@@ -320,14 +328,7 @@ export function LatexProjectFields({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className={`text-xs ${
-            projectLength > PROJECT_LIMIT ? "text-destructive" : "text-muted-foreground"
-          }`}
-        >
-          {projectLength.toLocaleString()} / {PROJECT_LIMIT.toLocaleString()}
-        </span>
+      <div className="flex items-center justify-end gap-2">
         <div className="flex flex-wrap justify-end gap-2">
           <Button
             type="button"
@@ -442,6 +443,7 @@ function readProjectFromRecord(value: unknown): ProjectDraft | undefined {
       record.explanation ?? record.role ?? record.summary ?? description,
     ),
     techStack: readJsonString(record.techStack ?? record.tech_stack ?? record.stack),
+    link: readJsonString(record.link ?? record.url ?? record.projectUrl ?? record.project_url),
     fromDate: readJsonString(
       record.fromDate ?? record.from_date ?? dates?.from ?? dates?.start,
     ),
