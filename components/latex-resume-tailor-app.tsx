@@ -114,6 +114,8 @@ export function LatexResumeTailorApp() {
   const previewPaneRef = useRef<HTMLDivElement>(null);
   const paneGridRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
+  const acceptSuggestionRef = useRef<(suggestion: AiSuggestion) => void>(() => {});
+  const declineSuggestionRef = useRef<(suggestionId: string) => void>(() => {});
   const [editorPaneWidth, setEditorPaneWidth] = useState(54);
   const [isPaneResizing, setIsPaneResizing] = useState(false);
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
@@ -285,10 +287,10 @@ export function LatexResumeTailorApp() {
       createLatexSuggestionExtension({
         sections: resumeSections,
         suggestionsByLine,
-        onAcceptSuggestion: acceptSuggestion,
-        onDeclineSuggestion: declineSuggestion,
+        onAcceptSuggestion: (suggestion) => acceptSuggestionRef.current(suggestion),
+        onDeclineSuggestion: (suggestionId) => declineSuggestionRef.current(suggestionId),
       }),
-    [acceptSuggestion, declineSuggestion, resumeSections, suggestionsByLine],
+    [resumeSections, suggestionsByLine],
   );
 
   useEffect(() => {
@@ -534,6 +536,9 @@ export function LatexResumeTailorApp() {
     setSuggestions((current) => current.filter((item) => item.id !== suggestionId));
     setActiveSuggestionId(nextSuggestion?.id ?? null);
   }
+
+  acceptSuggestionRef.current = acceptSuggestion;
+  declineSuggestionRef.current = declineSuggestion;
 
   function acceptAllSuggestions() {
     if (orderedSuggestions.length === 0) {
@@ -1471,4 +1476,3 @@ function getSourceLineFromSuggestionId(targetLineId: string) {
 
   return match ? Number.parseInt(match[1], 10) : undefined;
 }
-
