@@ -29,17 +29,19 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!process.env.GEMINI_API_KEY) {
+  const resolvedApiKey = parsedRequest.data.apiKey?.trim() || process.env.GEMINI_API_KEY;
+
+  if (!resolvedApiKey) {
     return NextResponse.json(
-      { error: "Missing GEMINI_API_KEY in .env.local." },
+      { error: "Missing Gemini API key. Add it in settings or .env.local." },
       { status: 500 },
     );
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey: resolvedApiKey });
     const prompt = buildResumeTailorPrompt(parsedRequest.data);
-    const result = await generateWithRetry(ai, prompt);
+    const result = await generateWithRetry(ai, prompt, parsedRequest.data.model);
 
     const parsedGemini = parseGeminiJson(result.text ?? "");
     const validatedResponse = suggestionResponseSchema.parse(parsedGemini);
@@ -276,11 +278,18 @@ function looksLikeBulletText(value: string) {
   );
 }
 
-async function generateWithRetry(ai: GoogleGenAI, prompt: string) {
+async function generateWithRetry(
+  ai: GoogleGenAI,
+  prompt: string,
+  preferredModel?: string,
+) {
   const delaysMs = [1200, 2500];
   let lastRetryableOrQuotaError: unknown;
+  const modelsToTry = preferredModel
+    ? [preferredModel, ...GEMINI_SUGGESTION_MODELS.filter((model) => model !== preferredModel)]
+    : [...GEMINI_SUGGESTION_MODELS];
 
-  for (const model of GEMINI_SUGGESTION_MODELS) {
+  for (const model of modelsToTry) {
     for (let attempt = 0; attempt <= delaysMs.length; attempt += 1) {
       try {
         return await ai.models.generateContent({

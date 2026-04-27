@@ -25,9 +25,12 @@ import {
   Minus,
   Plus,
   Sparkles,
+  Settings2,
+  KeyRound, 
   Upload,
   X,
 } from "lucide-react";
+
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -73,6 +76,7 @@ import type {
 const COMPANY_ROLE_LIMIT = 300;
 const JD_LIMIT = 20000;
 const PROJECT_CACHE_KEY = "resume-tailor-projects-v1";
+const GEMINI_SETTINGS_CACHE_KEY = "resume-tailor-gemini-settings-v1";
 const WORKSPACE_PANE_HEIGHT = "clamp(560px, calc(100vh - 190px), 820px)";
 const MIN_EDITOR_PANE_WIDTH = 34;
 const MAX_EDITOR_PANE_WIDTH = 68;
@@ -85,6 +89,11 @@ type CompilerStatus = {
   available: boolean;
   compiler: string | null;
   message: string;
+};
+
+type GeminiSettings = {
+  apiKey: string;
+  model: string;
 };
 
 export function LatexResumeTailorApp() {
@@ -110,6 +119,9 @@ export function LatexResumeTailorApp() {
   const [compilerStatus, setCompilerStatus] = useState<CompilerStatus | null>(null);
   const [checkingCompiler, setCheckingCompiler] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [geminiSettingsOpen, setGeminiSettingsOpen] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [geminiModel, setGeminiModel] = useState("gemini-2.5-flash");
   const previewRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
   const paneGridRef = useRef<HTMLDivElement>(null);
@@ -150,6 +162,17 @@ export function LatexResumeTailorApp() {
       setProjectDraft(cachedProjects[0]);
       setProjectDrafts(cachedProjects);
     }
+  }, []);
+
+  useEffect(() => {
+    const cachedGeminiSettings = readCachedGeminiSettings();
+
+    if (!cachedGeminiSettings) {
+      return;
+    }
+
+    setGeminiApiKey(cachedGeminiSettings.apiKey);
+    setGeminiModel(cachedGeminiSettings.model);
   }, []);
 
   useEffect(() => {
@@ -471,6 +494,8 @@ export function LatexResumeTailorApp() {
           project: projectForPrompt,
           companyRole,
           jd,
+          model: geminiModel.trim(),
+          apiKey: geminiApiKey.trim(),
         }),
       });
 
@@ -820,6 +845,66 @@ export function LatexResumeTailorApp() {
           onClose={() => setPdfFullscreen(false)}
         />
       ) : null}
+      {geminiSettingsOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-xl">
+            <div className="mb-4">
+              <h2 className="text-base font-semibold">Gemini settings</h2>
+              <p className="text-sm text-muted-foreground">
+                Choose a model and save API key locally in this browser.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="geminiModel">Model</Label>
+                <select
+                  id="geminiModel"
+                  value={geminiModel}
+                  onChange={(event) => setGeminiModel(event.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-flash-latest">gemini-flash-latest</option>
+                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="geminiApiKey">Gemini API key</Label>
+                <Input
+                  id="geminiApiKey"
+                  type="password"
+                  value={geminiApiKey}
+                  onChange={(event) => setGeminiApiKey(event.target.value)}
+                  placeholder="AIza..."
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setGeminiSettingsOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  const nextSettings: GeminiSettings = {
+                    model: geminiModel.trim() || "gemini-2.5-flash",
+                    apiKey: geminiApiKey.trim(),
+                  };
+
+                  setGeminiModel(nextSettings.model);
+                  setGeminiApiKey(nextSettings.apiKey);
+                  writeCachedGeminiSettings(nextSettings);
+                  setGeminiSettingsOpen(false);
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="mx-auto flex min-h-screen max-w-[1760px] flex-col items-stretch gap-5 px-4 py-5 xl:flex-row">
         <section className="flex w-full min-w-0 flex-1 flex-col rounded-md border bg-white">
           <div className="flex flex-col gap-3 border-b bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
@@ -830,6 +915,14 @@ export function LatexResumeTailorApp() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-2"
+                onClick={() => setGeminiSettingsOpen(true)}
+              >
+                <KeyRound className="h-4 w-4" />
+              </Button>
               <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-muted">
                 <input
                   type="file"
@@ -1360,6 +1453,51 @@ function readCachedProjectDrafts() {
   } catch {
     return [];
   }
+}
+
+function readCachedGeminiSettings(): GeminiSettings | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  try {
+    const cachedValue = window.localStorage.getItem(GEMINI_SETTINGS_CACHE_KEY);
+
+    if (!cachedValue) {
+      return undefined;
+    }
+
+    const parsed = JSON.parse(cachedValue) as unknown;
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return undefined;
+    }
+
+    const record = parsed as { apiKey?: unknown; model?: unknown };
+    const apiKey = typeof record.apiKey === "string" ? record.apiKey : "";
+    const model =
+      typeof record.model === "string" && record.model.trim().length > 0
+        ? record.model
+        : "gemini-2.5-flash";
+
+    return { apiKey, model };
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCachedGeminiSettings(settings: GeminiSettings) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(
+    GEMINI_SETTINGS_CACHE_KEY,
+    JSON.stringify({
+      apiKey: settings.apiKey,
+      model: settings.model,
+    }),
+  );
 }
 
 function writeCachedProjectDrafts(projects: ProjectDraft[]) {

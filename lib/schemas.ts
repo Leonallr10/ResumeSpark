@@ -47,6 +47,8 @@ export const suggestionRequestSchema = z.object({
   project: z.string().min(1),
   companyRole: z.string().min(1).max(300),
   jd: z.string().min(1).max(20000),
+  model: z.string().min(1).max(120).optional(),
+  apiKey: z.string().min(1).max(500).optional(),
 });
 
 export const aiSuggestionSchema = z.object({
