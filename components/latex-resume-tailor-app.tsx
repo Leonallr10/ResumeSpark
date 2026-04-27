@@ -843,7 +843,7 @@ export function LatexResumeTailorApp() {
                   <Upload className="h-4 w-4" />
                 )}
               </label>
-              <Button
+              {/* <Button
                 type="button"
                 variant={viewMode === "pdf" ? "default" : "outline"}
                 onClick={renderPdfPreview}
@@ -854,7 +854,7 @@ export function LatexResumeTailorApp() {
                 ) : (
                   <FileText className="h-4 w-4" />
                 )}
-              </Button>
+              </Button> */}
               <Button type="button" variant="outline" onClick={downloadLatexSource}>
                 <Code2 className="h-4 w-4" />
               </Button>
@@ -907,64 +907,64 @@ export function LatexResumeTailorApp() {
             }
           >
             <div className="flex min-h-0 flex-col border-b lg:h-[var(--workspace-pane-height)] lg:border-b-0 lg:border-r">
-              <div className="flex min-h-[57px] flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2">
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">LaTeX source</h2>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {orderedSuggestions.length === 0
-                      ? "No suggested changes"
-                      : `Suggestion ${Math.max(activeSuggestionIndex + 1, 1)} of ${orderedSuggestions.length}`}
-                  </p>
+              {orderedSuggestions.length > 0 ? (
+                <div className="flex min-h-[57px] flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-sm font-semibold">LaTeX source</h2>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {`Suggestion ${Math.max(activeSuggestionIndex + 1, 1)} of ${orderedSuggestions.length}`}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7"
+                      onClick={() => focusSuggestionAtIndex(activeSuggestionIndex - 1)}
+                      disabled={orderedSuggestions.length === 0}
+                      aria-label="Previous suggested change"
+                      title="Previous suggested change"
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7"
+                      onClick={() => focusSuggestionAtIndex(activeSuggestionIndex + 1)}
+                      disabled={orderedSuggestions.length === 0}
+                      aria-label="Next suggested change"
+                      title="Next suggested change"
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={acceptAllSuggestions}
+                      disabled={orderedSuggestions.length === 0}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" />
+                      Accept all
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={declineAllSuggestions}
+                      disabled={orderedSuggestions.length === 0}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Decline all
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    onClick={() => focusSuggestionAtIndex(activeSuggestionIndex - 1)}
-                    disabled={orderedSuggestions.length === 0}
-                    aria-label="Previous suggested change"
-                    title="Previous suggested change"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    onClick={() => focusSuggestionAtIndex(activeSuggestionIndex + 1)}
-                    disabled={orderedSuggestions.length === 0}
-                    aria-label="Next suggested change"
-                    title="Next suggested change"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                  <span className="mx-1 hidden h-6 w-px bg-border sm:block" />
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 px-2.5"
-                    onClick={acceptAllSuggestions}
-                    disabled={orderedSuggestions.length === 0}
-                  >
-                    <CheckCheck className="h-4 w-4" />
-                    Accept all
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 px-2.5"
-                    onClick={declineAllSuggestions}
-                    disabled={orderedSuggestions.length === 0}
-                  >
-                    <X className="h-4 w-4" />
-                    Decline all
-                  </Button>
-                </div>
-              </div>
+              ) : null}
               <CodeMirror
                 value={latexCode}
                 height="100%"
