@@ -6,7 +6,6 @@ import CodeMirror from "@uiw/react-codemirror";
 import {
   type ChangeEvent,
   type CSSProperties,
-  type WheelEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -84,6 +83,7 @@ const WORKSPACE_PANE_HEIGHT = "clamp(560px, calc(100vh - 190px), 820px)";
 const MIN_EDITOR_PANE_WIDTH = 34;
 const MAX_EDITOR_PANE_WIDTH = 68;
 const PDF_ZOOM_STEP = 10;
+const PREVIEW_WHEEL_ZOOM_STEP = 1;
 const latexLanguage = StreamLanguage.define(stex);
 
 type ViewMode = "preview" | "pdf";
@@ -127,6 +127,7 @@ export function LatexResumeTailorApp() {
   const [geminiModel, setGeminiModel] = useState("gemini-1.5-pro");
   const previewRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
   const paneGridRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const acceptSuggestionRef = useRef<(suggestion: AiSuggestion) => void>(() => {});
@@ -225,16 +226,57 @@ export function LatexResumeTailorApp() {
     [previewPageCount, scrollToPreviewPage],
   );
 
-  const handlePreviewWheelZoom = useCallback((event: WheelEvent<HTMLDivElement>) => {
-    // Trackpad pinch zoom usually emits wheel events with Ctrl/Cmd pressed.
-    if (!event.ctrlKey && !event.metaKey) {
+  useEffect(() => {
+    const element = previewScrollRef.current;
+
+    if (!element) {
       return;
     }
 
-    event.preventDefault();
-    const zoomDirection = event.deltaY < 0 ? 1 : -1;
-    setPreviewZoom((current) => clampPdfZoom(current + zoomDirection * PDF_ZOOM_STEP));
-  }, []);
+    const handleNativeWheel = (event: globalThis.WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+
+      // Prevent browser/page zoom while pinching inside preview pane.
+      event.preventDefault();
+      const previousZoom = previewZoom;
+      const zoomDirection = event.deltaY < 0 ? 1 : -1;
+      const nextZoom = clampPdfZoom(previousZoom + zoomDirection * PREVIEW_WHEEL_ZOOM_STEP);
+
+      if (nextZoom === previousZoom) {
+        return;
+      }
+
+      const bounds = element.getBoundingClientRect();
+      const pointerX = event.clientX - bounds.left;
+      const pointerY = event.clientY - bounds.top;
+      const previousScrollLeft = element.scrollLeft;
+      const previousScrollTop = element.scrollTop;
+      const zoomRatio = nextZoom / previousZoom;
+
+      setPreviewZoom(nextZoom);
+
+      window.requestAnimationFrame(() => {
+        const scrollContainer = previewScrollRef.current;
+
+        if (!scrollContainer) {
+          return;
+        }
+
+        scrollContainer.scrollLeft =
+          (previousScrollLeft + pointerX) * zoomRatio - pointerX;
+        scrollContainer.scrollTop =
+          (previousScrollTop + pointerY) * zoomRatio - pointerY;
+      });
+    };
+
+    element.addEventListener("wheel", handleNativeWheel, { passive: false });
+
+    return () => {
+      element.removeEventListener("wheel", handleNativeWheel);
+    };
+  }, [previewZoom]);
 
   const focusEditorAtSourceLine = useCallback((zeroBasedLineNumber: number) => {
     const view = editorViewRef.current;
@@ -1384,9 +1426,9 @@ export function LatexResumeTailorApp() {
                     <PdfPreview pdfUrl={pdfUrl} rendering={renderingPdf} zoom={previewZoom} />
                   ) : (
                     <div
+                      ref={previewScrollRef}
                       className="h-full overflow-x-auto overflow-y-scroll px-3 py-4"
                       style={{ scrollbarGutter: "stable both-edges" }}
-                      onWheel={handlePreviewWheelZoom}
                     >
                       <ResumePreview
                         ref={previewRef}

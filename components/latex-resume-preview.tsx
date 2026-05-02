@@ -36,7 +36,7 @@ export const ResumePreview = forwardRef<HTMLDivElement, ResumePreviewProps>(
             <div
               key={page.id}
               data-preview-page={index + 1}
-              className="flex justify-start"
+              className="flex justify-center"
               style={{ height: `${layout.pageHeightPx * zoomScale}px` }}
             >
               <div
@@ -45,7 +45,7 @@ export const ResumePreview = forwardRef<HTMLDivElement, ResumePreviewProps>(
                   width: `${layout.pageWidthPx}px`,
                   height: `${layout.pageHeightPx}px`,
                   transform: `scale(${zoomScale})`,
-                  transformOrigin: "top left",
+                  transformOrigin: "top center",
                 }}
               >
                 <div
