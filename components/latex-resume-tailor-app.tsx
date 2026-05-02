@@ -121,7 +121,7 @@ export function LatexResumeTailorApp() {
   const [error, setError] = useState<string | null>(null);
   const [geminiSettingsOpen, setGeminiSettingsOpen] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState("");
-  const [geminiModel, setGeminiModel] = useState("gemini-2.5-flash");
+  const [geminiModel, setGeminiModel] = useState("gemini-1.5-pro");
   const previewRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
   const paneGridRef = useRef<HTMLDivElement>(null);
@@ -880,10 +880,9 @@ export function LatexResumeTailorApp() {
                   onChange={(event) => setGeminiModel(event.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                  <option value="gemini-flash-latest">gemini-flash-latest</option>
-                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                  <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro (Recommended)</option>
+                  <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro Latest</option>
+                  <option value="gemini-pro">Gemini Pro 1.0 (Legacy)</option>
                 </select>
               </div>
               <div className="space-y-1.5">
