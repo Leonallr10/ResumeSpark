@@ -9,7 +9,8 @@ const A4_PAGE_HEIGHT_PX = 1122.5;
 const DEFAULT_A4_MARGIN_PX = 96;
 const MIN_PREVIEW_MARGIN_PX = 28;
 const MIN_PREVIEW_VERTICAL_MARGIN_PX = 20;
-const PAGE_BREAK_TOLERANCE_PX = 28;
+/** Allow fitting a bit past the estimator so pagination matches tighter browser layout. */
+const PAGE_BREAK_TOLERANCE_PX = 40;
 
 type ResumePreviewProps = {
   pages: PaginatedPreviewPage[];
@@ -333,7 +334,8 @@ export function paginateResumeSections(
       return;
     }
 
-    const sectionHeadingHeight = 26;
+    /** Matches section heading row (~0.69rem + rule + mb-1.5) in `PreviewSection`. */
+    const sectionHeadingHeight = 22;
     let headingRendered = false;
     let chunkLines: ResumeLine[] = [];
 
@@ -392,30 +394,38 @@ function estimatePreviewLineHeight(line: ResumeLine, layout: PreviewLayoutProfil
   const wrappedRows = estimateWrappedRows(
     mainText,
     line.kind === "bullet" ? bodyWidth - 16 : bodyWidth,
+    6.2,
   );
 
+  /** ~11px text, leading 1.3 → ~14.3px; keep slightly conservative for bullets/grid. */
+  const bodyRowHeightPx = 14;
+
   if (line.kind === "bullet") {
-    return wrappedRows * 15 + 4;
+    return wrappedRows * bodyRowHeightPx + 2;
   }
 
   if (line.kind === "projectHeading" || line.kind === "subheading") {
     const secondaryRows = line.secondaryText
-      ? estimateWrappedRows(line.secondaryText, bodyWidth - 10)
+      ? estimateWrappedRows(line.secondaryText, bodyWidth - 10, 5.2)
       : 0;
-    return 18 + secondaryRows * 12 + 5;
+    return 16 + secondaryRows * 12 + 3;
   }
 
-  return wrappedRows * 15 + 4;
+  return wrappedRows * bodyRowHeightPx + 2;
 }
 
-function estimateWrappedRows(text: string, availableWidthPx: number) {
+function estimateWrappedRows(
+  text: string,
+  availableWidthPx: number,
+  avgCharWidthPx: number = 6.2,
+) {
   const clean = text.trim();
 
   if (!clean) {
     return 1;
   }
 
-  const charsPerRow = Math.max(20, Math.floor(availableWidthPx / 5.6));
+  const charsPerRow = Math.max(20, Math.floor(availableWidthPx / avgCharWidthPx));
   return Math.max(1, Math.ceil(clean.length / charsPerRow));
 }
 
