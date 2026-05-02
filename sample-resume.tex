@@ -1,0 +1,221 @@
+
+\documentclass[a4paper,10.5pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks,unicode,pdfpagelabels=false]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{multicol}
+% Text-based icon replacements
+\newcommand{\faPhone}{{\small\textbf{T}}}
+\newcommand{\faEnvelope}{{\small\textbf{E}}}
+\newcommand{\faLinkedin}{{\small\textbf{in}}}
+\newcommand{\faGithub}{{\small\textbf{GH}}}
+\newcommand{\faLaptopCode}{{\small\textbf{W}}}
+\newcommand{\faFile}{[cert]}
+\newcommand{\faYoutube}{[video]}
+\newcommand{\faLink}{[link]}
+\input{glyphtounicode}
+
+% ---------------- Layout ----------------
+% A4 = 210mm x 297mm. Target: 0.3in symmetric margins top/bottom, 0.28in left/right.
+\addtolength{\oddsidemargin}{-0.74in}
+\addtolength{\evensidemargin}{-0.375in}
+\addtolength{\textwidth}{1.2in}
+\addtolength{\topmargin}{-0.8in}
+\addtolength{\textheight}{1.75in}
+\setlength{\footskip}{4.08pt}
+\setlength{\headsep}{0pt}
+\setlength{\headheight}{0pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\urlstyle{rm}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+\setlength{\parskip}{0pt}
+
+% ---------------- Section Formatting ----------------
+\titleformat{\section}
+  {\vspace{-4pt}\scshape\raggedright\large}
+  {}
+  {0pt}
+  {}
+  [\color{black}\titlerule\vspace{-4pt}]
+
+\titlespacing*{\section}
+  {0pt}
+  {0pt}
+  {0pt}
+
+
+% ---------------- Custom Commands ----------------
+
+\newcommand{\resumeItemNoBullet}[1]{%
+  \item \small #1 \vspace{-2pt}
+}
+
+\newcommand{\resumeSubheading}[4]{%
+  \item
+  \begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+    \textbf{#1} & #2 \\
+    \textit{#3} & \textit{#4} \\
+  \end{tabular*}\vspace{-4pt}
+}
+
+\newcommand{\resumeSubItem}[2]{%
+  \item \small \textbf{#1}: #2 \vspace{-2pt}
+}
+
+\newcommand{\resumeSubHeadingListStart}{%
+  \begin{itemize}[leftmargin=0.15in, label={}, itemsep=0pt, topsep=0pt, parsep=0pt, partopsep=0pt]
+}
+
+\newcommand{\resumeSubHeadingListEnd}{%
+  \end{itemize}\vspace{-4pt}
+}
+
+% Tight version for achievements (no bullet content under entries)
+\newcommand{\resumeAchievementListStart}{%
+  \begin{itemize}[leftmargin=0.15in, label={}, itemsep=0pt, topsep=0pt, parsep=0pt, partopsep=0pt]
+}
+
+\newcommand{\resumeAchievementListEnd}{%
+  \end{itemize}\vspace{-4pt}
+}
+
+\newcommand{\resumeItemListStart}{%
+  \begin{itemize}[leftmargin=0.25in, label=\textbullet, itemsep=0pt, topsep=0pt, parsep=0pt, partopsep=0pt]
+}
+
+\newcommand{\resumeItemListEnd}{%
+  \end{itemize}\vspace{-4pt}
+}
+
+\newcommand{\techstack}[1]{\small #1 \vspace{-2pt}}
+
+% Compact achievement entry (single line, no subtitle rows)
+\newcommand{\achievementEntry}[3]{%
+  \item
+  \begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+    \textbf{#1} \hspace{0.1cm} #3 & \small #2 \\
+  \end{tabular*}\vspace{-4pt}
+}
+
+% ---------------- Document ----------------
+\begin{document}
+
+% ---------------- Header ----------------
+\begin{center}
+  {\Huge \scshape Leonal Robin} \\ \vspace{1pt}
+  Dindigul, Tamil Nadu, India \\ \vspace{1pt}
+  \small
+  \ +91 8248731433 \quad
+  {\ leonalrobinlr10@gmail.com} \quad
+  {\ https://www.linkedin.com/in/leonal-robin-47b681284/} \quad
+  {\ https://github.com/Leonallr10} \quad
+  {\ https://leonalrobin.vercel.app/}
+\end{center}\vspace{-6pt}
+
+% ---------------- Summary ----------------
+\section{Summary}
+\resumeSubHeadingListStart
+\resumeItemNoBullet{Computer Science and Engineering graduate with strong expertise in Web and AI development. Recently finished  a Front-end Engineer in an R\&D environment at Flam, building scalable web applications and AI-powered interactive media solutions. National-level Hackathon Winner with a proven ability to solve real-world problems through innovative, collaborative engineering.}
+\resumeSubHeadingListEnd
+
+% ---------------- Skills ----------------
+\section{Skills Summary}
+\resumeSubHeadingListStart
+\resumeSubItem{Programming Languages}{Python, JavaScript, TypeScript, SQL}
+\resumeSubItem{Frameworks \& Libraries}{React.js, Next.js, Node.js, Django, Flask, FastAPI, RAG, LLM, Langchain, FastAPI, Databricks}
+\resumeSubItem{Tools \& Technologies}{Tailwind CSS, MySQL, PostgreSQL, Pinecone, FAISS, Firebase, AWS, MongoDB, Git, Jira}
+\resumeSubHeadingListEnd
+
+% ---------------- Experience ----------------
+\section{Experience}
+\resumeSubHeadingListStart
+
+\resumeSubheading
+{Flam \textbar{} Front-End Engineer (R\&D) Intern}{Bangalore, karnataka, India}
+{NextJs, TypeScript, TailwindCSS, GitHub}{Aug 2025 -- Mar 2026}
+\resumeItemListStart
+  \resumeItemNoBullet{Built a Remotion-powered video editor with timeline-based sync for text, images, videos, and GLB overlays.}
+  \resumeItemNoBullet{Engineered a Mastra + OpenAI function-calling pipeline enabling prompt-driven AI control over canvas state, overlay sequencing, and with image-to-video generation so users could produce animated outputs through NLP commands.
+}
+\resumeItemNoBullet{Introduced advanced video editing capabilities including gizmo controls, layer masking, text shaping, and timeline-based keyframe animation with a professional-grade editing experience within a fully browser-based Remotion composition engine.}
+  \resumeItemNoBullet{Engineered a grouped QR scanning system that bundles multiple related AR experiences under a single scan.}
+  \resumeItemNoBullet{Built a full-featured AR experience dashboard enabling creation, organization, and publishing of image and ground-tracking experiences—with intuitive editing controls, asset management, and live preview for streamlined content workflows.}
+\resumeItemListEnd
+
+\resumeSubheading
+{MANNIT \textbar{} SDE Intern}{Chennai, Tamil nadu, India}
+{ReactJs, TypeScript, LLMs, VectorDB, Flask, Langchain, FastAPI}{Feb 2025 -- Jul 2025}
+\resumeItemListStart
+  \resumeItemNoBullet{Architected an admin-driven vector database pipeline with automatic category generation and dynamic user-specific data isolation, enabling real-time category reflection that scales with data growth without any hardcoded configuration.}
+  \resumeItemNoBullet{Resolved Pinecone API quota limits by engineering a hybrid FAISS local indexing layer with in-memory storage, achieving 3--5x faster similarity search and reducing query latency from several seconds down to milliseconds.}
+  \resumeItemNoBullet{ Built PostgreSQL-backed authentication with chat history persistence and admin dashboard for embedding management}
+  \resumeItemNoBullet{Developed an OAuth-authenticated GitHub app that reads user repositories and delivers AI-powered code reviews covering quality improvements, architectural explanations, refactoring suggestions and auto-generated Mermaid flowcharts }
+  \resumeItemNoBullet{Engineered scalable codebase analysis for 10,000+ file repos via AST parsing, smart filtering, and batched async processing.
+}
+\resumeItemListEnd
+
+\resumeSubheading
+{Telesto Energy \textbar{} SDE Intern}{Coimbatore, Tamil Nadu, India}
+{Django, SQL, Node.js, PlotlyJS, MySQL, Jira, REST}{Feb 2025 -- Jul 2025}
+\resumeItemListStart
+  \resumeItemNoBullet{Developed and optimized REST APIs using Node.js to ingest and serve large-scale real-time energy datasets with low latency.}
+  \resumeItemNoBullet{Normalized and built MySQL schemas to improve query performance and data integrity across energy monitoring pipelines.}
+ \resumeItemNoBullet{Integrated ML models into the data pipeline to enable predictive analytics on energy consumption patterns; automated model inference on incoming data streams and surfaced actionable insights through interactive PlotlyJS dashboards.}
+\resumeItemNoBullet{Built a responsive Django web interface with real-time data visualizations using PlotlyJS, enabling users to monitor live energy metrics, analyze historical usage trends, and make data-driven decisions through an intuitive UI.}
+\resumeItemListEnd
+% ---------------- Projects ----------------
+\section{Projects}
+\resumeSubHeadingListStart
+
+% \resumeSubheading
+% {Gate Opening System  \hspace{0.1cm} \textcolor{blue}{\href{https://github.com/Leonallr10/gate-opening-system-computer-vision-}{\textit{\small GitHub}}}}{July 2024 - September 2024}
+% {\small Python (OpenCV, face-recognition), cvzone, Firebase, Raspberry Pi Pico}{}
+% \resumeItemListStart
+%   \resumeItemNoBullet{Engineered a computer vision-based security system that integrates advanced \textbf{facial recognition} algorithms with \textbf{IoT hardware} for automated gate access, achieving a 95\% detection accuracy and reducing false alarms by 30\%.}
+%   \resumeItemNoBullet{Leveraged keyframe extraction, optical flow analysis, and \textbf{image processing }to process up to 20 frames per second, ensuring real-time dynamic gate control.}
+% \resumeItemListEnd
+
+\resumeSubheading
+{Fake News Detection\hspace{0.1cm} \textcolor{blue}{\href{https://drive.google.com/file/d/1P3h2ZsxuLq73YD2gYXsldPL2EQDdx1wp/view?usp=drive_link}{\textit{\small Certificate}}}  \hspace{0.1cm} \textcolor{blue}{\href{https://www.canva.com/design/DAGj5KQbtaM/FLAo9ZgrF_3S8h_EoTGfQQ/edit?utm_content=DAGj5KQbtaM&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton}{\textit{\small Demo}}}}{Nov 2024 -- Jan 2025}
+{\techstack{ReactJs, TailwindCSS, Flask, GitHub, AWS, LLM}}{}
+\resumeItemListStart
+  \resumeItemNoBullet{Architected a real-time fact-checking UI integrating OCR pipelines and multimodal AI models (CLIP, GPT-2, Whisper) to analyze uploaded images, text, and video to detect misinformation with 85\% accuracy across diverse media formats.}
+  \resumeItemNoBullet{Extended the detection pipeline to support live and recorded media inputs including YouTube URL, and article URLs—enabling automated misinformation flagging across dynamic web content without requiring manual media uploads.}
+  \resumeItemNoBullet{Implemented real-time predictions; recognized among 5000+ participants at the \textbf{Truth Tell Hackathon}.}
+\resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
+% ---------------- Education ----------------
+\section{Education}
+\resumeSubHeadingListStart
+\resumeSubheading
+{Amrita Vishwa Vidyapeetham}{Coimbatore, India}
+{Bachelor of Technology in Computer Science and Engineering}{Sep 2021 -- May 2025}
+\resumeSubHeadingListEnd
+
+% ---------------- Achievements ----------------
+\section{Achievements and Activities}
+\begin{itemize}[leftmargin=0.25in, label=\textbullet, itemsep=0pt, topsep=0pt, parsep=0pt, partopsep=0pt]
+  \item \small \textbf{NASA Space App Challenge} (Oct 2024) — Seismic Data from Apollo and Mars InSight Missions
+  \item \small \textbf{ANSAN -- GDSC Project} (Jan 2024) — Google Solutions Challenge India Regional Bootcamp
+  \item \small \textbf{Pragyan '23 -- National Winner} (Mar 2023) — National Level Hackathon at NIT Trichy
+\end{itemize}
+
+\end{document}

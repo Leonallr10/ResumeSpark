@@ -204,14 +204,14 @@ export function buildProjectLatexBlock(
   options?: { useTechStackCommand?: boolean },
 ) {
   const heading = escapeLatexText(project.heading.trim());
-  const explanation = escapeLatexText(project.explanation.trim());
+  const bullets = splitExplanationIntoBullets(project.explanation.trim());
   const techStack = escapeLatexText(stripTechStackLabel(project.techStack));
   const dateRange = escapeLatexText(formatProjectDateRange(project));
   const link = normalizeProjectLink(project.link);
   const headingWithLink = buildHeadingWithLink(heading, link);
   const techStackLine = options?.useTechStackCommand
-    ? `  \\techstack{${techStack}}`
-    : `    \\resumeItem{\\textbf{Tech Stack:} ${techStack}}`;
+    ? `\\techstack{${techStack}}`
+    : `  \\resumeItem{\\textbf{Tech Stack:} ${techStack}}`;
 
   if (link) {
     const subheadingTechStack = options?.useTechStackCommand
@@ -219,20 +219,37 @@ export function buildProjectLatexBlock(
       : `Tech Stack: ${techStack}`;
 
     return [
-      `  \\resumeSubheading{${headingWithLink}}{${dateRange}}{${subheadingTechStack}}{}`,
-      "  \\resumeItemListStart",
-      `    \\resumeItemNoBullet{${explanation}}`,
-      "  \\resumeItemListEnd",
+      `\\resumeSubheading{${headingWithLink}}{${dateRange}}{${subheadingTechStack}}{}`,
+      "\\resumeItemListStart",
+      ...bullets.map((b) => `  \\resumeItemNoBullet{${escapeLatexText(b)}}`),
+      "\\resumeItemListEnd",
     ].join("\n");
   }
 
   return [
-    `  \\resumeProjectHeading{${heading}}{${dateRange}}`,
-    "  \\resumeItemListStart",
-    `    \\resumeItem{${explanation}}`,
+    `\\resumeProjectHeading{${heading}}{${dateRange}}`,
+    "\\resumeItemListStart",
+    ...bullets.map((b) => `  \\resumeItem{${escapeLatexText(b)}}`),
     techStackLine,
-    "  \\resumeItemListEnd",
+    "\\resumeItemListEnd",
   ].join("\n");
+}
+
+function splitExplanationIntoBullets(explanation: string): string[] {
+  if (explanation.includes(";;")) {
+    return explanation.split(";;").map((b) => b.trim()).filter(Boolean);
+  }
+
+  const newlineSplit = explanation
+    .split(/\n/)
+    .map((line) => line.replace(/^[-•*]\s*/, "").replace(/^\d+\.\s*/, "").trim())
+    .filter(Boolean);
+
+  if (newlineSplit.length > 1) {
+    return newlineSplit;
+  }
+
+  return [explanation];
 }
 
 export function insertProjectIntoLatex(latex: string, project: ProjectDraft) {
@@ -328,14 +345,17 @@ export function applySuggestionToLatex(
     const targetSection = sections.find((section) =>
       section.lines.some((line) => line.id === suggestion.targetLineId),
     );
-    const projectSuggestion = parseProjectSuggestion(
-      stripSuggestionBullet(suggestion.suggestedText),
-    );
+    const strippedText = stripSuggestionBullet(suggestion.suggestedText);
+    const projectSuggestion = parseProjectSuggestion(strippedText);
 
     if (targetSection?.title.toLowerCase().includes("project") && projectSuggestion) {
       return replaceProjectBlockInLatex(lines, targetIndex, projectSuggestion, {
         useTechStackCommand,
       }).join("\n");
+    }
+
+    if (isProjectReplacementFormat(strippedText)) {
+      return latex;
     }
 
     lines.splice(
@@ -657,9 +677,9 @@ function cleanLatexText(value: string) {
     .replace(/\\(?:textbar)\{\}/g, "|")
     .replace(/\\\\/g, " | ")
     .replace(/\$?\s*\|\s*\$?/g, " | ")
-    .replace(/\\href(?:\[[^\]]*\])?\{[^}]*\}\{([^}]*)\}/g, "$1")
-    .replace(/\\textcolor\{[^{}]*\}\{([^{}]*)\}/g, "$1")
-    .replace(/\\(?:textbf|textit|emph|small|large|Large|LARGE|huge|Huge|techstack)\{([^{}]*)\}/g, "$1")
+    .replace(/\\textcolor\{[^{}]*\}/g, "")
+    .replace(/\\href(?:\[[^\]]*\])?\{(?:[^{}]|\{[^{}]*\})*\}\{((?:[^{}]|\{[^{}]*\})*)\}/g, "$1")
+    .replace(/\\(?:textbf|textit|emph|small|large|Large|LARGE|huge|Huge|techstack)\{((?:[^{}]|\{[^{}]*\})*)\}/g, "$1")
     .replace(/\\(?:textbackslash|textasciitilde|textasciicircum)\{\}/g, "")
     .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?/g, "")
     .replace(/\\([&%$#_{}])/g, "$1")
@@ -781,7 +801,7 @@ function createInsertedLatexLine(
       heading: projectSuggestion.heading,
       explanation: projectSuggestion.detail,
       techStack: projectSuggestion.tech,
-      link: "",
+      link: projectSuggestion.link,
       fromDate: projectSuggestion.dates,
       toDate: "",
     }, options);
@@ -831,30 +851,40 @@ function splitSuggestedLabelValue(value: string) {
 }
 
 function parseProjectSuggestion(value: string) {
-  if (!value.trim().toLowerCase().startsWith("project |")) {
+  if (!/^project\s*\|/i.test(value.trim())) {
     return undefined;
   }
 
-  const fields = value
-    .split("|")
-    .slice(1)
-    .map((part) => part.trim())
-    .reduce<Record<string, string>>((acc, part) => {
-      const separatorIndex = part.indexOf(":");
+  const afterPrefix = value.trim().replace(/^project\s*\|\s*/i, "");
+  const parts = afterPrefix.split("|");
+  const fields: Record<string, string> = {};
 
-      if (separatorIndex === -1) {
-        return acc;
-      }
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i].trim();
+    const separatorIndex = part.indexOf(":");
 
-      const key = part.slice(0, separatorIndex).trim().toLowerCase();
-      const fieldValue = part.slice(separatorIndex + 1).trim();
+    if (separatorIndex === -1) {
+      continue;
+    }
 
-      if (key && fieldValue) {
-        acc[key] = fieldValue;
-      }
+    const key = part.slice(0, separatorIndex).trim().toLowerCase();
 
-      return acc;
-    }, {});
+    if (key === "detail") {
+      // detail is always the last field and may contain | characters in bullet text
+      const detailValue = [
+        part.slice(separatorIndex + 1),
+        ...parts.slice(i + 1),
+      ].join("|").trim();
+      fields.detail = detailValue;
+      break;
+    }
+
+    const fieldValue = part.slice(separatorIndex + 1).trim();
+
+    if (key && fieldValue) {
+      fields[key] = fieldValue;
+    }
+  }
 
   if (!fields.heading || !fields.detail || !fields.tech) {
     return undefined;
@@ -865,7 +895,17 @@ function parseProjectSuggestion(value: string) {
     dates: fields.dates ?? "",
     tech: fields.tech,
     detail: fields.detail,
+    link: fields.link ?? "",
   };
+}
+
+function isProjectReplacementFormat(text: string) {
+  const normalized = text.trim().toLowerCase();
+  return (
+    /^project\s*\|/.test(normalized) &&
+    normalized.includes("heading:") &&
+    normalized.includes("detail:")
+  );
 }
 
 function stripTechStackLabel(value: string) {
@@ -883,8 +923,19 @@ function buildHeadingWithLink(heading: string, link: string) {
   }
 
   const escapedUrl = escapeLatexHref(link);
+  const linkText = inferLinkText(link);
 
-  return `${heading}\\hspace{0.1cm} \\textcolor{blue}{\\href{${escapedUrl}}{Demo}}`;
+  return `${heading}\\hspace{0.1cm} \\textcolor{blue}{\\href{${escapedUrl}}{\\textit{\\small ${linkText}}}}`;
+}
+
+function inferLinkText(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes("github.com") || lower.includes("github.io")) return "GitHub";
+  if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "Video";
+  if (lower.includes("drive.google.com")) return "Certificate";
+  if (lower.includes("vercel.app") || lower.includes("netlify.app") || lower.includes("herokuapp.com")) return "Live";
+  if (lower.includes("canva.com") || lower.includes("figma.com")) return "Demo";
+  return "Link";
 }
 
 function escapeLatexHref(value: string) {
@@ -959,7 +1010,7 @@ function replaceProjectBlockInLatex(
           heading: projectSuggestion.heading,
           explanation: projectSuggestion.detail,
           techStack: projectSuggestion.tech,
-          link: "",
+          link: projectSuggestion.link,
           fromDate: projectSuggestion.dates,
           toDate: "",
         },
@@ -975,7 +1026,7 @@ function replaceProjectBlockInLatex(
       heading: projectSuggestion.heading,
       explanation: projectSuggestion.detail,
       techStack: projectSuggestion.tech,
-      link: "",
+      link: projectSuggestion.link,
       fromDate: projectSuggestion.dates,
       toDate: "",
     },

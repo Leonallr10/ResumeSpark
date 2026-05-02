@@ -569,17 +569,34 @@ export function LatexResumeTailorApp() {
     if (orderedSuggestions.length === 0) {
       return;
     }
-    setLatexCode((current) =>
-      [...orderedSuggestions].sort((left, right) => right.sourceLine - left.sourceLine).reduce(
-        (nextLatex, suggestion) =>
-          applySuggestionToLatex(
-            nextLatex,
-            parseLatexResume(nextLatex),
-            suggestion.suggestion,
-          ),
-        current,
-      ),
-    );
+    setLatexCode((current) => {
+      const sorted = [...orderedSuggestions].sort((left, right) => {
+        if (left.sourceLine !== right.sourceLine) {
+          return right.sourceLine - left.sourceLine;
+        }
+        const actionPriority = (action: string) =>
+          action === "replace" ? 0 : action === "insert_after" ? 1 : action === "insert_before" ? 2 : 3;
+        return actionPriority(left.suggestion.action) - actionPriority(right.suggestion.action);
+      });
+
+      const replaces = sorted.filter((s) => s.suggestion.action === "replace");
+      const inserts = sorted.filter(
+        (s) => s.suggestion.action === "insert_before" || s.suggestion.action === "insert_after",
+      );
+      const deletes = sorted.filter((s) => s.suggestion.action === "delete");
+
+      let result = current;
+      for (const entry of replaces) {
+        result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
+      }
+      for (const entry of inserts) {
+        result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
+      }
+      for (const entry of deletes) {
+        result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
+      }
+      return result;
+    });
     setSuggestions([]);
     setSectionReviews([]);
     setActiveSuggestionId(null);
@@ -1588,6 +1605,16 @@ function retargetSuggestionsAfterAccepted(
       targetSourceLine >= acceptedLocation.sourceLine &&
       targetSourceLine <= acceptedLocation.sourceEndLine
     ) {
+      if (suggestion.action === "insert_after" || suggestion.action === "insert_before") {
+        const retargetLine = Math.max(0, acceptedLocation.sourceLine - 1);
+        return [
+          {
+            ...suggestion,
+            action: "insert_after" as const,
+            targetLineId: `line-${retargetLine}`,
+          },
+        ];
+      }
       return [];
     }
 
