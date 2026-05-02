@@ -6,6 +6,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import {
   type ChangeEvent,
   type CSSProperties,
+  type WheelEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -26,7 +27,9 @@ import {
   Plus,
   Sparkles,
   Settings2,
-  KeyRound, 
+  KeyRound,
+  Redo2,
+  Undo2,
   Upload,
   X,
 } from "lucide-react";
@@ -131,6 +134,24 @@ export function LatexResumeTailorApp() {
   const [editorPaneWidth, setEditorPaneWidth] = useState(54);
   const [isPaneResizing, setIsPaneResizing] = useState(false);
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const latestLatexRef = useRef(latexCode);
+  const isApplyingHistoryRef = useRef(false);
+  const pastLatexRef = useRef<string[]>([]);
+  const futureLatexRef = useRef<string[]>([]);
+  const preTypingBaselineRef = useRef<string | null>(null);
+  const typingIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const LATEX_HISTORY_DEBOUNCE_MS = 450;
+
+  latestLatexRef.current = latexCode;
+
+  const { canUndoLatex, canRedoLatex } = useMemo(
+    () => ({
+      canUndoLatex: pastLatexRef.current.length > 0,
+      canRedoLatex: futureLatexRef.current.length > 0,
+    }),
+    [historyVersion],
+  );
 
   const resumeSections = useMemo(() => parseLatexResume(latexCode), [latexCode]);
   const previewLayout = useMemo(() => derivePreviewLayoutFromLatex(latexCode), [latexCode]);
@@ -203,6 +224,17 @@ export function LatexResumeTailorApp() {
     },
     [previewPageCount, scrollToPreviewPage],
   );
+
+  const handlePreviewWheelZoom = useCallback((event: WheelEvent<HTMLDivElement>) => {
+    // Trackpad pinch zoom usually emits wheel events with Ctrl/Cmd pressed.
+    if (!event.ctrlKey && !event.metaKey) {
+      return;
+    }
+
+    event.preventDefault();
+    const zoomDirection = event.deltaY < 0 ? 1 : -1;
+    setPreviewZoom((current) => clampPdfZoom(current + zoomDirection * PDF_ZOOM_STEP));
+  }, []);
 
   const focusEditorAtSourceLine = useCallback((zeroBasedLineNumber: number) => {
     const view = editorViewRef.current;
@@ -435,7 +467,111 @@ export function LatexResumeTailorApp() {
     };
   }, [isPaneResizing]);
 
-  function updateLatex(value: string) {
+  useEffect(
+    () => () => {
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  function bumpLatexHistory() {
+    setHistoryVersion((current) => current + 1);
+  }
+
+  function commitLatexHistoryBeforeEdit(previousSnapshot: string) {
+    pastLatexRef.current.push(previousSnapshot);
+    futureLatexRef.current = [];
+    bumpLatexHistory();
+  }
+
+  function cancelTypingHistoryDebounce(options?: { flushPending?: boolean }) {
+    if (typingIdleTimerRef.current) {
+      clearTimeout(typingIdleTimerRef.current);
+      typingIdleTimerRef.current = null;
+    }
+    const baseline = preTypingBaselineRef.current;
+    preTypingBaselineRef.current = null;
+    if (
+      options?.flushPending &&
+      baseline !== null &&
+      baseline !== latestLatexRef.current
+    ) {
+      commitLatexHistoryBeforeEdit(baseline);
+    }
+  }
+
+  function undoLatex() {
+    if (pastLatexRef.current.length === 0) {
+      return;
+    }
+
+    cancelTypingHistoryDebounce({ flushPending: true });
+    const previous = pastLatexRef.current.pop()!;
+    futureLatexRef.current.push(latestLatexRef.current);
+    isApplyingHistoryRef.current = true;
+    setLatexCode(previous);
+    setSuggestions([]);
+    setSectionReviews([]);
+    revokePdfPreview();
+    isApplyingHistoryRef.current = false;
+    latestLatexRef.current = previous;
+    bumpLatexHistory();
+  }
+
+  function redoLatex() {
+    if (futureLatexRef.current.length === 0) {
+      return;
+    }
+
+    cancelTypingHistoryDebounce({ flushPending: true });
+    const next = futureLatexRef.current.pop()!;
+    pastLatexRef.current.push(latestLatexRef.current);
+    isApplyingHistoryRef.current = true;
+    setLatexCode(next);
+    setSuggestions([]);
+    setSectionReviews([]);
+    revokePdfPreview();
+    isApplyingHistoryRef.current = false;
+    latestLatexRef.current = next;
+    bumpLatexHistory();
+  }
+
+  function replaceLatexContent(value: string, options?: { recordHistory?: boolean }) {
+    cancelTypingHistoryDebounce({ flushPending: true });
+    if (options?.recordHistory && value !== latestLatexRef.current) {
+      commitLatexHistoryBeforeEdit(latestLatexRef.current);
+    }
+    isApplyingHistoryRef.current = true;
+    setLatexCode(value);
+    setSuggestions([]);
+    setSectionReviews([]);
+    revokePdfPreview();
+    isApplyingHistoryRef.current = false;
+    latestLatexRef.current = value;
+  }
+
+  function handleLatexEditorChange(value: string) {
+    if (!isApplyingHistoryRef.current) {
+      if (preTypingBaselineRef.current === null) {
+        preTypingBaselineRef.current = latestLatexRef.current;
+      }
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+      }
+      typingIdleTimerRef.current = setTimeout(() => {
+        typingIdleTimerRef.current = null;
+        const baseline = preTypingBaselineRef.current;
+        preTypingBaselineRef.current = null;
+        const latest = latestLatexRef.current;
+        if (baseline !== null && baseline !== latest) {
+          commitLatexHistoryBeforeEdit(baseline);
+        }
+      }, LATEX_HISTORY_DEBOUNCE_MS);
+    }
+
+    latestLatexRef.current = value;
     setLatexCode(value);
     setSuggestions([]);
     setSectionReviews([]);
@@ -452,7 +588,7 @@ export function LatexResumeTailorApp() {
     setLoadingFile(true);
 
     try {
-      updateLatex(await file.text());
+      replaceLatexContent(await file.text(), { recordHistory: true });
       setViewMode("preview");
     } catch (uploadError) {
       setError(
@@ -532,9 +668,14 @@ export function LatexResumeTailorApp() {
     const sourceLine = sourceLineById.get(suggestion.targetLineId);
     const sourceEndLine =
       sourceEndLineById.get(suggestion.targetLineId) ?? sourceLine;
-    const nextLatex = applySuggestionToLatex(latexCode, resumeSections, suggestion);
-    const lineDelta = countLatexLines(nextLatex) - countLatexLines(latexCode);
+    const currentLatex = latestLatexRef.current;
+    const currentSections = parseLatexResume(currentLatex);
+    cancelTypingHistoryDebounce({ flushPending: true });
+    commitLatexHistoryBeforeEdit(currentLatex);
+    const nextLatex = applySuggestionToLatex(currentLatex, currentSections, suggestion);
+    const lineDelta = countLatexLines(nextLatex) - countLatexLines(currentLatex);
 
+    isApplyingHistoryRef.current = true;
     setLatexCode(nextLatex);
     setSuggestions((current) =>
       retargetSuggestionsAfterAccepted(
@@ -548,6 +689,8 @@ export function LatexResumeTailorApp() {
     );
     setActiveSuggestionId(nextSuggestion?.id ?? null);
     revokePdfPreview();
+    isApplyingHistoryRef.current = false;
+    latestLatexRef.current = nextLatex;
   }
 
   function declineSuggestion(suggestionId: string) {
@@ -569,38 +712,46 @@ export function LatexResumeTailorApp() {
     if (orderedSuggestions.length === 0) {
       return;
     }
-    setLatexCode((current) => {
-      const sorted = [...orderedSuggestions].sort((left, right) => {
-        if (left.sourceLine !== right.sourceLine) {
-          return right.sourceLine - left.sourceLine;
-        }
-        const actionPriority = (action: string) =>
-          action === "replace" ? 0 : action === "insert_after" ? 1 : action === "insert_before" ? 2 : 3;
-        return actionPriority(left.suggestion.action) - actionPriority(right.suggestion.action);
-      });
 
-      const replaces = sorted.filter((s) => s.suggestion.action === "replace");
-      const inserts = sorted.filter(
-        (s) => s.suggestion.action === "insert_before" || s.suggestion.action === "insert_after",
-      );
-      const deletes = sorted.filter((s) => s.suggestion.action === "delete");
+    cancelTypingHistoryDebounce({ flushPending: true });
 
-      let result = current;
-      for (const entry of replaces) {
-        result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
+    const sorted = [...orderedSuggestions].sort((left, right) => {
+      if (left.sourceLine !== right.sourceLine) {
+        return right.sourceLine - left.sourceLine;
       }
-      for (const entry of inserts) {
-        result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
-      }
-      for (const entry of deletes) {
-        result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
-      }
-      return result;
+      const actionPriority = (action: string) =>
+        action === "replace" ? 0 : action === "insert_after" ? 1 : action === "insert_before" ? 2 : 3;
+      return actionPriority(left.suggestion.action) - actionPriority(right.suggestion.action);
     });
+
+    const replaces = sorted.filter((s) => s.suggestion.action === "replace");
+    const inserts = sorted.filter(
+      (s) => s.suggestion.action === "insert_before" || s.suggestion.action === "insert_after",
+    );
+    const deletes = sorted.filter((s) => s.suggestion.action === "delete");
+
+    let result = latestLatexRef.current;
+    for (const entry of replaces) {
+      commitLatexHistoryBeforeEdit(result);
+      result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
+    }
+    for (const entry of inserts) {
+      commitLatexHistoryBeforeEdit(result);
+      result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
+    }
+    for (const entry of deletes) {
+      commitLatexHistoryBeforeEdit(result);
+      result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
+    }
+
+    isApplyingHistoryRef.current = true;
+    setLatexCode(result);
     setSuggestions([]);
     setSectionReviews([]);
     setActiveSuggestionId(null);
     revokePdfPreview();
+    isApplyingHistoryRef.current = false;
+    latestLatexRef.current = result;
   }
 
   function declineAllSuggestions() {
@@ -647,7 +798,9 @@ export function LatexResumeTailorApp() {
       return;
     }
 
-    updateLatex(insertProjectsIntoLatex(latexCode, insertableProjects));
+    replaceLatexContent(insertProjectsIntoLatex(latexCode, insertableProjects), {
+      recordHistory: true,
+    });
     persistProjectDrafts([]);
   }
 
@@ -1087,7 +1240,7 @@ export function LatexResumeTailorApp() {
                   highlightActiveLine: true,
                   highlightSelectionMatches: true,
                 }}
-                onChange={updateLatex}
+                onChange={handleLatexEditorChange}
                 className="min-h-0 flex-1 text-sm [&_.cm-editor]:h-full"
               />
             </div>
@@ -1168,6 +1321,31 @@ export function LatexResumeTailorApp() {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                      onClick={undoLatex}
+                      disabled={!canUndoLatex}
+                      aria-label="Undo LaTeX edit"
+                      title="Undo LaTeX edit"
+                    >
+                      <Undo2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                      onClick={redoLatex}
+                      disabled={!canRedoLatex}
+                      aria-label="Redo LaTeX edit"
+                      title="Redo LaTeX edit"
+                    >
+                      <Redo2 className="h-4 w-4" />
+                    </Button>
+                    <span className="mx-1 h-6 w-px bg-slate-600" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
                       className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
                       onClick={() =>
                         setPreviewZoom((current) => clampPdfZoom(current - PDF_ZOOM_STEP))
@@ -1208,6 +1386,7 @@ export function LatexResumeTailorApp() {
                     <div
                       className="h-full overflow-x-auto overflow-y-scroll px-3 py-4"
                       style={{ scrollbarGutter: "stable both-edges" }}
+                      onWheel={handlePreviewWheelZoom}
                     >
                       <ResumePreview
                         ref={previewRef}
