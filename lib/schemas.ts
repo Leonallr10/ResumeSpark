@@ -42,11 +42,14 @@ export const resumeSectionSchema = z.object({
   lines: z.array(resumeLineSchema),
 });
 
+const llmProviderSchema = z.enum(["gemini", "groq", "claude"]).default("gemini");
+
 export const suggestionRequestSchema = z.object({
   resumeSections: z.array(resumeSectionSchema).min(1),
   project: z.string().min(1),
   companyRole: z.string().min(1).max(300),
   jd: z.string().min(1).max(20000),
+  provider: llmProviderSchema,
   model: z.string().min(1).max(120).optional(),
   apiKey: z.string().min(1).max(500).optional(),
 });
@@ -76,6 +79,7 @@ export const suggestionResponseSchema = z.object({
 export const polishRequestSchema = z.object({
   text: z.string().min(1).max(5000),
   action: z.enum(["improve", "elaborate", "professional", "concise", "quantify"]),
+  provider: llmProviderSchema,
   model: z.string().min(1).max(120).optional(),
   apiKey: z.string().min(1).max(500).optional(),
 });

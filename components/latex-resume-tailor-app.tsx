@@ -71,6 +71,7 @@ import { getDownloadFilename, sanitizeFilename } from "@/lib/resume";
 import { EditorView } from "@codemirror/view";
 import type {
   AiSuggestion,
+  LlmProvider,
   PolishAction,
   PolishState,
   ResumeSection,
@@ -81,7 +82,8 @@ import type {
 const COMPANY_ROLE_LIMIT = 300;
 const JD_LIMIT = 20000;
 const PROJECT_CACHE_KEY = "resume-tailor-projects-v1";
-const GEMINI_SETTINGS_CACHE_KEY = "resume-tailor-gemini-settings-v1";
+const LLM_SETTINGS_CACHE_KEY = "resume-tailor-llm-settings-v1";
+const LEGACY_GEMINI_SETTINGS_KEY = "resume-tailor-gemini-settings-v1";
 const WORKSPACE_PANE_HEIGHT = "clamp(560px, calc(100vh - 190px), 820px)";
 const MIN_EDITOR_PANE_WIDTH = 34;
 const MAX_EDITOR_PANE_WIDTH = 68;
@@ -97,10 +99,25 @@ type CompilerStatus = {
   message: string;
 };
 
-type GeminiSettings = {
-  apiKey: string;
+type LlmSettings = {
+  provider: LlmProvider;
   model: string;
+  geminiApiKey: string;
+  groqApiKey: string;
+  claudeApiKey: string;
 };
+
+const MODEL_OPTIONS: { provider: LlmProvider; model: string; label: string }[] = [
+  { provider: "gemini", model: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Recommended)" },
+  { provider: "gemini", model: "gemini-1.5-pro-latest", label: "Gemini 1.5 Pro Latest" },
+  { provider: "gemini", model: "gemini-pro", label: "Gemini Pro 1.0 (Legacy)" },
+  { provider: "groq", model: "llama-3.3-70b-versatile", label: "Llama 3.3 70B (Groq)" },
+  { provider: "claude", model: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+];
+
+function providerForModel(model: string): LlmProvider {
+  return MODEL_OPTIONS.find((opt) => opt.model === model)?.provider ?? "gemini";
+}
 
 export function LatexResumeTailorApp() {
   const [latexCode, setLatexCode] = useState(DEFAULT_LATEX_RESUME);
@@ -126,8 +143,13 @@ export function LatexResumeTailorApp() {
   const [checkingCompiler, setCheckingCompiler] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [geminiSettingsOpen, setGeminiSettingsOpen] = useState(false);
+  const [llmProvider, setLlmProvider] = useState<LlmProvider>("gemini");
+  const [llmModel, setLlmModel] = useState("gemini-1.5-pro");
   const [geminiApiKey, setGeminiApiKey] = useState("");
-  const [geminiModel, setGeminiModel] = useState("gemini-1.5-pro");
+  const [groqApiKey, setGroqApiKey] = useState("");
+  const [claudeApiKey, setClaudeApiKey] = useState("");
+  const [testingKey, setTestingKey] = useState(false);
+  const [testKeyResult, setTestKeyResult] = useState<{ ok: boolean; message: string } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
@@ -192,14 +214,13 @@ export function LatexResumeTailorApp() {
   }, []);
 
   useEffect(() => {
-    const cachedGeminiSettings = readCachedGeminiSettings();
-
-    if (!cachedGeminiSettings) {
-      return;
-    }
-
-    setGeminiApiKey(cachedGeminiSettings.apiKey);
-    setGeminiModel(cachedGeminiSettings.model);
+    const cached = readCachedLlmSettings();
+    if (!cached) return;
+    setLlmProvider(cached.provider);
+    setLlmModel(cached.model);
+    setGeminiApiKey(cached.geminiApiKey);
+    setGroqApiKey(cached.groqApiKey);
+    setClaudeApiKey(cached.claudeApiKey);
   }, []);
 
   useEffect(() => {
@@ -683,8 +704,9 @@ export function LatexResumeTailorApp() {
           project: projectForPrompt,
           companyRole,
           jd,
-          model: geminiModel.trim(),
-          apiKey: geminiApiKey.trim(),
+          provider: llmProvider,
+          model: llmModel.trim(),
+          apiKey: (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim(),
         }),
       });
 
@@ -828,8 +850,9 @@ export function LatexResumeTailorApp() {
           body: JSON.stringify({
             text,
             action,
-            model: geminiModel.trim(),
-            apiKey: geminiApiKey.trim(),
+            provider: llmProvider,
+            model: llmModel.trim(),
+            apiKey: (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim(),
           }),
           signal: controller.signal,
         });
@@ -861,7 +884,7 @@ export function LatexResumeTailorApp() {
         setPolishState(null);
       }
     },
-    [geminiModel, geminiApiKey],
+    [llmProvider, llmModel, geminiApiKey, groqApiKey, claudeApiKey],
   );
 
   const handleAcceptPolish = useCallback(
@@ -1165,27 +1188,42 @@ export function LatexResumeTailorApp() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-xl">
             <div className="mb-4">
-              <h2 className="text-base font-semibold">Gemini settings</h2>
+              <h2 className="text-base font-semibold">AI Model Settings</h2>
               <p className="text-sm text-muted-foreground">
-                Choose a model and save API key locally in this browser.
+                Choose a model and save API keys locally in this browser.
               </p>
             </div>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="geminiModel">Model</Label>
+                <Label htmlFor="llmModel">Model</Label>
                 <select
-                  id="geminiModel"
-                  value={geminiModel}
-                  onChange={(event) => setGeminiModel(event.target.value)}
+                  id="llmModel"
+                  value={llmModel}
+                  onChange={(event) => {
+                    setLlmModel(event.target.value);
+                    setLlmProvider(providerForModel(event.target.value));
+                  }}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="gemini-1.5-pro">Gemini 1.5 Pro (Recommended)</option>
-                  <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro Latest</option>
-                  <option value="gemini-pro">Gemini Pro 1.0 (Legacy)</option>
+                  <optgroup label="Gemini">
+                    {MODEL_OPTIONS.filter((o) => o.provider === "gemini").map((o) => (
+                      <option key={o.model} value={o.model}>{o.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Groq">
+                    {MODEL_OPTIONS.filter((o) => o.provider === "groq").map((o) => (
+                      <option key={o.model} value={o.model}>{o.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Claude">
+                    {MODEL_OPTIONS.filter((o) => o.provider === "claude").map((o) => (
+                      <option key={o.model} value={o.model}>{o.label}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="geminiApiKey">Gemini API key</Label>
+              <div className={`space-y-1.5 rounded-md p-2 ${llmProvider === "gemini" ? "bg-emerald-50 ring-1 ring-emerald-200" : ""}`}>
+                <Label htmlFor="geminiApiKey">Gemini API Key</Label>
                 <Input
                   id="geminiApiKey"
                   type="password"
@@ -1195,23 +1233,91 @@ export function LatexResumeTailorApp() {
                   autoComplete="off"
                 />
               </div>
+              <div className={`space-y-1.5 rounded-md p-2 ${llmProvider === "groq" ? "bg-emerald-50 ring-1 ring-emerald-200" : ""}`}>
+                <Label htmlFor="groqApiKey">Groq API Key</Label>
+                <Input
+                  id="groqApiKey"
+                  type="password"
+                  value={groqApiKey}
+                  onChange={(event) => setGroqApiKey(event.target.value)}
+                  placeholder="gsk_..."
+                  autoComplete="off"
+                />
+              </div>
+              <div className={`space-y-1.5 rounded-md p-2 ${llmProvider === "claude" ? "bg-emerald-50 ring-1 ring-emerald-200" : ""}`}>
+                <Label htmlFor="claudeApiKey">Claude API Key</Label>
+                <Input
+                  id="claudeApiKey"
+                  type="password"
+                  value={claudeApiKey}
+                  onChange={(event) => setClaudeApiKey(event.target.value)}
+                  placeholder="sk-ant-..."
+                  autoComplete="off"
+                />
+              </div>
             </div>
+            {testKeyResult ? (
+              <div className={`mt-3 rounded-md px-3 py-2 text-sm ${testKeyResult.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}>
+                {testKeyResult.ok ? "✓ " : "✗ "}{testKeyResult.message}
+              </div>
+            ) : null}
             <div className="mt-4 flex items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setGeminiSettingsOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={testingKey}
+                onClick={async () => {
+                  const activeKey = (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim();
+                  if (!activeKey) {
+                    setTestKeyResult({ ok: false, message: `No ${llmProvider} API key entered.` });
+                    return;
+                  }
+                  setTestingKey(true);
+                  setTestKeyResult(null);
+                  try {
+                    const res = await fetch("/api/resume/test-key", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ provider: llmProvider, model: llmModel, apiKey: activeKey }),
+                    });
+                    const data = await res.json() as { ok: boolean; error?: string; reply?: string };
+                    if (data.ok) {
+                      setTestKeyResult({ ok: true, message: `Key works! Response: "${data.reply}"` });
+                    } else {
+                      setTestKeyResult({ ok: false, message: data.error || "Test failed." });
+                    }
+                  } catch {
+                    setTestKeyResult({ ok: false, message: "Network error." });
+                  } finally {
+                    setTestingKey(false);
+                  }
+                }}
+              >
+                {testingKey ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                Test Key
+              </Button>
+              <Button type="button" variant="outline" onClick={() => { setGeminiSettingsOpen(false); setTestKeyResult(null); }}>
                 Cancel
               </Button>
               <Button
                 type="button"
                 onClick={() => {
-                  const nextSettings: GeminiSettings = {
-                    model: geminiModel.trim() || "gemini-2.5-flash",
-                    apiKey: geminiApiKey.trim(),
+                  const nextSettings: LlmSettings = {
+                    provider: llmProvider,
+                    model: llmModel.trim() || "gemini-1.5-pro",
+                    geminiApiKey: geminiApiKey.trim(),
+                    groqApiKey: groqApiKey.trim(),
+                    claudeApiKey: claudeApiKey.trim(),
                   };
 
-                  setGeminiModel(nextSettings.model);
-                  setGeminiApiKey(nextSettings.apiKey);
-                  writeCachedGeminiSettings(nextSettings);
+                  setLlmProvider(nextSettings.provider);
+                  setLlmModel(nextSettings.model);
+                  setGeminiApiKey(nextSettings.geminiApiKey);
+                  setGroqApiKey(nextSettings.groqApiKey);
+                  setClaudeApiKey(nextSettings.claudeApiKey);
+                  writeCachedLlmSettings(nextSettings);
                   setGeminiSettingsOpen(false);
+                  setTestKeyResult(null);
                 }}
               >
                 Save
@@ -1796,49 +1902,55 @@ function readCachedProjectDrafts() {
   }
 }
 
-function readCachedGeminiSettings(): GeminiSettings | undefined {
+function readCachedLlmSettings(): LlmSettings | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
 
   try {
-    const cachedValue = window.localStorage.getItem(GEMINI_SETTINGS_CACHE_KEY);
+    const cachedValue = window.localStorage.getItem(LLM_SETTINGS_CACHE_KEY);
 
-    if (!cachedValue) {
-      return undefined;
+    if (cachedValue) {
+      const parsed = JSON.parse(cachedValue) as Record<string, unknown>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return {
+          provider: (["gemini", "groq", "claude"].includes(parsed.provider as string)
+            ? parsed.provider
+            : "gemini") as LlmProvider,
+          model: typeof parsed.model === "string" ? parsed.model : "gemini-1.5-pro",
+          geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
+          groqApiKey: typeof parsed.groqApiKey === "string" ? parsed.groqApiKey : "",
+          claudeApiKey: typeof parsed.claudeApiKey === "string" ? parsed.claudeApiKey : "",
+        };
+      }
     }
 
-    const parsed = JSON.parse(cachedValue) as unknown;
-
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return undefined;
+    const legacyValue = window.localStorage.getItem(LEGACY_GEMINI_SETTINGS_KEY);
+    if (legacyValue) {
+      const legacy = JSON.parse(legacyValue) as Record<string, unknown>;
+      if (legacy && typeof legacy === "object") {
+        return {
+          provider: "gemini",
+          model: typeof legacy.model === "string" ? legacy.model : "gemini-1.5-pro",
+          geminiApiKey: typeof legacy.apiKey === "string" ? legacy.apiKey : "",
+          groqApiKey: "",
+          claudeApiKey: "",
+        };
+      }
     }
 
-    const record = parsed as { apiKey?: unknown; model?: unknown };
-    const apiKey = typeof record.apiKey === "string" ? record.apiKey : "";
-    const model =
-      typeof record.model === "string" && record.model.trim().length > 0
-        ? record.model
-        : "gemini-2.5-flash";
-
-    return { apiKey, model };
+    return undefined;
   } catch {
     return undefined;
   }
 }
 
-function writeCachedGeminiSettings(settings: GeminiSettings) {
+function writeCachedLlmSettings(settings: LlmSettings) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(
-    GEMINI_SETTINGS_CACHE_KEY,
-    JSON.stringify({
-      apiKey: settings.apiKey,
-      model: settings.model,
-    }),
-  );
+  window.localStorage.setItem(LLM_SETTINGS_CACHE_KEY, JSON.stringify(settings));
 }
 
 function writeCachedProjectDrafts(projects: ProjectDraft[]) {

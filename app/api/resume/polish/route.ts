@@ -1,12 +1,20 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 
 import { polishRequestSchema } from "@/lib/schemas";
-import type { PolishAction } from "@/types/resume";
+import type { LlmProvider, PolishAction } from "@/types/resume";
 
 export const runtime = "nodejs";
 
 const GEMINI_MODELS = ["gemini-1.5-pro", "gemini-1.5-pro-latest", "gemini-pro"] as const;
+
+const ENV_KEY_MAP: Record<LlmProvider, string> = {
+  gemini: "GEMINI_API_KEY",
+  groq: "GROQ_API_KEY",
+  claude: "ANTHROPIC_API_KEY",
+};
 
 const SYSTEM_PROMPT = `You are an expert resume writing assistant specialized in polishing resume content for software engineering roles.
 
@@ -50,11 +58,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const resolvedApiKey = parsed.data.apiKey?.trim() || process.env.GEMINI_API_KEY;
+  const provider = parsed.data.provider;
+  const resolvedApiKey = parsed.data.apiKey?.trim() || process.env[ENV_KEY_MAP[provider]];
 
   if (!resolvedApiKey) {
     return NextResponse.json(
-      { error: "Missing Gemini API key. Add it in settings or .env.local." },
+      { error: `Missing ${provider} API key. Add it in settings or .env.local.` },
       { status: 500 },
     );
   }
@@ -69,19 +78,43 @@ Polish type: "${action}"
 Rewrite the selected text using the "${action}" polish type.
 Return ONLY the rewritten text.`;
 
-  const fullPrompt = `${SYSTEM_PROMPT}\n\n${userPrompt}`;
+  try {
+    if (provider === "groq") {
+      return streamGroq(resolvedApiKey, userPrompt, parsed.data.model);
+    }
+    if (provider === "claude") {
+      return streamClaude(resolvedApiKey, userPrompt, parsed.data.model);
+    }
+    return streamGemini(resolvedApiKey, userPrompt, parsed.data.model);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1);
+    return NextResponse.json(
+      { error: `${providerLabel} error: ${message}` },
+      { status: 500 },
+    );
+  }
+}
 
-  const ai = new GoogleGenAI({ apiKey: resolvedApiKey });
-  const preferredModel = parsed.data.model?.trim() || GEMINI_MODELS[0];
+const STREAM_HEADERS = {
+  "Content-Type": "text/plain; charset=utf-8",
+  "Cache-Control": "no-cache",
+  "X-Content-Type-Options": "nosniff",
+} as const;
+
+async function streamGemini(apiKey: string, userPrompt: string, model?: string) {
+  const ai = new GoogleGenAI({ apiKey });
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n${userPrompt}`;
+  const preferredModel = model?.trim() || GEMINI_MODELS[0];
   const modelsToTry = [
     preferredModel,
     ...GEMINI_MODELS.filter((m) => m !== preferredModel),
   ];
 
-  for (const model of modelsToTry) {
+  for (const modelId of modelsToTry) {
     try {
       const stream = await ai.models.generateContentStream({
-        model,
+        model: modelId,
         contents: fullPrompt,
         config: { temperature: 0.3 },
       });
@@ -89,14 +122,10 @@ Return ONLY the rewritten text.`;
       const readable = new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
-
           try {
             for await (const chunk of stream) {
               const part = chunk.text ?? "";
-
-              if (part) {
-                controller.enqueue(encoder.encode(part));
-              }
+              if (part) controller.enqueue(encoder.encode(part));
             }
           } catch (streamError) {
             controller.error(streamError);
@@ -106,47 +135,78 @@ Return ONLY the rewritten text.`;
         },
       });
 
-      return new Response(readable, {
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "Cache-Control": "no-cache",
-          "X-Content-Type-Options": "nosniff",
-        },
-      });
+      return new Response(readable, { headers: STREAM_HEADERS });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-
-      if (message.includes("not found") || message.includes("not supported")) {
-        continue;
-      }
-
-      if (
-        message.includes("429") ||
-        message.includes("RESOURCE_EXHAUSTED") ||
-        message.toLowerCase().includes("quota")
-      ) {
-        return NextResponse.json(
-          { error: "Gemini quota limit reached. Please retry shortly." },
-          { status: 429 },
-        );
-      }
-
-      if (message.includes("503") || message.includes("UNAVAILABLE")) {
-        return NextResponse.json(
-          { error: "Gemini is busy right now. Please retry in a moment." },
-          { status: 503 },
-        );
-      }
-
-      return NextResponse.json(
-        { error: `Gemini error: ${message}` },
-        { status: 500 },
-      );
+      if (message.includes("not found") || message.includes("not supported")) continue;
+      throw error;
     }
   }
 
-  return NextResponse.json(
-    { error: "No available Gemini model could fulfill the request." },
-    { status: 500 },
-  );
+  throw new Error("No available Gemini model could fulfill the request.");
+}
+
+async function streamGroq(apiKey: string, userPrompt: string, model?: string) {
+  const groq = new Groq({ apiKey });
+  const stream = await groq.chat.completions.create({
+    model: model || "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.3,
+    stream: true,
+  });
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      try {
+        for await (const chunk of stream) {
+          const part = chunk.choices[0]?.delta?.content ?? "";
+          if (part) controller.enqueue(encoder.encode(part));
+        }
+      } catch (streamError) {
+        controller.error(streamError);
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(readable, { headers: STREAM_HEADERS });
+}
+
+async function streamClaude(apiKey: string, userPrompt: string, model?: string) {
+  const anthropic = new Anthropic({ apiKey });
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      try {
+        const stream = anthropic.messages.stream({
+          model: model || "claude-sonnet-4-20250514",
+          max_tokens: 2048,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: userPrompt }],
+          temperature: 0.3,
+        });
+
+        for await (const event of stream) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            controller.enqueue(encoder.encode(event.delta.text));
+          }
+        }
+      } catch (streamError) {
+        controller.error(streamError);
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(readable, { headers: STREAM_HEADERS });
 }

@@ -79,6 +79,8 @@ export type SuggestionResponse = {
   sectionReviews: SectionReview[];
 };
 
+export type LlmProvider = "gemini" | "groq" | "claude";
+
 export type PolishAction = "improve" | "elaborate" | "professional" | "concise" | "quantify";
 
 export type PolishState = {

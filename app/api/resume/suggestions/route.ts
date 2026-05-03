@@ -1,4 +1,6 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -7,6 +9,7 @@ import {
   suggestionResponseSchema,
 } from "@/lib/schemas";
 import { getResumeText } from "@/lib/resume";
+import type { LlmProvider } from "@/types/resume";
 
 export const runtime = "nodejs";
 const GEMINI_SUGGESTION_MODELS = [
@@ -14,6 +17,12 @@ const GEMINI_SUGGESTION_MODELS = [
   "gemini-1.5-pro-latest",
   "gemini-pro",
 ] as const;
+
+const ENV_KEY_MAP: Record<LlmProvider, string> = {
+  gemini: "GEMINI_API_KEY",
+  groq: "GROQ_API_KEY",
+  claude: "ANTHROPIC_API_KEY",
+};
 
 export async function POST(request: Request) {
   const parsedRequest = suggestionRequestSchema.safeParse(await request.json());
@@ -28,22 +37,33 @@ export async function POST(request: Request) {
     );
   }
 
-  const resolvedApiKey = parsedRequest.data.apiKey?.trim() || process.env.GEMINI_API_KEY;
+  const provider = parsedRequest.data.provider;
+  const resolvedApiKey =
+    parsedRequest.data.apiKey?.trim() || process.env[ENV_KEY_MAP[provider]];
 
   if (!resolvedApiKey) {
     return NextResponse.json(
-      { error: "Missing Gemini API key. Add it in settings or .env.local." },
+      { error: `Missing ${provider} API key. Add it in settings or .env.local.` },
       { status: 500 },
     );
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: resolvedApiKey });
     const prompt = buildResumeTailorPrompt(parsedRequest.data);
-    const result = await generateWithRetry(ai, prompt, parsedRequest.data.model);
+    let responseText: string;
 
-    const parsedGemini = parseGeminiJson(result.text ?? "");
-    const validatedResponse = suggestionResponseSchema.parse(parsedGemini);
+    if (provider === "groq") {
+      responseText = await generateWithGroq(resolvedApiKey, prompt, parsedRequest.data.model);
+    } else if (provider === "claude") {
+      responseText = await generateWithClaude(resolvedApiKey, prompt, parsedRequest.data.model);
+    } else {
+      const ai = new GoogleGenAI({ apiKey: resolvedApiKey });
+      const result = await generateWithRetry(ai, prompt, parsedRequest.data.model);
+      responseText = result.text ?? "";
+    }
+
+    const parsedJson = parseGeminiJson(responseText);
+    const validatedResponse = suggestionResponseSchema.parse(parsedJson);
     const safeResponse = filterInvalidTargets(validatedResponse, parsedRequest.data);
 
     return NextResponse.json(safeResponse);
@@ -51,13 +71,14 @@ export async function POST(request: Request) {
     const quotaError = isQuotaGeminiError(error);
     const retryableError = isRetryableGeminiError(error);
     const retryAfterSeconds = getRetryAfterSeconds(error);
+    const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1);
     const message =
       error instanceof z.ZodError
-        ? "Gemini returned an invalid response shape."
+        ? `${providerLabel} returned an invalid response shape.`
         : quotaError
-          ? "Gemini quota limit reached. Please retry shortly or check Gemini billing/quota."
+          ? `${providerLabel} quota limit reached. Please retry shortly.`
         : retryableError
-          ? "Gemini is busy right now. Please retry in a moment."
+          ? `${providerLabel} is busy right now. Please retry in a moment.`
         : "Unable to generate resume suggestions.";
 
     return NextResponse.json(
@@ -76,6 +97,37 @@ export async function POST(request: Request) {
       },
     );
   }
+}
+
+async function generateWithGroq(apiKey: string, prompt: string, model?: string): Promise<string> {
+  const groq = new Groq({ apiKey });
+  const response = await groq.chat.completions.create({
+    model: model || "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: "You are an expert resume tailoring assistant. Return valid JSON only." },
+      { role: "user", content: prompt },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.25,
+  });
+
+  return response.choices[0]?.message?.content ?? "";
+}
+
+async function generateWithClaude(apiKey: string, prompt: string, model?: string): Promise<string> {
+  const anthropic = new Anthropic({ apiKey });
+  const response = await anthropic.messages.create({
+    model: model || "claude-sonnet-4-20250514",
+    max_tokens: 8192,
+    system: "You are an expert resume tailoring assistant. Return valid JSON only. Do not wrap the JSON in markdown code blocks.",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.25,
+  });
+
+  const textBlock = response.content.find(
+    (block): block is Anthropic.TextBlock => block.type === "text",
+  );
+  return textBlock?.text ?? "";
 }
 
 type SuggestionRequest = z.infer<typeof suggestionRequestSchema>;
