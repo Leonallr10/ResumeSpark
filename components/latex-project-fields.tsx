@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Save, Trash2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,6 +103,7 @@ export function LatexProjectFields({
 
     if (!parsedProjects.ok) {
       setJsonError(parsedProjects.error);
+      toast.error(parsedProjects.error);
       return;
     }
 
@@ -108,6 +111,7 @@ export function LatexProjectFields({
     setSelectedProjectIndex(0);
     setJsonValue(formatProjectJson(parsedProjects.projects));
     setJsonError(null);
+    toast.success("Project JSON applied successfully!");
   }
 
   function addProjectDraft() {
@@ -122,6 +126,7 @@ export function LatexProjectFields({
     setSelectedProjectIndex(nextProjects.length - 1);
     setInputMode("form");
     setJsonError(null);
+    toast.success("New project draft added!");
   }
 
   function deleteSelectedProject() {
@@ -129,6 +134,7 @@ export function LatexProjectFields({
     onDeleteProject(selectedProjectIndex);
     setSelectedProjectIndex(nextIndex);
     setJsonError(null);
+    toast.success("Project deleted.");
   }
 
   function goToPreviousProject() {
@@ -147,20 +153,20 @@ export function LatexProjectFields({
     activeProjects.length > 1 || hasProjectDraftContent(selectedProject);
 
   return (
-    <div className="space-y-3 rounded-md border bg-white p-3">
+    <div className="space-y-3 rounded-md border bg-white p-3 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <Label>Project input</Label>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <Label className="text-sm font-semibold">Project Input</Label>
+          <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
             Add a project once, then insert it into the LaTeX Projects section.
           </p>
         </div>
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
             Input method
           </p>
           <div
-            className="grid grid-cols-2 rounded-lg border bg-muted p-1"
+            className="grid grid-cols-2 rounded-lg border bg-muted/50 p-0.5"
             role="tablist"
             aria-label="Project input method"
           >
@@ -168,22 +174,22 @@ export function LatexProjectFields({
               type="button"
               size="sm"
               variant={inputMode === "form" ? "secondary" : "ghost"}
-              className={`h-7 px-3 text-xs ${inputMode === "form"
-                ? "bg-background text-foreground shadow-sm hover:bg-background"
+              className={`h-6 px-3 text-[10px] font-bold transition-all ${inputMode === "form"
+                ? "bg-white text-emerald-700 shadow-sm hover:bg-white"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
               onClick={() => switchInputMode("form")}
               role="tab"
               aria-selected={inputMode === "form"}
             >
-              Form
+              FORM
             </Button>
             <Button
               type="button"
               size="sm"
               variant={inputMode === "json" ? "secondary" : "ghost"}
-              className={`h-7 px-3 text-xs ${inputMode === "json"
-                ? "bg-background text-foreground shadow-sm hover:bg-background"
+              className={`h-6 px-3 text-[10px] font-bold transition-all ${inputMode === "json"
+                ? "bg-white text-emerald-700 shadow-sm hover:bg-white"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
               onClick={() => switchInputMode("json")}
@@ -196,104 +202,170 @@ export function LatexProjectFields({
         </div>
       </div>
 
-      {inputMode === "form" ? (
-        <>
-          <div className="flex flex-wrap items-start gap-2">
-            {activeProjects.length > 1 ? (
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={goToPreviousProject}
-                  disabled={selectedProjectIndex === 0}
-                  aria-label="Go to previous project"
-                  className="h-9 w-9 shrink-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="min-w-0 flex-1">
-                  <select
-                    value={selectedProjectIndex}
-                    onChange={(event) => setSelectedProjectIndex(Number(event.target.value))}
-                    className="h-9 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    aria-label="Select project"
+      <AnimatePresence mode="wait">
+        {inputMode === "form" ? (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-3"
+          >
+            <div className="flex flex-wrap items-start gap-2">
+              {activeProjects.length > 1 ? (
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={goToPreviousProject}
+                    disabled={selectedProjectIndex === 0}
+                    aria-label="Go to previous project"
+                    className="h-8 w-8 shrink-0"
                   >
-                    {activeProjects.map((currentProject, index) => (
-                      <option key={`${currentProject.heading}-${index}`} value={index}>
-                        {currentProject.heading.trim() || `Project ${index + 1}`}
-                      </option>
-                    ))}
-                  </select>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="min-w-0 flex-1">
+                    <select
+                      value={selectedProjectIndex}
+                      onChange={(event) => setSelectedProjectIndex(Number(event.target.value))}
+                      className="h-8 min-w-0 w-full rounded-md border border-input bg-background px-3 text-xs font-medium"
+                      aria-label="Select project"
+                    >
+                      {activeProjects.map((currentProject, index) => (
+                        <option key={`${currentProject.heading}-${index}`} value={index}>
+                          {currentProject.heading.trim() || `Project ${index + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={goToNextProject}
+                    disabled={selectedProjectIndex >= activeProjects.length - 1}
+                    aria-label="Go to next project"
+                    className="h-8 w-8 shrink-0"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <p className="shrink-0 text-[10px] font-bold text-muted-foreground tabular-nums bg-muted px-1.5 py-0.5 rounded">
+                    {selectedProjectIndex + 1} / {activeProjects.length}
+                  </p>
                 </div>
+              ) : (
+                <p className="min-w-0 flex-1 text-[11px] font-medium text-muted-foreground italic">
+                  Editing {selectedProject.heading.trim() || "Project 1"}
+                </p>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 gap-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold"
+                onClick={addProjectDraft}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                NEW
+              </Button>
+            </div>
+            
+            <div className="space-y-2.5">
+              <Input
+                value={selectedProject.heading}
+                onChange={(event) => updateField("heading", event.target.value)}
+                placeholder="Project heading"
+                className="h-9 text-xs"
+              />
+              <Textarea
+                value={selectedProject.explanation}
+                onChange={(event) => updateField("explanation", event.target.value)}
+                placeholder="Project explanation"
+                className="min-h-40 text-xs leading-relaxed"
+              />
+              <Input
+                value={selectedProject.techStack}
+                onChange={(event) => updateField("techStack", event.target.value)}
+                placeholder="Tech stack (e.g. React, Node.js, MongoDB)"
+                className="h-9 text-xs"
+              />
+              <Input
+                value={selectedProject.link}
+                onChange={(event) => updateField("link", event.target.value)}
+                placeholder="Project link (optional)"
+                className="h-9 text-xs"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  value={selectedProject.fromDate}
+                  onChange={(event) => updateField("fromDate", event.target.value)}
+                  placeholder="From date"
+                  className="h-9 text-xs"
+                />
+                <Input
+                  value={selectedProject.toDate}
+                  onChange={(event) => updateField("toDate", event.target.value)}
+                  placeholder="To date"
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1 border-t mt-4">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <Button
                   type="button"
-                  size="icon"
+                  size="sm"
                   variant="outline"
-                  onClick={goToNextProject}
-                  disabled={selectedProjectIndex >= activeProjects.length - 1}
-                  aria-label="Go to next project"
-                  className="h-9 w-9 shrink-0"
+                  className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 border-rose-100 transition-colors"
+                  onClick={deleteSelectedProject}
+                  disabled={!canDeleteProject}
+                  title="Delete project"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-                <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {selectedProjectIndex + 1} / {activeProjects.length}
-                </p>
+                {insertProjectCount > 1 ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 gap-1.5 bg-gradient-to-br from-emerald-500/90 to-emerald-600/90 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold"
+                    onClick={() => onInsertSingleProject(selectedProjectIndex)}
+                    disabled={!canInsertProject(selectedProject)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    ADD THIS
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 gap-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold px-4"
+                  onClick={onInsertProject}
+                  disabled={insertProjectCount === 0}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {insertProjectCount > 1 ? `INSERT ${insertProjectCount} PROJECTS` : "INSERT PROJECT"}
+                </Button>
               </div>
-            ) : (
-              <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-                Editing {selectedProject.heading.trim() || "Project 1"}
-              </p>
-            )}
-            <Button type="button" size="sm" variant="outline" onClick={addProjectDraft}>
-              <Plus className="h-4 w-4" />
-              New
-            </Button>
-          </div>
-          <Input
-            value={selectedProject.heading}
-            onChange={(event) => updateField("heading", event.target.value)}
-            placeholder="Project heading"
-          />
-          <Textarea
-            value={selectedProject.explanation}
-            onChange={(event) => updateField("explanation", event.target.value)}
-            placeholder="Project explanation"
-            className="min-h-44"
-          />
-          <Input
-            value={selectedProject.techStack}
-            onChange={(event) => updateField("techStack", event.target.value)}
-            placeholder="Tech stack, for example React, Node.js, MongoDB"
-          />
-          <Input
-            value={selectedProject.link}
-            onChange={(event) => updateField("link", event.target.value)}
-            placeholder="Project link (optional)"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              value={selectedProject.fromDate}
-              onChange={(event) => updateField("fromDate", event.target.value)}
-              placeholder="From date"
-            />
-            <Input
-              value={selectedProject.toDate}
-              onChange={(event) => updateField("toDate", event.target.value)}
-              placeholder="To date"
-            />
-          </div>
-        </>
-      ) : (
-        <div className="space-y-2">
-          <Textarea
-            value={jsonValue}
-            onChange={(event) => {
-              setJsonValue(event.target.value);
-              setJsonError(null);
-            }}
-            placeholder={`{
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="json"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-3"
+          >
+            <Textarea
+              value={jsonValue}
+              onChange={(event) => {
+                setJsonValue(event.target.value);
+                setJsonError(null);
+              }}
+              placeholder={`{
   "projects": [
     {
       "heading": "AI Resume Analyzer",
@@ -302,70 +374,31 @@ export function LatexProjectFields({
       "link": "https://github.com/example/ai-resume-analyzer",
       "fromDate": "Jan 2026",
       "toDate": "Apr 2026"
-    },
-    {
-      "heading": "Portfolio CMS",
-      "explanation": "Built a content dashboard for publishing case studies and project pages.",
-      "techStack": "Next.js, MongoDB, Tailwind CSS",
-      "link": "https://portfolio.example.com",
-      "fromDate": "May 2026",
-      "toDate": "Jun 2026"
     }
   ]
 }`}
-            className="min-h-48 font-mono text-xs"
-          />
-          {jsonError ? (
-            <p className="text-xs text-destructive">{jsonError}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Paste one object, an array, or an object with a projects array.
-            </p>
-          )}
-          <Button type="button" size="sm" variant="outline" onClick={applyJsonProject}>
-            Apply JSON
-          </Button>
-        </div>
-      )}
-
-      {inputMode === "form" && (
-        <div className="flex items-center justify-end gap-2">
-          <div className="flex flex-wrap justify-end gap-2">
-
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={deleteSelectedProject}
-              disabled={!canDeleteProject}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-            {insertProjectCount > 1 ? (
+              className="min-h-72 font-mono text-[10px] leading-relaxed bg-slate-50/50 border-emerald-100"
+            />
+            <div className="flex items-center justify-between pt-1">
+              {jsonError ? (
+                <p className="text-[10px] text-destructive font-bold">{jsonError.toUpperCase()}</p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground font-medium">
+                  PASTE OBJECT OR ARRAY
+                </p>
+              )}
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
-                onClick={() => onInsertSingleProject(selectedProjectIndex)}
-                disabled={!canInsertProject(selectedProject)}
+                className="h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold px-6"
+                onClick={applyJsonProject}
               >
-                <Plus className="h-4 w-4" />
-                Add this project
+                APPLY JSON
               </Button>
-            ) : null}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={onInsertProject}
-              disabled={insertProjectCount === 0}
-            >
-              <Plus className="h-4 w-4" />
-              {insertProjectCount > 1 ? `Insert ${insertProjectCount} projects` : "Insert project"}
-            </Button>
-          </div>
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
