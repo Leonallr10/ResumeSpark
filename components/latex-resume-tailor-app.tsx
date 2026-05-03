@@ -88,7 +88,7 @@ const WORKSPACE_PANE_HEIGHT = "clamp(560px, calc(100vh - 190px), 820px)";
 const MIN_EDITOR_PANE_WIDTH = 34;
 const MAX_EDITOR_PANE_WIDTH = 68;
 const PDF_ZOOM_STEP = 10;
-const PREVIEW_WHEEL_ZOOM_STEP = 1;
+const PREVIEW_WHEEL_ZOOM_STEP = 2;
 const latexLanguage = StreamLanguage.define(stex);
 
 type ViewMode = "preview" | "pdf";
@@ -155,8 +155,8 @@ export function LatexResumeTailorApp() {
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const paneGridRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
-  const acceptSuggestionRef = useRef<(suggestion: AiSuggestion) => void>(() => {});
-  const declineSuggestionRef = useRef<(suggestionId: string) => void>(() => {});
+  const acceptSuggestionRef = useRef<(suggestion: AiSuggestion) => void>(() => { });
+  const declineSuggestionRef = useRef<(suggestionId: string) => void>(() => { });
   const [editorPaneWidth, setEditorPaneWidth] = useState(54);
   const [isPaneResizing, setIsPaneResizing] = useState(false);
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
@@ -274,27 +274,7 @@ export function LatexResumeTailorApp() {
         return;
       }
 
-      const bounds = element.getBoundingClientRect();
-      const pointerX = event.clientX - bounds.left;
-      const pointerY = event.clientY - bounds.top;
-      const previousScrollLeft = element.scrollLeft;
-      const previousScrollTop = element.scrollTop;
-      const zoomRatio = nextZoom / previousZoom;
-
       setPreviewZoom(nextZoom);
-
-      window.requestAnimationFrame(() => {
-        const scrollContainer = previewScrollRef.current;
-
-        if (!scrollContainer) {
-          return;
-        }
-
-        scrollContainer.scrollLeft =
-          (previousScrollLeft + pointerX) * zoomRatio - pointerX;
-        scrollContainer.scrollTop =
-          (previousScrollTop + pointerY) * zoomRatio - pointerY;
-      });
     };
 
     element.addEventListener("wheel", handleNativeWheel, { passive: false });
@@ -973,6 +953,18 @@ export function LatexResumeTailorApp() {
     persistProjectDrafts([]);
   }
 
+  function insertSingleProject(index: number) {
+    const project = activeProjectDrafts[index];
+    if (!project || !canInsertProject(project)) {
+      setError("This project is missing heading, explanation, or tech stack.");
+      return;
+    }
+
+    replaceLatexContent(insertProjectsIntoLatex(latexCode, [project]), {
+      recordHistory: true,
+    });
+  }
+
   function persistProjectDrafts(
     projects: ProjectDraft[],
     options?: { clearError?: boolean },
@@ -1505,9 +1497,8 @@ export function LatexResumeTailorApp() {
               aria-valuemax={MAX_EDITOR_PANE_WIDTH}
               aria-valuenow={Math.round(editorPaneWidth)}
               tabIndex={0}
-              className={`hidden cursor-col-resize items-center justify-center border-r bg-border/60 transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex ${
-                isPaneResizing ? "bg-primary/20" : ""
-              }`}
+              className={`hidden cursor-col-resize items-center justify-center border-r bg-border/60 transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex ${isPaneResizing ? "bg-primary/20" : ""
+                }`}
               onPointerDown={(event) => {
                 event.preventDefault();
                 setIsPaneResizing(true);
@@ -1668,11 +1659,10 @@ export function LatexResumeTailorApp() {
                     type="button"
                     size="sm"
                     variant={inputSidebarTab === "project" ? "secondary" : "ghost"}
-                    className={`h-8 text-xs ${
-                      inputSidebarTab === "project"
+                    className={`h-8 text-xs ${inputSidebarTab === "project"
                         ? "bg-background text-foreground shadow-sm hover:bg-background"
                         : "text-muted-foreground hover:text-foreground"
-                    }`}
+                      }`}
                     onClick={() => setInputSidebarTab("project")}
                     role="tab"
                     aria-selected={inputSidebarTab === "project"}
@@ -1683,11 +1673,10 @@ export function LatexResumeTailorApp() {
                     type="button"
                     size="sm"
                     variant={inputSidebarTab === "jd" ? "secondary" : "ghost"}
-                    className={`h-8 text-xs ${
-                      inputSidebarTab === "jd"
+                    className={`h-8 text-xs ${inputSidebarTab === "jd"
                         ? "bg-background text-foreground shadow-sm hover:bg-background"
                         : "text-muted-foreground hover:text-foreground"
-                    }`}
+                      }`}
                     onClick={() => setInputSidebarTab("jd")}
                     role="tab"
                     aria-selected={inputSidebarTab === "jd"}
@@ -1705,6 +1694,7 @@ export function LatexResumeTailorApp() {
                     onSaveProjects={saveProjectDrafts}
                     onDeleteProject={deleteProjectDraft}
                     onInsertProject={insertProject}
+                    onInsertSingleProject={insertSingleProject}
                   />
                 ) : (
                   <>
@@ -1818,9 +1808,8 @@ function FieldCounter({ value, max }: { value: number; max: number }) {
 
   return (
     <p
-      className={`text-right text-xs ${
-        isOver ? "text-destructive" : "text-muted-foreground"
-      }`}
+      className={`text-right text-xs ${isOver ? "text-destructive" : "text-muted-foreground"
+        }`}
     >
       {value.toLocaleString()} / {max.toLocaleString()}
     </p>
@@ -2015,9 +2004,9 @@ function retargetSuggestionsAfterAccepted(
   acceptedSuggestion: AiSuggestion,
   acceptedLocation:
     | {
-        sourceLine: number;
-        sourceEndLine: number;
-      }
+      sourceLine: number;
+      sourceEndLine: number;
+    }
     | undefined,
   lineDelta: number,
 ) {

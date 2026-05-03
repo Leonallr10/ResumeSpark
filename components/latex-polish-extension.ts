@@ -33,11 +33,11 @@ type CreatePolishExtensionInput = {
 };
 
 const POLISH_ACTIONS: { action: PolishAction; label: string; icon: IconType }[] = [
-  { action: "improve", label: "Improve", icon: FiTrendingUp },
-  { action: "elaborate", label: "Elaborate", icon: FiFileText },
-  { action: "professional", label: "Professional", icon: FiBriefcase },
-  { action: "concise", label: "Concise", icon: FiScissors },
-  { action: "quantify", label: "Quantify", icon: FiBarChart2 },
+  { action: "improve", label: "Improve writing", icon: FiTrendingUp },
+  { action: "elaborate", label: "Elaborate details", icon: FiFileText },
+  { action: "professional", label: "Professional tone", icon: FiBriefcase },
+  { action: "concise", label: "Make concise", icon: FiScissors },
+  { action: "quantify", label: "Quantify impact", icon: FiBarChart2 },
 ];
 
 export function createPolishExtension({
@@ -105,19 +105,23 @@ function buildTooltipDom(
 
   const roots: Root[] = [];
 
+  const header = document.createElement("div");
+  header.className = "cm-polishTooltipHeader";
+  header.textContent = "AI Polish Actions";
+  container.appendChild(header);
+
   for (const { action, label, icon } of POLISH_ACTIONS) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "cm-polishTooltipButton";
 
-    const iconSpan = document.createElement("span");
-    iconSpan.style.display = "flex";
-    iconSpan.style.alignItems = "center";
-    button.appendChild(iconSpan);
-
     const labelSpan = document.createElement("span");
     labelSpan.textContent = label;
     button.appendChild(labelSpan);
+
+    const iconSpan = document.createElement("span");
+    iconSpan.className = "cm-polishTooltipButtonIcon";
+    button.appendChild(iconSpan);
 
     button.addEventListener("mousedown", (event) => {
       event.preventDefault();
@@ -279,34 +283,55 @@ class PolishDiffWidget extends WidgetType {
 const polishTheme = EditorView.baseTheme({
   ".cm-tooltip.cm-polishTooltip": {
     display: "flex",
-    gap: "4px",
-    padding: "6px 8px",
-    borderRadius: "8px",
+    flexDirection: "column",
+    gap: "0",
+    padding: "4px",
+    borderRadius: "10px",
     background: "white",
-    border: "1px solid rgb(203, 213, 225)",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+    border: "1px solid rgb(226, 232, 240)",
+    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
     fontFamily: "var(--font-sans), Arial, sans-serif",
     zIndex: "100",
+    minWidth: "180px",
+  },
+  ".cm-polishTooltipHeader": {
+    padding: "6px 10px 4px 10px",
+    fontSize: "11px",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: "0.025em",
+    color: "rgb(148, 163, 184)",
   },
   ".cm-polishTooltipButton": {
-    display: "inline-flex",
+    display: "flex",
     alignItems: "center",
-    gap: "4px",
-    height: "28px",
-    padding: "0 10px",
+    justifyContent: "space-between",
+    gap: "12px",
+    width: "100%",
+    padding: "8px 10px",
     borderRadius: "6px",
-    border: "1px solid rgb(226, 232, 240)",
-    background: "rgb(248, 250, 252)",
-    color: "rgb(15, 23, 42)",
-    fontSize: "12px",
-    fontWeight: "600",
+    border: "none",
+    background: "transparent",
+    color: "rgb(51, 65, 85)",
+    fontSize: "13px",
+    fontWeight: "500",
     cursor: "pointer",
     whiteSpace: "nowrap",
-    transition: "background 120ms, border-color 120ms",
+    transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+    textAlign: "left",
   },
   ".cm-polishTooltipButton:hover": {
     background: "rgb(241, 245, 249)",
-    borderColor: "rgb(148, 163, 184)",
+    color: "rgb(15, 23, 42)",
+  },
+  ".cm-polishTooltipButtonIcon": {
+    display: "flex",
+    alignItems: "center",
+    opacity: "0.4",
+    transition: "opacity 150ms",
+  },
+  ".cm-polishTooltipButton:hover .cm-polishTooltipButtonIcon": {
+    opacity: "1",
   },
   ".cm-polishDiffWidget": {
     margin: "4px 0 6px 0",

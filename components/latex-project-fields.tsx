@@ -33,6 +33,7 @@ type LatexProjectFieldsProps = {
   onSaveProjects: (projects: ProjectDraft[]) => void;
   onDeleteProject: (index: number) => void;
   onInsertProject: () => void;
+  onInsertSingleProject: (index: number) => void;
 };
 
 export function LatexProjectFields({
@@ -43,6 +44,7 @@ export function LatexProjectFields({
   onSaveProjects,
   onDeleteProject,
   onInsertProject,
+  onInsertSingleProject,
 }: LatexProjectFieldsProps) {
   const [inputMode, setInputMode] = useState<ProjectInputMode>("form");
   const [jsonValue, setJsonValue] = useState(formatProjectJson([project]));
@@ -166,11 +168,10 @@ export function LatexProjectFields({
               type="button"
               size="sm"
               variant={inputMode === "form" ? "secondary" : "ghost"}
-              className={`h-7 px-3 text-xs ${
-                inputMode === "form"
-                  ? "bg-background text-foreground shadow-sm hover:bg-background"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`h-7 px-3 text-xs ${inputMode === "form"
+                ? "bg-background text-foreground shadow-sm hover:bg-background"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
               onClick={() => switchInputMode("form")}
               role="tab"
               aria-selected={inputMode === "form"}
@@ -181,11 +182,10 @@ export function LatexProjectFields({
               type="button"
               size="sm"
               variant={inputMode === "json" ? "secondary" : "ghost"}
-              className={`h-7 px-3 text-xs ${
-                inputMode === "json"
-                  ? "bg-background text-foreground shadow-sm hover:bg-background"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`h-7 px-3 text-xs ${inputMode === "json"
+                ? "bg-background text-foreground shadow-sm hover:bg-background"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
               onClick={() => switchInputMode("json")}
               role="tab"
               aria-selected={inputMode === "json"}
@@ -260,7 +260,7 @@ export function LatexProjectFields({
             value={selectedProject.explanation}
             onChange={(event) => updateField("explanation", event.target.value)}
             placeholder="Project explanation"
-            className="min-h-24"
+            className="min-h-44"
           />
           <Input
             value={selectedProject.techStack}
@@ -328,40 +328,44 @@ export function LatexProjectFields({
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2">
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onSaveProjects(activeProjects)}
-            disabled={!canSaveProjects}
-          >
-            <Save className="h-4 w-4" />
-            Save
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={deleteSelectedProject}
-            disabled={!canDeleteProject}
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onInsertProject}
-            disabled={insertProjectCount === 0}
-          >
-            <Plus className="h-4 w-4" />
-            {insertProjectCount > 1 ? `Insert ${insertProjectCount} projects` : "Insert project"}
-          </Button>
+      {inputMode === "form" && (
+        <div className="flex items-center justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={deleteSelectedProject}
+              disabled={!canDeleteProject}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            {insertProjectCount > 1 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => onInsertSingleProject(selectedProjectIndex)}
+                disabled={!canInsertProject(selectedProject)}
+              >
+                <Plus className="h-4 w-4" />
+                Add this project
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onInsertProject}
+              disabled={insertProjectCount === 0}
+            >
+              <Plus className="h-4 w-4" />
+              {insertProjectCount > 1 ? `Insert ${insertProjectCount} projects` : "Insert project"}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
