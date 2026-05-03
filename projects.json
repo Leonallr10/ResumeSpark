@@ -1,6 +1,22 @@
 {
   "resume_projects": [
     {
+      "heading": "Resume Tailor — AI-Assisted LaTeX Resume Editor",
+      "explanation": "1. Edit resume content as LaTeX (`.tex`) in a browser-based editor with structured project fields.\n2. Preview the resume in a parsed/readable view alongside the source for faster iteration.\n3. Paste a job description and get LLM-backed, role-specific suggestions to tailor bullets and wording.\n4. Review suggestions in a side panel and accept or decline changes inline without losing control of the source.\n5. Download the updated `.tex` and export a PDF via server-side LaTeX compilation (`pdflatex` / `xelatex` / `tectonic`) when a compiler is available on the host.",
+      "techStack": "Next.js 15, React 19, TypeScript, Tailwind CSS, Radix UI, CodeMirror (@uiw/react-codemirror), Zod, html2pdf.js, pdf.js; AI: Google Gemini (@google/genai); optional API routes also reference Anthropic & Groq SDKs for multi-provider suggestions",
+      "link": "https://resume-spark-lake.vercel.app/",
+      "fromDate": "2026-04-20",
+      "toDate": "2026-05-04"
+    },
+    {
+      "heading": "SmartClinic",
+      "explanation": "1. AI-assisted clinic workflows for patients, doctors, and admins using Groq (Llama 3.3-70B) for symptom triage, visit summaries, prescription drafting, and semantic record search.\n2. Patient portal: symptom checker with urgency levels, appointment booking with doctors, medical records and prescriptions, and profile/health details.\n3. Doctor portal: live sessions, AI visit summaries and prescription drafts from notes, natural-language search over records, and availability toggles.\n4. Admin panel: user CRUD, doctor verification, and platform analytics.\n5. Secure auth with JWT (HTTP-only cookies) and bcrypt; REST APIs with Zod validation; PostgreSQL via Prisma; deployed on Vercel with Supabase Postgres.",
+      "techStack": "Next.js 16, React 19, TypeScript, Tailwind CSS 4, Radix UI, Prisma 7, PostgreSQL (Supabase/Neon-compatible), Groq SDK, Zod, JWT (jose) + bcryptjs, Playwright, Jest",
+      "link": "https://smartclinic-wine.vercel.app/",
+      "fromDate": "2026-04-28",
+      "toDate": "2026-05-02"
+    },
+    {
       "heading": "Nextflow AI",
       "explanation": "1. Built a modern visual workflow editor using React Flow, enabling users to create and manage AI automation workflows through an interactive node-based interface.\n2. Integrated Google Gemini LLM to execute intelligent workflow nodes with dynamic input-output resolution across DAG-based workflows.\n3. Implemented secure authentication and authorization using Clerk, protected middleware, role-based access, and session management.\n4. Designed full-stack persistence with Prisma and PostgreSQL for workflows, webhook events, media records, and execution metadata.\n5. Integrated Trigger.dev, Transloadit, and FFmpeg to support background jobs, file processing, webhook handling, and media automation pipelines.\n",
       "techStack": "Next.js, React, TypeScript, React Flow, Zustand, Zod, Prisma, PostgreSQL, Clerk, Google Gemini API, Trigger.dev, Transloadit, FFmpeg, Vercel",

@@ -153,7 +153,7 @@ export function LatexProjectFields({
     activeProjects.length > 1 || hasProjectDraftContent(selectedProject);
 
   return (
-    <div className="space-y-3 rounded-md border bg-white p-3 shadow-sm">
+    <div className="w-full space-y-3 rounded-md border bg-white p-3 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <Label className="text-sm font-semibold">Project Input</Label>
@@ -263,14 +263,14 @@ export function LatexProjectFields({
               <Button
                 type="button"
                 size="sm"
-                className="h-8 gap-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold"
+                className="h-9 gap-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold"
                 onClick={addProjectDraft}
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-4 w-4" />
                 NEW
               </Button>
             </div>
-            
+
             <div className="space-y-2.5">
               <Input
                 value={selectedProject.heading}
@@ -282,7 +282,7 @@ export function LatexProjectFields({
                 value={selectedProject.explanation}
                 onChange={(event) => updateField("explanation", event.target.value)}
                 placeholder="Project explanation"
-                className="min-h-40 text-xs leading-relaxed"
+                className="min-h-35 text-xs leading-relaxed"
               />
               <Input
                 value={selectedProject.techStack}
@@ -318,33 +318,33 @@ export function LatexProjectFields({
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 border-rose-100 transition-colors"
+                  className="h-9 w-9 text-rose-500 hover:text-rose-600 hover:bg-rose-50 border-rose-100 transition-colors"
                   onClick={deleteSelectedProject}
                   disabled={!canDeleteProject}
                   title="Delete project"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-6 w-6" />
                 </Button>
                 {insertProjectCount > 1 ? (
                   <Button
                     type="button"
                     size="sm"
-                    className="h-8 gap-1.5 bg-gradient-to-br from-emerald-500/90 to-emerald-600/90 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold"
+                    className="h-9 gap-1.5 bg-gradient-to-br from-emerald-500/90 to-emerald-600/90 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold"
                     onClick={() => onInsertSingleProject(selectedProjectIndex)}
                     disabled={!canInsertProject(selectedProject)}
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <Plus className="h-4 w-4" />
                     ADD THIS
                   </Button>
                 ) : null}
                 <Button
                   type="button"
                   size="sm"
-                  className="h-8 gap-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold px-4"
+                  className="h-9 gap-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold px-4"
                   onClick={onInsertProject}
                   disabled={insertProjectCount === 0}
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-4 w-4" />
                   {insertProjectCount > 1 ? `INSERT ${insertProjectCount} PROJECTS` : "INSERT PROJECT"}
                 </Button>
               </div>
@@ -390,7 +390,7 @@ export function LatexProjectFields({
               <Button
                 type="button"
                 size="sm"
-                className="h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold px-6"
+                className="h-9 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold px-6"
                 onClick={applyJsonProject}
               >
                 APPLY JSON
