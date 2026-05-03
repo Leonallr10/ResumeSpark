@@ -84,7 +84,6 @@ const JD_LIMIT = 20000;
 const PROJECT_CACHE_KEY = "resume-tailor-projects-v1";
 const LLM_SETTINGS_CACHE_KEY = "resume-tailor-llm-settings-v1";
 const LEGACY_GEMINI_SETTINGS_KEY = "resume-tailor-gemini-settings-v1";
-const WORKSPACE_PANE_HEIGHT = "clamp(560px, calc(100vh - 190px), 820px)";
 const MIN_EDITOR_PANE_WIDTH = 34;
 const MAX_EDITOR_PANE_WIDTH = 68;
 const PDF_ZOOM_STEP = 10;
@@ -1164,7 +1163,7 @@ export function LatexResumeTailorApp() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f8f8]">
+    <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-[#f4f8f8]">
       {pdfFullscreen ? (
         <PdfFullscreenPreview
           pdfUrl={pdfUrl}
@@ -1318,8 +1317,8 @@ export function LatexResumeTailorApp() {
           </div>
         </div>
       ) : null}
-      <div className="mx-auto flex min-h-screen max-w-[1760px] flex-col items-stretch gap-5 px-4 py-5 xl:flex-row">
-        <section className="flex w-full min-w-0 flex-1 flex-col rounded-md border bg-white">
+      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col items-stretch gap-5 px-4 py-5 xl:flex-row xl:items-stretch">
+        <section className="flex w-full min-w-0 flex-1 min-h-0 flex-col rounded-md border bg-white xl:min-h-0">
           <div className="flex flex-col gap-3 border-b bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-xl font-bold tracking-normal">Resume Tailor</h1>
@@ -1404,15 +1403,14 @@ export function LatexResumeTailorApp() {
 
           <div
             ref={paneGridRef}
-            className="grid gap-0 overflow-hidden lg:grid-cols-[minmax(320px,var(--editor-pane-width))_10px_minmax(380px,1fr)]"
+            className="grid min-h-0 flex-1 grid-rows-[1fr_1fr] gap-0 overflow-hidden lg:grid-cols-[minmax(320px,var(--editor-pane-width))_10px_minmax(380px,1fr)] lg:grid-rows-1"
             style={
               {
                 "--editor-pane-width": `${editorPaneWidth}%`,
-                "--workspace-pane-height": WORKSPACE_PANE_HEIGHT,
               } as CSSProperties
             }
           >
-            <div className="flex min-h-0 flex-col border-b lg:h-[var(--workspace-pane-height)] lg:border-b-0 lg:border-r">
+            <div className="flex min-h-0 flex-col border-b lg:h-full lg:border-b-0 lg:border-r">
               {orderedSuggestions.length > 0 ? (
                 <div className="flex min-h-[57px] flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2">
                   <div className="min-w-0">
@@ -1497,7 +1495,7 @@ export function LatexResumeTailorApp() {
               aria-valuemax={MAX_EDITOR_PANE_WIDTH}
               aria-valuenow={Math.round(editorPaneWidth)}
               tabIndex={0}
-              className={`hidden cursor-col-resize items-center justify-center border-r bg-border/60 transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex ${isPaneResizing ? "bg-primary/20" : ""
+              className={`hidden h-full min-h-0 cursor-col-resize items-center justify-center self-stretch border-r bg-border/60 transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex ${isPaneResizing ? "bg-primary/20" : ""
                 }`}
               onPointerDown={(event) => {
                 event.preventDefault();
@@ -1518,8 +1516,8 @@ export function LatexResumeTailorApp() {
               <span className="h-16 w-1 rounded-sm bg-muted-foreground/35" />
             </div>
 
-            <div className="min-h-0 bg-[#e8eeee] lg:h-[var(--workspace-pane-height)]">
-              <div className="flex h-[var(--workspace-pane-height)] flex-col">
+            <div className="h-full min-h-0 bg-[#e8eeee]">
+              <div className="flex h-full min-h-0 flex-col">
                 <div className="flex items-center justify-between border-b bg-slate-800 px-2 py-1 text-slate-100">
                   <div className="flex items-center gap-1">
                     <Button
@@ -1622,7 +1620,7 @@ export function LatexResumeTailorApp() {
                   </Button>
                 </div>
 
-                <div ref={previewPaneRef} className="min-h-0 flex-1">
+                <div ref={previewPaneRef} className="min-h-0 flex-1 overflow-hidden">
                   {viewMode === "pdf" ? (
                     <PdfPreview pdfUrl={pdfUrl} rendering={renderingPdf} zoom={previewZoom} />
                   ) : (
@@ -1647,8 +1645,8 @@ export function LatexResumeTailorApp() {
         </section>
 
         {isInputPanelOpen ? (
-          <aside className="w-full xl:w-[510px] xl:self-stretch">
-            <Card className="sticky top-5 xl:flex xl:h-full xl:flex-col">
+          <aside className="flex w-full min-h-0 flex-col xl:w-[510px] xl:self-stretch">
+            <Card className="sticky top-5 min-h-0 flex-1 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
               <CardContent className="space-y-5 pt-5 xl:flex xl:flex-1 xl:flex-col xl:overflow-y-auto">
                 <div
                   className="grid grid-cols-2 rounded-lg border bg-muted p-1"
