@@ -41,6 +41,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createLatexSuggestionExtension } from "@/components/latex-editor-suggestions";
+import { createPolishExtension } from "@/components/latex-polish-extension";
 import {
   emptyProjectDraft,
   LatexProjectFields,
@@ -70,6 +71,8 @@ import { getDownloadFilename, sanitizeFilename } from "@/lib/resume";
 import { EditorView } from "@codemirror/view";
 import type {
   AiSuggestion,
+  PolishAction,
+  PolishState,
   ResumeSection,
   SectionReview,
   SuggestionResponse,
@@ -142,6 +145,8 @@ export function LatexResumeTailorApp() {
   const futureLatexRef = useRef<string[]>([]);
   const preTypingBaselineRef = useRef<string | null>(null);
   const typingIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [polishState, setPolishState] = useState<PolishState>(null);
+  const polishAbortRef = useRef<AbortController | null>(null);
   const LATEX_HISTORY_DEBOUNCE_MS = 450;
 
   latestLatexRef.current = latexCode;
@@ -514,6 +519,7 @@ export function LatexResumeTailorApp() {
       if (typingIdleTimerRef.current) {
         clearTimeout(typingIdleTimerRef.current);
       }
+      polishAbortRef.current?.abort();
     },
     [],
   );
@@ -618,6 +624,11 @@ export function LatexResumeTailorApp() {
     setSuggestions([]);
     setSectionReviews([]);
     revokePdfPreview();
+
+    if (polishState) {
+      polishAbortRef.current?.abort();
+      setPolishState(null);
+    }
   }
 
   async function handleTexFile(file: File) {
@@ -801,6 +812,99 @@ export function LatexResumeTailorApp() {
     setSectionReviews([]);
     setActiveSuggestionId(null);
   }
+
+  const handleTriggerPolish = useCallback(
+    async (action: PolishAction, text: string, range: { from: number; to: number }) => {
+      polishAbortRef.current?.abort();
+      const controller = new AbortController();
+      polishAbortRef.current = controller;
+
+      setPolishState({ range, original: text, polished: null, loading: true, action });
+
+      try {
+        const response = await fetch("/api/resume/polish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            action,
+            model: geminiModel.trim(),
+            apiKey: geminiApiKey.trim(),
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({ error: "Polish request failed." }));
+          throw new Error(payload.error || "Polish request failed.");
+        }
+
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let result = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          result += decoder.decode(value, { stream: true });
+          setPolishState((prev) =>
+            prev ? { ...prev, polished: result, loading: true } : null,
+          );
+        }
+
+        setPolishState((prev) =>
+          prev ? { ...prev, polished: result, loading: false } : null,
+        );
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Polish request failed.");
+        setPolishState(null);
+      }
+    },
+    [geminiModel, geminiApiKey],
+  );
+
+  const handleAcceptPolish = useCallback(
+    (polished: string, range: { from: number; to: number }) => {
+      const view = editorViewRef.current;
+      if (!view) return;
+
+      cancelTypingHistoryDebounce({ flushPending: true });
+      commitLatexHistoryBeforeEdit(latestLatexRef.current);
+
+      view.dispatch({
+        changes: { from: range.from, to: range.to, insert: polished },
+      });
+
+      const newDoc = view.state.doc.toString();
+      latestLatexRef.current = newDoc;
+      isApplyingHistoryRef.current = true;
+      setLatexCode(newDoc);
+      setSuggestions([]);
+      setSectionReviews([]);
+      revokePdfPreview();
+      isApplyingHistoryRef.current = false;
+      setPolishState(null);
+    },
+    [revokePdfPreview],
+  );
+
+  const handleRejectPolish = useCallback(() => {
+    polishAbortRef.current?.abort();
+    setPolishState(null);
+  }, []);
+
+  const latexPolishExtension = useMemo(
+    () =>
+      createPolishExtension({
+        polishState,
+        hasSuggestions: suggestions.length > 0,
+        onTriggerPolish: handleTriggerPolish,
+        onAcceptPolish: handleAcceptPolish,
+        onRejectPolish: handleRejectPolish,
+      }),
+    [polishState, suggestions.length, handleTriggerPolish, handleAcceptPolish, handleRejectPolish],
+  );
 
   function focusSuggestionAtIndex(index: number) {
     if (orderedSuggestions.length === 0) {
@@ -1272,7 +1376,7 @@ export function LatexResumeTailorApp() {
               <CodeMirror
                 value={latexCode}
                 height="100%"
-                extensions={[latexLanguage, latexSuggestionExtension]}
+                extensions={[latexLanguage, latexSuggestionExtension, latexPolishExtension]}
                 onCreateEditor={(view) => {
                   editorViewRef.current = view;
                 }}

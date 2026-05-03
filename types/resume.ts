@@ -78,3 +78,13 @@ export type SuggestionResponse = {
   suggestions: AiSuggestion[];
   sectionReviews: SectionReview[];
 };
+
+export type PolishAction = "improve" | "elaborate" | "professional" | "concise" | "quantify";
+
+export type PolishState = {
+  range: { from: number; to: number };
+  original: string;
+  polished: string | null;
+  loading: boolean;
+  action: PolishAction;
+} | null;

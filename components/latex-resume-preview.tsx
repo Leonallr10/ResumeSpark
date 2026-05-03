@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, type ReactNode } from "react";
 
 import type { ResumeLine, ResumeSection } from "@/types/resume";
 
@@ -196,11 +196,12 @@ function PreviewLine({
   const canNavigate =
     Boolean(onNavigateToSource) &&
     (typeof line.sourceLine === "number" || typeof line.sourceEndLine === "number");
+  const renderedText = renderLineText(line);
   const content =
     line.kind === "projectHeading" || line.kind === "subheading" ? (
       <div>
         <div className="flex items-start justify-between gap-4 text-[0.64rem]">
-          <strong>{line.text}</strong>
+          <strong>{renderedText}</strong>
           {line.rightText ? (
             <span className="shrink-0 text-right text-[10px] font-semibold text-slate-700">
               {line.rightText}
@@ -214,14 +215,14 @@ function PreviewLine({
     ) : line.kind === "bullet" ? (
       <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-1 text-[11px] leading-[1.3]">
         <span className="pt-[1px]">-</span>
-        <p>{line.text}</p>
+        <p>{renderedText}</p>
       </div>
     ) : labelValue ? (
       <p className="text-[11px] leading-[1.3]">
         <strong>{labelValue.label}:</strong> {labelValue.value}
       </p>
     ) : (
-      <p className="text-[11px] leading-[1.3]">{line.text}</p>
+      <p className="text-[11px] leading-[1.3]">{renderedText}</p>
     );
 
   return (
@@ -257,6 +258,84 @@ function PreviewLine({
       {content}
     </div>
   );
+}
+
+const HREF_PATTERN =
+  /\\textcolor\{blue\}\{\\href\{([^{}]*)\}\{((?:[^{}]|\{[^{}]*\})*)\}\}|\\href\{([^{}]*)\}\{((?:[^{}]|\{[^{}]*\})*)\}/g;
+
+type LinkInfo = { label: string; url: string; isBlue: boolean };
+
+function extractLinks(sourceText: string): LinkInfo[] {
+  const links: LinkInfo[] = [];
+  const regex = new RegExp(HREF_PATTERN.source, "g");
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(sourceText)) !== null) {
+    const url = match[1] ?? match[3] ?? "";
+    const rawLabel = match[2] ?? match[4] ?? "";
+    const label = cleanInlineLatex(rawLabel);
+    const isBlue = Boolean(match[1]);
+    if (label) links.push({ label, url, isBlue });
+  }
+
+  return links;
+}
+
+function renderLineText(line: ResumeLine): ReactNode {
+  const source = line.sourceText;
+  if (!source) return line.text;
+
+  const links = extractLinks(source);
+  if (links.length === 0) return line.text;
+
+  const text = line.text;
+  const parts: ReactNode[] = [];
+  let remaining = text;
+  let keyIndex = 0;
+
+  for (const link of links) {
+    const idx = remaining.indexOf(link.label);
+    if (idx === -1) continue;
+
+    if (idx > 0) {
+      parts.push(remaining.slice(0, idx));
+    } else if (parts.length > 0) {
+      parts.push(" ");
+    }
+
+    parts.push(
+      <a
+        key={keyIndex++}
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`italic underline ${link.isBlue ? "text-blue-600" : ""}`}
+        style={{ marginLeft: 4, marginRight: 4 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {link.label}
+      </a>,
+    );
+
+    remaining = remaining.slice(idx + link.label.length);
+  }
+
+  if (remaining) {
+    parts.push(remaining);
+  }
+
+  return parts.length > 0 ? <>{parts}</> : line.text;
+}
+
+function cleanInlineLatex(text: string): string {
+  return text
+    .replace(/\\(?:textit|textbf|emph|small|large|Large|LARGE|techstack)\{((?:[^{}]|\{[^{}]*\})*)\}/g, "$1")
+    .replace(/\\(?:hspace|vspace)\*?(?:\[[^\]]*\])?\{[^{}]*\}/g, " ")
+    .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?/g, "")
+    .replace(/\\([&%$#_{}])/g, "$1")
+    .replace(/[{}]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function splitLabelValue(text: string) {

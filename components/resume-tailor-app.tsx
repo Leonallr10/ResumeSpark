@@ -148,18 +148,18 @@ export function ResumeTailorApp() {
       current.map((section) =>
         section.id === sectionId
           ? {
-              ...section,
-              lines: section.lines.map((line) =>
-                line.id === lineId
-                  ? {
-                      ...line,
-                      text,
-                      replacedText: undefined,
-                      changeKind: undefined,
-                    }
-                  : line,
-              ),
-            }
+            ...section,
+            lines: section.lines.map((line) =>
+              line.id === lineId
+                ? {
+                  ...line,
+                  text,
+                  replacedText: undefined,
+                  changeKind: undefined,
+                }
+                : line,
+            ),
+          }
           : section,
       ),
     );
@@ -342,7 +342,7 @@ export function ResumeTailorApp() {
 
         <aside className="w-full lg:w-[430px]">
           <Card className="sticky top-5">
- 
+
             <CardContent className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="project">Project</Label>
@@ -446,9 +446,8 @@ function FieldCounter({ value, max }: { value: number; max: number }) {
 
   return (
     <p
-      className={`text-right text-xs ${
-        isOver ? "text-destructive" : "text-muted-foreground"
-      }`}
+      className={`text-right text-xs ${isOver ? "text-destructive" : "text-muted-foreground"
+        }`}
     >
       {value.toLocaleString()} / {max.toLocaleString()}
     </p>
@@ -620,9 +619,8 @@ function ResumeLineEditor({
       ) : null}
 
       <div
-        className={`editable-line rounded-sm transition-colors hover:bg-teal-50 ${
-          lineChangeKind ? `changed-line changed-line-${lineChangeKind}` : ""
-        }`}
+        className={`editable-line rounded-sm transition-colors hover:bg-teal-50 ${lineChangeKind ? `changed-line changed-line-${lineChangeKind}` : ""
+          }`}
         style={lineStyle}
         contentEditable={!isReplacePreview}
         suppressContentEditableWarning

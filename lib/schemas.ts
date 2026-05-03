@@ -72,3 +72,10 @@ export const suggestionResponseSchema = z.object({
   suggestions: z.array(aiSuggestionSchema),
   sectionReviews: z.array(sectionReviewSchema),
 });
+
+export const polishRequestSchema = z.object({
+  text: z.string().min(1).max(5000),
+  action: z.enum(["improve", "elaborate", "professional", "concise", "quantify"]),
+  model: z.string().min(1).max(120).optional(),
+  apiKey: z.string().min(1).max(500).optional(),
+});
