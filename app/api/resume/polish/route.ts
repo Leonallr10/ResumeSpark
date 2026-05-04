@@ -8,7 +8,7 @@ import type { LlmProvider, PolishAction } from "@/types/resume";
 
 export const runtime = "nodejs";
 
-const GEMINI_MODELS = ["gemini-1.5-pro", "gemini-1.5-pro-latest", "gemini-pro"] as const;
+const GEMINI_MODELS = ["gemini-2.5-pro-preview-05-06", "gemini-2.0-flash"] as const;
 
 const ENV_KEY_MAP: Record<LlmProvider, string> = {
   gemini: "GEMINI_API_KEY",

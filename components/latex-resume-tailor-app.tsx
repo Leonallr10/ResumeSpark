@@ -109,9 +109,8 @@ type LlmSettings = {
 };
 
 const MODEL_OPTIONS: { provider: LlmProvider; model: string; label: string }[] = [
-  { provider: "gemini", model: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Recommended)" },
-  { provider: "gemini", model: "gemini-1.5-pro-latest", label: "Gemini 1.5 Pro Latest" },
-  { provider: "gemini", model: "gemini-pro", label: "Gemini Pro 1.0 (Legacy)" },
+  { provider: "gemini", model: "gemini-2.5-pro-preview-05-06", label: "Gemini 2.5 Pro (Recommended)" },
+  { provider: "gemini", model: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
   { provider: "groq", model: "llama-3.3-70b-versatile", label: "Llama 3.3 70B (Groq)" },
   { provider: "claude", model: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
 ];
@@ -145,7 +144,7 @@ export function LatexResumeTailorApp() {
   const [error, setError] = useState<string | null>(null);
   const [geminiSettingsOpen, setGeminiSettingsOpen] = useState(false);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("gemini");
-  const [llmModel, setLlmModel] = useState("gemini-1.5-pro");
+  const [llmModel, setLlmModel] = useState("gemini-2.5-pro-preview-05-06");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [groqApiKey, setGroqApiKey] = useState("");
   const [claudeApiKey, setClaudeApiKey] = useState("");
@@ -687,7 +686,7 @@ export function LatexResumeTailorApp() {
           jd,
           provider: llmProvider,
           model: llmModel.trim(),
-          apiKey: (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim(),
+          apiKey: (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim() || undefined,
         }),
       });
 
@@ -833,7 +832,7 @@ export function LatexResumeTailorApp() {
             action,
             provider: llmProvider,
             model: llmModel.trim(),
-            apiKey: (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim(),
+            apiKey: (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim() || undefined,
           }),
           signal: controller.signal,
         });
@@ -1303,7 +1302,7 @@ export function LatexResumeTailorApp() {
                 onClick={() => {
                   const nextSettings: LlmSettings = {
                     provider: llmProvider,
-                    model: llmModel.trim() || "gemini-1.5-pro",
+                    model: llmModel.trim() || "gemini-2.5-pro-preview-05-06",
                     geminiApiKey: geminiApiKey.trim(),
                     groqApiKey: groqApiKey.trim(),
                     claudeApiKey: claudeApiKey.trim(),
@@ -2105,7 +2104,7 @@ function readCachedLlmSettings(): LlmSettings | undefined {
           provider: (["gemini", "groq", "claude"].includes(parsed.provider as string)
             ? parsed.provider
             : "gemini") as LlmProvider,
-          model: typeof parsed.model === "string" ? parsed.model : "gemini-1.5-pro",
+          model: typeof parsed.model === "string" ? parsed.model : "gemini-2.5-pro-preview-05-06",
           geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
           groqApiKey: typeof parsed.groqApiKey === "string" ? parsed.groqApiKey : "",
           claudeApiKey: typeof parsed.claudeApiKey === "string" ? parsed.claudeApiKey : "",
@@ -2119,7 +2118,7 @@ function readCachedLlmSettings(): LlmSettings | undefined {
       if (legacy && typeof legacy === "object") {
         return {
           provider: "gemini",
-          model: typeof legacy.model === "string" ? legacy.model : "gemini-1.5-pro",
+          model: typeof legacy.model === "string" ? legacy.model : "gemini-2.5-pro-preview-05-06",
           geminiApiKey: typeof legacy.apiKey === "string" ? legacy.apiKey : "",
           groqApiKey: "",
           claudeApiKey: "",
