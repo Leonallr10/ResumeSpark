@@ -786,17 +786,30 @@ export function LatexResumeTailorApp() {
     const deletes = sorted.filter((s) => s.suggestion.action === "delete");
 
     let result = latestLatexRef.current;
-    for (const entry of replaces) {
+    const pending = [...replaces, ...inserts, ...deletes];
+
+    for (let i = 0; i < pending.length; i++) {
+      const before = result;
       commitLatexHistoryBeforeEdit(result);
-      result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
-    }
-    for (const entry of inserts) {
-      commitLatexHistoryBeforeEdit(result);
-      result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
-    }
-    for (const entry of deletes) {
-      commitLatexHistoryBeforeEdit(result);
-      result = applySuggestionToLatex(result, parseLatexResume(result), entry.suggestion);
+      result = applySuggestionToLatex(result, parseLatexResume(result), pending[i].suggestion);
+      const lineDelta = countLatexLines(result) - countLatexLines(before);
+
+      if (lineDelta !== 0) {
+        const appliedLine = pending[i].sourceLine;
+        for (let j = i + 1; j < pending.length; j++) {
+          if (pending[j].sourceLine > appliedLine) {
+            const newLine = pending[j].sourceLine + lineDelta;
+            pending[j] = {
+              ...pending[j],
+              sourceLine: newLine,
+              suggestion: {
+                ...pending[j].suggestion,
+                targetLineId: `line-${newLine}`,
+              },
+            };
+          }
+        }
+      }
     }
 
     isApplyingHistoryRef.current = true;

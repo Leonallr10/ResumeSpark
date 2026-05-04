@@ -135,7 +135,12 @@ function buildTooltipDom(
     roots.push(root);
   }
 
-  return { dom: container, destroy: () => roots.forEach((r) => r.unmount()) };
+  return {
+    dom: container,
+    destroy: () => {
+      setTimeout(() => roots.forEach((r) => r.unmount()), 0);
+    },
+  };
 }
 
 function buildDiffDecorations(
