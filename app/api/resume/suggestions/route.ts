@@ -13,7 +13,8 @@ import type { LlmProvider } from "@/types/resume";
 
 export const runtime = "nodejs";
 const GEMINI_SUGGESTION_MODELS = [
-  "gemini-2.5-pro-preview-05-06",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
   "gemini-2.0-flash",
 ] as const;
 

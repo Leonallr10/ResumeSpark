@@ -109,7 +109,8 @@ type LlmSettings = {
 };
 
 const MODEL_OPTIONS: { provider: LlmProvider; model: string; label: string }[] = [
-  { provider: "gemini", model: "gemini-2.5-pro-preview-05-06", label: "Gemini 2.5 Pro (Recommended)" },
+  { provider: "gemini", model: "gemini-2.5-pro", label: "Gemini 2.5 Pro (Recommended)" },
+  { provider: "gemini", model: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
   { provider: "gemini", model: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
   { provider: "groq", model: "llama-3.3-70b-versatile", label: "Llama 3.3 70B (Groq)" },
   { provider: "claude", model: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
@@ -144,7 +145,7 @@ export function LatexResumeTailorApp() {
   const [error, setError] = useState<string | null>(null);
   const [geminiSettingsOpen, setGeminiSettingsOpen] = useState(false);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("gemini");
-  const [llmModel, setLlmModel] = useState("gemini-2.5-pro-preview-05-06");
+  const [llmModel, setLlmModel] = useState("gemini-2.5-pro");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [groqApiKey, setGroqApiKey] = useState("");
   const [claudeApiKey, setClaudeApiKey] = useState("");
@@ -1315,7 +1316,7 @@ export function LatexResumeTailorApp() {
                 onClick={() => {
                   const nextSettings: LlmSettings = {
                     provider: llmProvider,
-                    model: llmModel.trim() || "gemini-2.5-pro-preview-05-06",
+                    model: llmModel.trim() || "gemini-2.5-pro",
                     geminiApiKey: geminiApiKey.trim(),
                     groqApiKey: groqApiKey.trim(),
                     claudeApiKey: claudeApiKey.trim(),
@@ -2121,7 +2122,7 @@ function readCachedLlmSettings(): LlmSettings | undefined {
           provider: (["gemini", "groq", "claude"].includes(parsed.provider as string)
             ? parsed.provider
             : "gemini") as LlmProvider,
-          model: isValidModel(parsed.model) ? parsed.model : "gemini-2.5-pro-preview-05-06",
+          model: isValidModel(parsed.model) ? parsed.model : "gemini-2.5-pro",
           geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
           groqApiKey: typeof parsed.groqApiKey === "string" ? parsed.groqApiKey : "",
           claudeApiKey: typeof parsed.claudeApiKey === "string" ? parsed.claudeApiKey : "",
@@ -2135,7 +2136,7 @@ function readCachedLlmSettings(): LlmSettings | undefined {
       if (legacy && typeof legacy === "object") {
         return {
           provider: "gemini",
-          model: isValidModel(legacy.model) ? legacy.model : "gemini-2.5-pro-preview-05-06",
+          model: isValidModel(legacy.model) ? legacy.model : "gemini-2.5-pro",
           geminiApiKey: typeof legacy.apiKey === "string" ? legacy.apiKey : "",
           groqApiKey: "",
           claudeApiKey: "",
