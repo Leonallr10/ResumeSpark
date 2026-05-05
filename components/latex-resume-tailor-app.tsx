@@ -2102,6 +2102,10 @@ function readCachedProjectDrafts() {
   }
 }
 
+function isValidModel(model: unknown): model is string {
+  return typeof model === "string" && MODEL_OPTIONS.some((opt) => opt.model === model);
+}
+
 function readCachedLlmSettings(): LlmSettings | undefined {
   if (typeof window === "undefined") {
     return undefined;
@@ -2117,7 +2121,7 @@ function readCachedLlmSettings(): LlmSettings | undefined {
           provider: (["gemini", "groq", "claude"].includes(parsed.provider as string)
             ? parsed.provider
             : "gemini") as LlmProvider,
-          model: typeof parsed.model === "string" ? parsed.model : "gemini-2.5-pro-preview-05-06",
+          model: isValidModel(parsed.model) ? parsed.model : "gemini-2.5-pro-preview-05-06",
           geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
           groqApiKey: typeof parsed.groqApiKey === "string" ? parsed.groqApiKey : "",
           claudeApiKey: typeof parsed.claudeApiKey === "string" ? parsed.claudeApiKey : "",
@@ -2131,7 +2135,7 @@ function readCachedLlmSettings(): LlmSettings | undefined {
       if (legacy && typeof legacy === "object") {
         return {
           provider: "gemini",
-          model: typeof legacy.model === "string" ? legacy.model : "gemini-2.5-pro-preview-05-06",
+          model: isValidModel(legacy.model) ? legacy.model : "gemini-2.5-pro-preview-05-06",
           geminiApiKey: typeof legacy.apiKey === "string" ? legacy.apiKey : "",
           groqApiKey: "",
           claudeApiKey: "",
