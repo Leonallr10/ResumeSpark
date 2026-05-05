@@ -1,11 +1,13 @@
-import { RangeSetBuilder, StateField, type Extension } from "@codemirror/state";
+import { RangeSetBuilder, StateField, type Extension, StateEffect } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
   showTooltip,
   WidgetType,
+  ViewPlugin,
   type DecorationSet,
   type Tooltip,
+  type ViewUpdate,
 } from "@codemirror/view";
 import {
   FiTrendingUp,   // improve
@@ -40,6 +42,34 @@ const POLISH_ACTIONS: { action: PolishAction; label: string; icon: IconType }[] 
   { action: "quantify", label: "Quantify impact", icon: FiBarChart2 },
 ];
 
+const setMouseDragging = StateEffect.define<boolean>();
+
+const mouseDraggingField = StateField.define<boolean>({
+  create: () => false,
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setMouseDragging)) return effect.value;
+    }
+    return value;
+  },
+});
+
+const mouseDraggingPlugin = ViewPlugin.fromClass(
+  class {
+    constructor(readonly view: EditorView) { }
+  },
+  {
+    eventHandlers: {
+      mousedown() {
+        this.view.dispatch({ effects: setMouseDragging.of(true) });
+      },
+      mouseup() {
+        this.view.dispatch({ effects: setMouseDragging.of(false) });
+      },
+    },
+  },
+);
+
 export function createPolishExtension({
   polishState,
   hasSuggestions,
@@ -49,14 +79,16 @@ export function createPolishExtension({
 }: CreatePolishExtensionInput): Extension {
   const tooltipField = StateField.define<Tooltip | null>({
     create(state) {
-      if (polishState || hasSuggestions) return null;
-      return computeTooltip(state.selection.main.from, state.selection.main.to, onTriggerPolish);
+      if (polishState || hasSuggestions || state.field(mouseDraggingField)) return null;
+      const { from, to, head } = state.selection.main;
+      return computeTooltip(from, to, head, onTriggerPolish);
     },
     update(value, tr) {
-      if (polishState || hasSuggestions) return null;
-      if (!tr.selection && !tr.docChanged) return value;
-      const { from, to } = tr.state.selection.main;
-      return computeTooltip(from, to, onTriggerPolish);
+      if (polishState || hasSuggestions || tr.state.field(mouseDraggingField)) return null;
+      if (!tr.selection && !tr.docChanged && !tr.effects.some((e) => e.is(setMouseDragging)))
+        return value;
+      const { from, to, head } = tr.state.selection.main;
+      return computeTooltip(from, to, head, onTriggerPolish);
     },
     provide: (field) => showTooltip.from(field),
   });
@@ -72,18 +104,19 @@ export function createPolishExtension({
     provide: (field) => EditorView.decorations.from(field),
   });
 
-  return [polishTheme, tooltipField, diffField];
+  return [polishTheme, mouseDraggingField, mouseDraggingPlugin, tooltipField, diffField];
 }
 
 function computeTooltip(
   from: number,
   to: number,
+  head: number,
   onTriggerPolish: CreatePolishExtensionInput["onTriggerPolish"],
 ): Tooltip | null {
   if (from === to) return null;
 
   return {
-    pos: from,
+    pos: head,
     end: to,
     above: true,
     strictSide: false,
