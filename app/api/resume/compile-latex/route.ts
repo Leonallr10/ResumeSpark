@@ -21,14 +21,14 @@ export async function GET() {
 
   return NextResponse.json(
     {
-      available: Boolean(engine),
-      compiler: engine ?? null,
+      available: Boolean(engine) || true,
+      compiler: engine ?? "cloud (texlive.net)",
       candidates: compilerCandidates,
       message: engine
         ? `LaTeX compiler found: ${engine}.`
-        : "No LaTeX compiler was found. Install MiKTeX, TeX Live, or Tectonic and restart the dev server.",
+        : "Using cloud LaTeX compilation (texlive.net). Install tectonic locally for faster builds.",
     },
-    { status: engine ? 200 : 503 },
+    { status: 200 },
   );
 }
 
@@ -47,14 +47,9 @@ export async function POST(request: Request) {
 
   const engine = await resolveCompiler(parsedRequest.data.engine);
 
+  // No local compiler — try cloud LaTeX compilation
   if (!engine) {
-    return NextResponse.json(
-      {
-        error:
-          "No LaTeX compiler was found. Install MiKTeX, TeX Live, or Tectonic and make pdflatex, xelatex, or tectonic available on PATH.",
-      },
-      { status: 503 },
-    );
+    return compileViaCloud(parsedRequest.data.latex);
   }
 
   const workdir = path.join(process.cwd(), "tmp", "latex-compile", randomUUID());
@@ -104,6 +99,67 @@ export async function POST(request: Request) {
     );
   } finally {
     await rm(workdir, { recursive: true, force: true });
+  }
+}
+
+async function compileViaCloud(latex: string) {
+  const normalizedLatex = normalizeLatexForPdf(latex, "pdflatex");
+
+  const formData = new FormData();
+  formData.append("filecontents[]", new Blob([normalizedLatex], { type: "text/plain" }), "document.tex");
+  formData.append("filename[]", "document.tex");
+  formData.append("engine", "pdflatex");
+  formData.append("return", "pdf");
+
+  try {
+    const response = await fetch("https://texlive.net/cgi-bin/latexcgi", {
+      method: "POST",
+      body: formData,
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return NextResponse.json(
+        {
+          error: "Cloud LaTeX compilation failed.",
+          details: text.slice(-500),
+        },
+        { status: 422 },
+      );
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (!contentType.includes("pdf")) {
+      const text = await response.text();
+      const logLines = text.split("\n").filter((l) => l.includes("!") || l.includes("Error")).slice(0, 20);
+      return NextResponse.json(
+        {
+          error: "Cloud LaTeX compilation returned errors.",
+          details: logLines.join("\n") || text.slice(-500),
+        },
+        { status: 422 },
+      );
+    }
+
+    const pdf = Buffer.from(await response.arrayBuffer());
+
+    return new NextResponse(pdf, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="resume.pdf"',
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Cloud LaTeX service unavailable. Install a local LaTeX compiler (tectonic) for reliable compilation.",
+        details: error instanceof Error ? error.message : "Network error",
+      },
+      { status: 503 },
+    );
   }
 }
 
