@@ -22,7 +22,6 @@
 \newcommand{\faFile}{[cert]}
 \newcommand{\faYoutube}{[video]}
 \newcommand{\faLink}{[link]}
-\input{glyphtounicode}
 
 % ---------------- Layout ----------------
 % A4 = 210mm x 297mm. Target: 0.3in symmetric margins top/bottom, 0.28in left/right.
@@ -48,7 +47,7 @@
 
 % ---------------- Section Formatting ----------------
 \titleformat{\section}
-  {\vspace{-4pt}\scshape\raggedright\large}
+  {\vspace{-4pt}\bfseries\raggedright\large}
   {}
   {0pt}
   {}
@@ -118,14 +117,14 @@
 
 % ---------------- Header ----------------
 \begin{center}
-  {\Huge \scshape Leonal Robin} \\ \vspace{1pt}
+  {\Huge \textbf{Leonal Robin}} \\ \vspace{1pt}
   Dindigul, Tamil Nadu, India \\ \vspace{1pt}
   \small
-  \ +91 8248731433 \quad
-  {\ leonalrobinlr10@gmail.com} \quad
-  {\ https://www.linkedin.com/in/leonal-robin-47b681284/} \quad
-  {\ https://github.com/Leonallr10} \quad
-  {\ https://leonalrobin.vercel.app/}
+  \href{tel:+918248731433}{+91 8248731433} \quad $|$ \quad
+  \href{mailto:leonalrobinlr10@gmail.com}{leonalrobinlr10@gmail.com} \quad $|$ \quad
+  \href{https://www.linkedin.com/in/leonal-robin-47b681284/}{LinkedIn} \quad $|$ \quad
+  \href{https://github.com/Leonallr10}{GitHub} \quad $|$ \quad
+  \href{https://leonalrobin.vercel.app/}{Portfolio}
 \end{center}\vspace{-6pt}
 
 % ---------------- Summary ----------------
@@ -179,6 +178,9 @@
  \resumeItemNoBullet{Integrated ML models into the data pipeline to enable predictive analytics on energy consumption patterns; automated model inference on incoming data streams and surfaced actionable insights through interactive PlotlyJS dashboards.}
 \resumeItemNoBullet{Built a responsive Django web interface with real-time data visualizations using PlotlyJS, enabling users to monitor live energy metrics, analyze historical usage trends, and make data-driven decisions through an intuitive UI.}
 \resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
 % ---------------- Projects ----------------
 \section{Projects}
 \resumeSubHeadingListStart

@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   try {
     await mkdir(workdir, { recursive: true });
-    await writeFile(sourcePath, normalizeLatexForPdf(parsedRequest.data.latex), "utf8");
+    await writeFile(sourcePath, normalizeLatexForPdf(parsedRequest.data.latex, engine), "utf8");
 
     const firstRun = await runCompiler(engine, sourcePath, workdir);
 
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (engine !== "tectonic") {
+    if (engine !== "tectonic" && !engine.includes("tectonic")) {
       await runCompiler(engine, sourcePath, workdir);
     }
 
@@ -118,11 +118,18 @@ async function resolveCompiler(preferred?: CompilerEngine) {
     }
   }
 
+  // Check for tectonic in local project directory as fallback
+  const localTectonic = path.join(process.cwd(), "tectonic-bin", "tectonic.exe");
+  const localAvailability = await runProcess(localTectonic, ["--version"], process.cwd(), 5000);
+  if (localAvailability.ok) {
+    return localTectonic as unknown as CompilerEngine;
+  }
+
   return undefined;
 }
 
-function runCompiler(engine: CompilerEngine, sourcePath: string, workdir: string) {
-  if (engine === "tectonic") {
+function runCompiler(engine: string, sourcePath: string, workdir: string) {
+  if (engine === "tectonic" || engine.includes("tectonic")) {
     return runProcess(
       engine,
       ["--outdir", workdir, "--keep-logs", sourcePath],
@@ -190,7 +197,7 @@ function trimLog(log: string) {
   return log.split("\n").slice(-80).join("\n").trim();
 }
 
-function normalizeLatexForPdf(source: string) {
+function normalizeLatexForPdf(source: string, engine: string) {
   let latex = source;
 
   // Users sometimes add "\ https://..." in header lines.
@@ -198,6 +205,48 @@ function normalizeLatexForPdf(source: string) {
 
   // Ensure plain URLs are clickable in generated PDF.
   latex = wrapBareUrlsWithLatexUrl(latex);
+
+  // Tectonic/XeTeX handle Unicode natively — strip pdflatex-specific commands.
+  // For pdflatex, inject ATS-critical unicode mapping.
+  if (engine === "tectonic" || engine === "xelatex" || engine.includes("tectonic")) {
+    latex = stripPdflatexUnicodeCommands(latex);
+  } else {
+    latex = injectAtsCompatibility(latex);
+  }
+
+  return latex;
+}
+
+function stripPdflatexUnicodeCommands(source: string) {
+  return source
+    .replace(/\\input\{glyphtounicode\}\s*/gi, "")
+    .replace(/\\pdfgentounicode\s*=\s*1\s*/g, "");
+}
+
+function injectAtsCompatibility(source: string) {
+  let latex = source;
+
+  const hasGlyphtounicode = /\\input\{glyphtounicode\}/i.test(latex);
+  const hasPdfgentounicode = /\\pdfgentounicode\s*=\s*1/.test(latex);
+
+  if (!hasPdfgentounicode) {
+    const atsBlock = [
+      ...(!hasGlyphtounicode ? ["\\input{glyphtounicode}"] : []),
+      "\\pdfgentounicode=1",
+    ].join("\n");
+
+    if (hasGlyphtounicode) {
+      latex = latex.replace(
+        /(\\input\{glyphtounicode\})/i,
+        `$1\n\\pdfgentounicode=1`,
+      );
+    } else {
+      latex = latex.replace(
+        /\\begin\{document\}/,
+        `${atsBlock}\n\\begin{document}`,
+      );
+    }
+  }
 
   return latex;
 }

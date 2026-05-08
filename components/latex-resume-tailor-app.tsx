@@ -1131,6 +1131,10 @@ export function LatexResumeTailorApp() {
     } catch (compileError) {
       try {
         await downloadPreviewPdfFallback();
+        toast.warning(
+          "PDF exported as image (not ATS-compatible). Install a LaTeX compiler (tectonic/pdflatex) for text-based PDFs that pass ATS checks.",
+          { duration: 8000 },
+        );
       } catch (fallbackError) {
         const compileMessage =
           compileError instanceof Error ? compileError.message : "LaTeX PDF compile failed.";
@@ -1389,6 +1393,12 @@ export function LatexResumeTailorApp() {
                 type="button"
                 onClick={downloadResumePdf}
                 disabled={!canCompilePdf || downloading}
+                title={
+                  compilerStatus?.available
+                    ? `PDF via ${compilerStatus.compiler} (ATS-compatible)`
+                    : "No LaTeX compiler found — PDF will be image-based (not ATS-compatible)"
+                }
+                className={!compilerStatus?.available && !checkingCompiler ? "border-amber-400" : ""}
               >
                 {downloading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1420,6 +1430,12 @@ export function LatexResumeTailorApp() {
                 <AlertTitle>Something needs attention</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            </div>
+          ) : null}
+
+          {!compilerStatus?.available && !checkingCompiler ? (
+            <div className="px-4 pt-2">
+              <CompilerNotice status={compilerStatus} checking={checkingCompiler} />
             </div>
           ) : null}
 

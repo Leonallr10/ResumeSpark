@@ -4,6 +4,7 @@ out
 dist
 output
 tmp
+tectonic-bin/
 .env
 .env.local
 .env*.local
