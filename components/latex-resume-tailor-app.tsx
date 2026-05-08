@@ -26,6 +26,7 @@ import {
   Loader2,
   Minus,
   Plus,
+  SearchCheck,
   Sparkles,
   Settings2,
   KeyRound,
@@ -130,6 +131,7 @@ export function LatexResumeTailorApp() {
   const [jd, setJd] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [auditing, setAuditing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
@@ -1157,6 +1159,71 @@ export function LatexResumeTailorApp() {
     );
   }
 
+  async function auditResume() {
+    if (resumeSections.length === 0) return;
+
+    setAuditing(true);
+    setError(null);
+    setSuggestions([]);
+    setSectionReviews([]);
+
+    try {
+      const apiKey = (
+        llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey
+      ).trim() || undefined;
+
+      const response = await fetch("/api/resume/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resumeSections: resumeSections.map((section) => ({
+            id: section.id,
+            title: section.title,
+            lines: section.lines.map((line) => ({
+              id: line.id,
+              page: line.page,
+              sectionId: line.sectionId,
+              text: line.text,
+              sourceLine: line.sourceLine,
+              sourceText: line.sourceText,
+              kind: line.kind,
+            })),
+          })),
+          provider: llmProvider,
+          model: llmModel.trim(),
+          apiKey,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        suggestions?: AiSuggestion[];
+        sectionReviews?: SectionReview[];
+        error?: string;
+        details?: unknown;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Audit failed.");
+      }
+
+      setSuggestions(payload.suggestions ?? []);
+      setSectionReviews(payload.sectionReviews ?? []);
+      setViewMode("preview");
+
+      if ((payload.suggestions ?? []).length === 0) {
+        toast.success("No issues found — your resume looks clean!");
+      } else {
+        toast.info(`Found ${payload.suggestions!.length} issue(s) to fix.`);
+      }
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Unable to audit resume.",
+      );
+    } finally {
+      setAuditing(false);
+    }
+  }
+
   async function renderPdfPreview() {
     setViewMode("pdf");
     setPdfFullscreen(true);
@@ -1388,6 +1455,19 @@ export function LatexResumeTailorApp() {
               </Button> */}
               <Button type="button" variant="outline" onClick={downloadLatexSource}>
                 <Code2 className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={auditResume}
+                disabled={auditing || resumeSections.length === 0}
+                title="ATS Audit: Check for missing metrics, repetition, and grammar issues"
+              >
+                {auditing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <SearchCheck className="h-4 w-4" />
+                )}
               </Button>
               <Button
                 type="button"

@@ -190,7 +190,7 @@ function runCompiler(engine: string, sourcePath: string, workdir: string) {
       engine,
       ["--outdir", workdir, "--keep-logs", sourcePath],
       workdir,
-      30000,
+      120000,
     );
   }
 
@@ -206,7 +206,7 @@ function runCompiler(engine: string, sourcePath: string, workdir: string) {
       sourcePath,
     ],
     workdir,
-    30000,
+    60000,
   );
 }
 
