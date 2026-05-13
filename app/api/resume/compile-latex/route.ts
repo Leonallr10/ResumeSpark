@@ -6,6 +6,8 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { parseLatexLog } from "@/lib/latex-log-parser";
+
 export const runtime = "nodejs";
 
 const compileRequestSchema = z.object({
@@ -59,7 +61,11 @@ export async function POST(request: Request) {
 
   try {
     await mkdir(workdir, { recursive: true });
-    await writeFile(sourcePath, normalizeLatexForPdf(parsedRequest.data.latex, engine), "utf8");
+    const originalLineCount = parsedRequest.data.latex.split("\n").length;
+    const normalizedSource = normalizeLatexForPdf(parsedRequest.data.latex, engine);
+    const normalizedLineCount = normalizedSource.split("\n").length;
+    const lineOffset = normalizedLineCount - originalLineCount;
+    await writeFile(sourcePath, normalizedSource, "utf8");
 
     const firstRun = await runCompiler(engine, sourcePath, workdir);
 
@@ -71,6 +77,7 @@ export async function POST(request: Request) {
           error: "LaTeX compilation failed.",
           compiler: engine,
           details: trimLog(log),
+          diagnostics: parseLatexLog(log, lineOffset),
         },
         { status: 422 },
       );
@@ -104,6 +111,7 @@ export async function POST(request: Request) {
 
 async function compileViaCloud(latex: string) {
   const normalizedLatex = normalizeLatexForPdf(latex, "pdflatex");
+  const lineOffset = normalizedLatex.split("\n").length - latex.split("\n").length;
 
   const formData = new FormData();
   formData.append("filecontents[]", new Blob([normalizedLatex], { type: "text/plain" }), "document.tex");
@@ -124,6 +132,7 @@ async function compileViaCloud(latex: string) {
         {
           error: "Cloud LaTeX compilation failed.",
           details: text.slice(-500),
+          diagnostics: parseLatexLog(text, lineOffset),
         },
         { status: 422 },
       );
@@ -138,6 +147,7 @@ async function compileViaCloud(latex: string) {
         {
           error: "Cloud LaTeX compilation returned errors.",
           details: logLines.join("\n") || text.slice(-500),
+          diagnostics: parseLatexLog(text, lineOffset),
         },
         { status: 422 },
       );

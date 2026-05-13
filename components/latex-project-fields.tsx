@@ -282,7 +282,7 @@ export function LatexProjectFields({
                 value={selectedProject.explanation}
                 onChange={(event) => updateField("explanation", event.target.value)}
                 placeholder="Project explanation"
-                className="min-h-35 text-xs leading-relaxed"
+                className="min-h-32 text-xs leading-relaxed"
               />
               <Input
                 value={selectedProject.techStack}
@@ -377,7 +377,7 @@ export function LatexProjectFields({
     }
   ]
 }`}
-              className="min-h-72 font-mono text-[10px] leading-relaxed bg-slate-50/50 border-emerald-100"
+              className="min-h-40 font-mono text-[10px] leading-relaxed bg-slate-50/50 border-emerald-100"
             />
             <div className="flex items-center justify-between pt-1">
               {jsonError ? (

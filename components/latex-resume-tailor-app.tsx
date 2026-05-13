@@ -15,17 +15,21 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import {
+  AlertTriangle,
   CheckCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  CircleCheck,
   Code2,
   Download,
+  Eye,
   FileText,
   Loader2,
   Minus,
   Plus,
+  RefreshCw,
   SearchCheck,
   Sparkles,
   Settings2,
@@ -38,11 +42,14 @@ import {
 
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import type { LatexDiagnostic } from "@/types/latex-diagnostics";
 import { createLatexSuggestionExtension } from "@/components/latex-editor-suggestions";
 import { createPolishExtension } from "@/components/latex-polish-extension";
 import {
@@ -173,6 +180,11 @@ export function LatexResumeTailorApp() {
   const typingIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [polishState, setPolishState] = useState<PolishState>(null);
   const polishAbortRef = useRef<AbortController | null>(null);
+  const [diagnostics, setDiagnostics] = useState<LatexDiagnostic[]>([]);
+  const [isRecompiling, setIsRecompiling] = useState(false);
+  const [lastCompileSuccess, setLastCompileSuccess] = useState<boolean | null>(null);
+  const [diagnosticsPanelOpen, setDiagnosticsPanelOpen] = useState(false);
+  const [committedLatex, setCommittedLatex] = useState(DEFAULT_LATEX_RESUME);
   const LATEX_HISTORY_DEBOUNCE_MS = 450;
 
   latestLatexRef.current = latexCode;
@@ -186,10 +198,11 @@ export function LatexResumeTailorApp() {
   );
 
   const resumeSections = useMemo(() => parseLatexResume(latexCode), [latexCode]);
-  const previewLayout = useMemo(() => derivePreviewLayoutFromLatex(latexCode), [latexCode]);
+  const previewSections = useMemo(() => parseLatexResume(committedLatex), [committedLatex]);
+  const previewLayout = useMemo(() => derivePreviewLayoutFromLatex(committedLatex), [committedLatex]);
   const previewPages = useMemo(
-    () => paginateResumeSections(resumeSections, previewLayout),
-    [resumeSections, previewLayout],
+    () => paginateResumeSections(previewSections, previewLayout),
+    [previewSections, previewLayout],
   );
   const previewPageCount = previewPages.length;
   const activeProjectDrafts = useMemo(
@@ -428,6 +441,9 @@ export function LatexResumeTailorApp() {
   const revokePdfPreview = useCallback(() => {
     setPdfFullscreen(false);
     pdfBlobRef.current = null;
+    setDiagnostics([]);
+    setLastCompileSuccess(null);
+    setDiagnosticsPanelOpen(false);
     setPdfUrl((currentUrl) => {
       if (currentUrl) {
         URL.revokeObjectURL(currentUrl);
@@ -1027,6 +1043,62 @@ export function LatexResumeTailorApp() {
   }
 
 
+  async function recompileLatex() {
+    setIsRecompiling(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/resume/compile-latex", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latex: latexCode }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json() as {
+          error?: string;
+          details?: string;
+          diagnostics?: LatexDiagnostic[];
+        };
+        const diags = payload.diagnostics ?? [];
+        setDiagnostics(diags);
+        setLastCompileSuccess(false);
+        setDiagnosticsPanelOpen(diags.length > 0);
+
+        const errorCount = diags.filter((d) => d.severity === "error").length;
+        const warnCount = diags.filter((d) => d.severity === "warning").length;
+        const parts = [
+          errorCount > 0 ? `${errorCount} error${errorCount > 1 ? "s" : ""}` : "",
+          warnCount > 0 ? `${warnCount} warning${warnCount > 1 ? "s" : ""}` : "",
+        ].filter(Boolean).join(", ");
+
+        toast.error(
+          parts ? `Compilation failed: ${parts}` : (payload.error ?? "Compilation failed."),
+          { duration: 5000 },
+        );
+        return;
+      }
+
+      const blob = await response.blob();
+      pdfBlobRef.current = blob;
+      setPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(blob);
+      });
+      setCommittedLatex(latexCode);
+      setDiagnostics([]);
+      setLastCompileSuccess(true);
+      setDiagnosticsPanelOpen(false);
+      toast.success("Compiled successfully.", { duration: 3000 });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Compilation failed.");
+      setLastCompileSuccess(false);
+      toast.error("Compilation failed — check your connection.", { duration: 5000 });
+    } finally {
+      setIsRecompiling(false);
+    }
+  }
+
   async function downloadResumePdf() {
     setDownloading(true);
     setError(null);
@@ -1569,6 +1641,7 @@ export function LatexResumeTailorApp() {
                     />
                     <span className="text-sm text-slate-200">/ {previewPageCount}</span>
                     <span className="mx-1 h-6 w-px bg-slate-600" />
+
                     <Button
                       type="button"
                       variant="ghost"
@@ -1592,6 +1665,49 @@ export function LatexResumeTailorApp() {
                       title="Redo LaTeX edit"
                     >
                       <Redo2 className="h-4 w-4" />
+                    </Button>
+                    <span className="mx-1 h-6 w-px bg-slate-600" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className={`relative h-7 gap-1.5 px-2 text-sm hover:bg-slate-700 hover:text-slate-100 ${lastCompileSuccess === false
+                        ? "text-red-400"
+                        : lastCompileSuccess === true
+                          ? "text-green-400"
+                          : "text-slate-100"
+                        }`}
+                      onClick={recompileLatex}
+                      disabled={isRecompiling || !canCompilePdf}
+                      title="Recompile LaTeX and show diagnostics"
+                    >
+                      {isRecompiling ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : lastCompileSuccess === true ? (
+                        <CircleCheck className="h-3.5 w-3.5" />
+                      ) : lastCompileSuccess === false ? (
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                      {lastCompileSuccess === false && diagnostics.filter((d) => d.severity === "error").length > 0 && (
+                        <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 text-[10px] leading-none">
+                          {diagnostics.filter((d) => d.severity === "error").length}
+                        </Badge>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-7 gap-1.5 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                      onClick={renderPdfPreview}
+                      disabled={!canCompilePdf || renderingPdf}
+                      title="Preview compiled PDF fullscreen"
+                    >
+                      {renderingPdf ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                      )}
                     </Button>
                     <span className="mx-1 h-6 w-px bg-slate-600" />
                     <Button
@@ -1631,6 +1747,74 @@ export function LatexResumeTailorApp() {
                   </Button>
                 </div>
 
+                {/* Diagnostics Panel */}
+                <AnimatePresence>
+                  {diagnosticsPanelOpen && diagnostics.length > 0 && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden border-t border-slate-700 bg-slate-900"
+                    >
+                      <div className="flex items-center justify-between px-3 py-1.5">
+                        <div className="flex items-center gap-3 text-xs">
+                          {diagnostics.filter((d) => d.severity === "error").length > 0 && (
+                            <span className="flex items-center gap-1 text-red-400">
+                              <AlertTriangle className="h-3 w-3" />
+                              {diagnostics.filter((d) => d.severity === "error").length} error{diagnostics.filter((d) => d.severity === "error").length > 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {diagnostics.filter((d) => d.severity === "warning").length > 0 && (
+                            <span className="flex items-center gap-1 text-amber-400">
+                              <AlertTriangle className="h-3 w-3" />
+                              {diagnostics.filter((d) => d.severity === "warning").length} warning{diagnostics.filter((d) => d.severity === "warning").length > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-slate-400 hover:bg-slate-700 hover:text-slate-100"
+                          onClick={() => setDiagnosticsPanelOpen(false)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <ScrollArea className="max-h-48">
+                        <div className="space-y-0.5 px-3 pb-2">
+                          {diagnostics.map((diag) => (
+                            <div
+                              key={diag.id}
+                              className="flex items-start gap-2 rounded px-1.5 py-1 text-xs hover:bg-slate-800"
+                            >
+                              <AlertTriangle
+                                className={`mt-0.5 h-3 w-3 shrink-0 ${diag.severity === "error" ? "text-red-400" : "text-amber-400"
+                                  }`}
+                              />
+                              <button
+                                type="button"
+                                className="shrink-0 font-mono text-blue-400 hover:underline"
+                                onClick={() => focusEditorAtSourceLine(diag.line - 1)}
+                                title={`Go to line ${diag.line}`}
+                              >
+                                L{diag.line}
+                              </button>
+                              <span className="text-slate-300">{diag.message}</span>
+                              {diag.context && (
+                                <code className="ml-auto shrink-0 truncate rounded bg-slate-800 px-1 text-[10px] text-slate-500">
+                                  {diag.context}
+                                </code>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div ref={previewPaneRef} className="min-h-0 flex-1 overflow-hidden">
                   {viewMode === "pdf" ? (
                     <PdfPreview pdfUrl={pdfUrl} rendering={renderingPdf} zoom={previewZoom} />
@@ -1662,7 +1846,7 @@ export function LatexResumeTailorApp() {
               animate={{ opacity: 1, x: 0, width: "100%" }}
               exit={{ opacity: 0, x: 20, width: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="flex w-full min-h-0 flex-col xl:w-[510px] xl:max-w-[510px] xl:self-stretch overflow-hidden"
+              className="flex w-full min-h-0 flex-col xl:w-[450px] xl:max-w-[450px] xl:self-stretch overflow-hidden"
             >
               <Card className="sticky top-5 min-h-0 flex-1 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
                 <CardContent className="space-y-5 pt-5 xl:flex xl:flex-1 xl:flex-col xl:overflow-y-auto">
@@ -1751,7 +1935,7 @@ export function LatexResumeTailorApp() {
                               value={jd}
                               onChange={(event) => setJd(event.target.value)}
                               placeholder="Paste the job description here."
-                              className="min-h-48"
+                              className="min-h-32"
                               maxLength={JD_LIMIT}
                             />
                             <FieldCounter value={jd.length} max={JD_LIMIT} />
