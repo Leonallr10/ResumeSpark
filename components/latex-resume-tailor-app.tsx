@@ -153,6 +153,7 @@ export function LatexResumeTailorApp() {
   const [claudeApiKey, setClaudeApiKey] = useState("");
   const [testingKey, setTestingKey] = useState(false);
   const [testKeyResult, setTestKeyResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const pdfBlobRef = useRef<Blob | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
@@ -426,6 +427,7 @@ export function LatexResumeTailorApp() {
 
   const revokePdfPreview = useCallback(() => {
     setPdfFullscreen(false);
+    pdfBlobRef.current = null;
     setPdfUrl((currentUrl) => {
       if (currentUrl) {
         URL.revokeObjectURL(currentUrl);
@@ -1024,129 +1026,20 @@ export function LatexResumeTailorApp() {
     return blob;
   }
 
-  async function downloadPreviewPdfFallback() {
-    const element = previewRef.current;
-
-    if (!element) {
-      throw new Error("Preview is not available for fallback export.");
-    }
-
-    const html2pdf = (await import("html2pdf.js")).default;
-    const exportRoot = element.cloneNode(true) as HTMLDivElement;
-    const pagesContainer = exportRoot.firstElementChild as HTMLDivElement | null;
-    const pageWrappers = Array.from(
-      exportRoot.querySelectorAll<HTMLDivElement>("[data-preview-page]"),
-    );
-    const pageCards = Array.from(
-      exportRoot.querySelectorAll<HTMLDivElement>(".resume-preview-page"),
-    );
-    const printablePages = pageWrappers.filter(hasRenderablePageContent);
-    const exportPageWidthPx = Math.floor(previewLayout.pageWidthPx);
-    const exportPageHeightPx = Math.floor(previewLayout.pageHeightPx);
-
-    if (printablePages.length === 0) {
-      throw new Error("Preview does not contain any printable content.");
-    }
-
-    // Remove preview layout classes so export sizing stays deterministic.
-    exportRoot.className = "";
-    exportRoot.classList.add("resume-export");
-    exportRoot.style.width = `${exportPageWidthPx}px`;
-    exportRoot.style.minWidth = `${exportPageWidthPx}px`;
-    exportRoot.style.maxWidth = `${exportPageWidthPx}px`;
-    exportRoot.style.margin = "0";
-    exportRoot.style.padding = "0";
-    exportRoot.style.overflow = "hidden";
-    exportRoot.style.background = "#ffffff";
-    exportRoot.style.boxSizing = "border-box";
-
-    if (pagesContainer) {
-      pagesContainer.classList.remove("space-y-6", "py-1");
-      pagesContainer.style.display = "flex";
-      pagesContainer.style.flexDirection = "column";
-      pagesContainer.style.gap = "0";
-      pagesContainer.style.padding = "0";
-    }
-
-    pageWrappers
-      .filter((page) => !printablePages.includes(page))
-      .forEach((page) => page.remove());
-
-    printablePages.forEach((page, index) => {
-      page.style.width = `${exportPageWidthPx}px`;
-      page.style.height = `${exportPageHeightPx}px`;
-      page.style.display = "block";
-      page.style.margin = "0";
-      page.style.padding = "0";
-      page.style.overflow = "hidden";
-      page.style.pageBreakInside = "avoid";
-      page.style.breakInside = "avoid";
-      page.style.pageBreakAfter = index === printablePages.length - 1 ? "auto" : "always";
-      page.style.breakAfter = index === printablePages.length - 1 ? "auto" : "page";
-    });
-
-    pageCards.forEach((page) => {
-      page.style.transform = "none";
-      page.style.transformOrigin = "top center";
-      page.style.width = `${exportPageWidthPx}px`;
-      page.style.height = `${exportPageHeightPx}px`;
-      page.style.boxShadow = "none";
-      page.style.margin = "0";
-      page.style.background = "#ffffff";
-    });
-
-    document.body.appendChild(exportRoot);
-
-    try {
-      await html2pdf()
-        .set({
-          filename: getDownloadFilename(companyRole),
-          margin: [0, 0, 0, 0],
-          image: { type: "jpeg", quality: 0.98 },
-          enableLinks: true,
-          html2canvas: {
-            scale: 2,
-            backgroundColor: "#ffffff",
-            useCORS: true,
-          },
-          jsPDF: {
-            unit: "mm",
-            format: "a4",
-            orientation: "portrait",
-          },
-          pagebreak: { mode: [] },
-        })
-        .from(exportRoot)
-        .save();
-    } finally {
-      exportRoot.remove();
-    }
-  }
 
   async function downloadResumePdf() {
     setDownloading(true);
     setError(null);
 
     try {
-      const blob = await createPdfBlob();
+      const blob = pdfBlobRef.current ?? await createPdfBlob();
+      pdfBlobRef.current = blob;
       downloadBlob(blob, getDownloadFilename(companyRole));
     } catch (compileError) {
-      try {
-        await downloadPreviewPdfFallback();
-        toast.warning(
-          "PDF exported as image (not ATS-compatible). Install a LaTeX compiler (tectonic/pdflatex) for text-based PDFs that pass ATS checks.",
-          { duration: 8000 },
-        );
-      } catch (fallbackError) {
-        const compileMessage =
-          compileError instanceof Error ? compileError.message : "LaTeX PDF compile failed.";
-        const fallbackMessage =
-          fallbackError instanceof Error
-            ? fallbackError.message
-            : "Fallback PDF export also failed.";
-
-        setError([compileMessage, fallbackMessage].join(" "));
-      }
+      const message =
+        compileError instanceof Error ? compileError.message : "LaTeX compilation failed.";
+      setError(message);
+      toast.error("PDF download failed — fix LaTeX errors and try again.", { duration: 6000 });
     } finally {
       setDownloading(false);
     }
@@ -1237,6 +1130,7 @@ export function LatexResumeTailorApp() {
 
     try {
       const blob = await createPdfBlob();
+      pdfBlobRef.current = blob;
       setPdfUrl(URL.createObjectURL(blob));
     } catch (previewError) {
       setViewMode("preview");
@@ -1475,10 +1369,9 @@ export function LatexResumeTailorApp() {
                 disabled={!canCompilePdf || downloading}
                 title={
                   compilerStatus?.available
-                    ? `PDF via ${compilerStatus.compiler} (ATS-compatible)`
-                    : "No LaTeX compiler found — PDF will be image-based (not ATS-compatible)"
+                    ? `Download PDF via ${compilerStatus.compiler} (ATS-compatible)`
+                    : "No LaTeX compiler found"
                 }
-                className={!compilerStatus?.available && !checkingCompiler ? "border-amber-400" : ""}
               >
                 {downloading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -2058,16 +1951,6 @@ export function LatexResumeTailorApp() {
       </div>
     </main>
   );
-}
-
-function hasRenderablePageContent(page: HTMLDivElement) {
-  const text = (page.textContent ?? "").replace(/\s+/g, " ").trim();
-
-  if (text.length > 0) {
-    return true;
-  }
-
-  return Boolean(page.querySelector("img,svg,canvas,table"));
 }
 
 function stripMetadataForGemini(sections: ResumeSection[]): ResumeSection[] {

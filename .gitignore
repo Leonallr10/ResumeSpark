@@ -10,3 +10,5 @@ tectonic-bin/
 .env*.local
 *.tsbuildinfo
 *.log
+*.pdf
+*.tex
