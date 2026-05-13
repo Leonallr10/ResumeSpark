@@ -1190,10 +1190,8 @@ export function LatexResumeTailorApp() {
   }
 
   async function renderPdfPreview() {
-    setViewMode("pdf");
-    setPdfFullscreen(true);
-
     if (pdfUrl) {
+      setPdfFullscreen(true);
       return;
     }
 
@@ -1204,8 +1202,8 @@ export function LatexResumeTailorApp() {
       const blob = await createPdfBlob();
       pdfBlobRef.current = blob;
       setPdfUrl(URL.createObjectURL(blob));
+      setPdfFullscreen(true);
     } catch (previewError) {
-      setViewMode("preview");
       setError(
         previewError instanceof Error
           ? previewError.message
@@ -1816,23 +1814,19 @@ export function LatexResumeTailorApp() {
                 </AnimatePresence>
 
                 <div ref={previewPaneRef} className="min-h-0 flex-1 overflow-hidden">
-                  {viewMode === "pdf" ? (
-                    <PdfPreview pdfUrl={pdfUrl} rendering={renderingPdf} zoom={previewZoom} />
-                  ) : (
-                    <div
-                      ref={previewScrollRef}
-                      className="h-full overflow-x-auto overflow-y-scroll px-3 py-4"
-                      style={{ scrollbarGutter: "stable both-edges" }}
-                    >
-                      <ResumePreview
-                        ref={previewRef}
-                        pages={previewPages}
-                        layout={previewLayout}
-                        zoom={previewZoom}
-                        onNavigateToSource={navigateFromPreviewToSource}
-                      />
-                    </div>
-                  )}
+                  <div
+                    ref={previewScrollRef}
+                    className="h-full overflow-x-auto overflow-y-scroll px-3 py-4"
+                    style={{ scrollbarGutter: "stable both-edges" }}
+                  >
+                    <ResumePreview
+                      ref={previewRef}
+                      pages={previewPages}
+                      layout={previewLayout}
+                      zoom={previewZoom}
+                      onNavigateToSource={navigateFromPreviewToSource}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

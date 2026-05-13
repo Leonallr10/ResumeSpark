@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -58,25 +58,13 @@ export function PdfFullscreenPreview({
 }: PdfFullscreenPreviewProps) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#e8eeee]">
-      <div className="flex items-center justify-between border-b bg-white px-4 py-3 shadow-sm">
+      <div className="flex items-center justify-between border-b bg-white px-4 py-2 shadow-sm">
         <div>
           <h2 className="text-sm font-semibold">PDF preview</h2>
-          <p className="text-xs text-muted-foreground">
-            Compiled from the current LaTeX source.
-          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="icon" onClick={onZoomOut} title="Zoom out">
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button type="button" variant="outline" className="min-w-16" onClick={onZoomReset}>
-            {zoom}%
-          </Button>
-          <Button type="button" variant="outline" size="icon" onClick={onZoomIn} title="Zoom in">
-            <ZoomIn className="h-4 w-4" />
-          </Button>
           <Button type="button" variant="outline" onClick={onClose}>
-            <X className="h-4 w-4" />
+            <Undo2 className="h-4 w-4" />
             Back to editor
           </Button>
         </div>
@@ -85,7 +73,7 @@ export function PdfFullscreenPreview({
       <div className="min-h-0 flex-1">
         {rendering ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-2 h-3 w-2 animate-spin" />
             Compiling LaTeX PDF...
           </div>
         ) : pdfUrl ? (
