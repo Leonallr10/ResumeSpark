@@ -1687,14 +1687,14 @@ export function LatexResumeTailorApp() {
                 <select
                   value={toolbarCommand}
                   onChange={(e) => setToolbarCommand(e.target.value as FormattingType)}
-                  className="h-8 rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-8 w-32 truncate rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="header-name">Header Name (\Huge)</option>
-                  <option value="section">Section (\section)</option>
-                  <option value="resumeSubheading">Subheading (\resumeSubheading)</option>
-                  <option value="resumeProjectHeading">Project Heading (\resumeProjectHeading)</option>
-                  <option value="resumeItem">Bullet Item (\resumeItem)</option>
-                  <option value="normal-text">Normal Text (base)</option>
+                  <option value="header-name">Header Name</option>
+                  <option value="section">Section</option>
+                  <option value="resumeSubheading">Subheading</option>
+                  <option value="resumeProjectHeading">Project Head</option>
+                  <option value="resumeItem">Bullet Item</option>
+                  <option value="normal-text">Normal Text</option>
                 </select>
                 <div
                   className="relative flex h-8 w-20 items-center rounded-md border border-input bg-background text-sm select-none"
