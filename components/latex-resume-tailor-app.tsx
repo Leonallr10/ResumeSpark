@@ -27,15 +27,19 @@ import {
   Download,
   Eye,
   FileText,
+  List,
+  ListOrdered,
   Loader2,
   Minus,
   Plus,
   RefreshCw,
+  Search,
   SearchCheck,
   Sparkles,
   Settings2,
   KeyRound,
   Redo2,
+  Type,
   Undo2,
   Upload,
   X,
@@ -66,6 +70,7 @@ import {
   derivePreviewLayoutFromLatex,
   paginateResumeSections,
   ResumePreview,
+  type PreviewFontSizes,
   type ResumePreviewSelection,
 } from "@/components/latex-resume-preview";
 import {
@@ -79,6 +84,7 @@ import {
   type ProjectDraft,
 } from "@/lib/latex-resume";
 import { getDownloadFilename, sanitizeFilename } from "@/lib/resume";
+import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
 import type {
   AiSuggestion,
@@ -127,6 +133,32 @@ const MODEL_OPTIONS: { provider: LlmProvider; model: string; label: string }[] =
 
 function providerForModel(model: string): LlmProvider {
   return MODEL_OPTIONS.find((opt) => opt.model === model)?.provider ?? "gemini";
+}
+
+type FormattingType = "section" | "resumeSubheading" | "resumeProjectHeading" | "resumeItem" | "normal-text" | "header-name";
+
+const LATEX_SIZE_COMMANDS = [
+  { cmd: "\\tiny", pt: 6 },
+  { cmd: "\\scriptsize", pt: 8 },
+  { cmd: "\\footnotesize", pt: 9 },
+  { cmd: "\\small", pt: 10 },
+  { cmd: "\\normalsize", pt: 11 },
+  { cmd: "\\large", pt: 12 },
+  { cmd: "\\Large", pt: 14 },
+  { cmd: "\\LARGE", pt: 17 },
+  { cmd: "\\huge", pt: 20 },
+  { cmd: "\\Huge", pt: 25 },
+] as const;
+
+const LATEX_SIZE_TABLES: Record<number, Record<string, number>> = {
+  10: { "\\tiny": 5, "\\scriptsize": 7, "\\footnotesize": 8, "\\small": 9, "\\normalsize": 10, "\\large": 12, "\\Large": 14, "\\LARGE": 17, "\\huge": 21, "\\Huge": 25 },
+  11: { "\\tiny": 6, "\\scriptsize": 8, "\\footnotesize": 9, "\\small": 10, "\\normalsize": 11, "\\large": 12, "\\Large": 14, "\\LARGE": 17, "\\huge": 21, "\\Huge": 25 },
+  12: { "\\tiny": 6, "\\scriptsize": 8, "\\footnotesize": 10, "\\small": 11, "\\normalsize": 12, "\\large": 14, "\\Large": 17, "\\LARGE": 21, "\\huge": 25, "\\Huge": 25 },
+};
+
+function latexSizePtForBase(cmd: string, basePt: number): number {
+  const table = LATEX_SIZE_TABLES[basePt] ?? LATEX_SIZE_TABLES[11];
+  return table[cmd] ?? basePt;
 }
 
 export function LatexResumeTailorApp() {
@@ -187,6 +219,8 @@ export function LatexResumeTailorApp() {
   const [diagnosticsPanelOpen, setDiagnosticsPanelOpen] = useState(false);
   const [committedLatex, setCommittedLatex] = useState(DEFAULT_LATEX_RESUME);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [toolbarCommand, setToolbarCommand] = useState<FormattingType>("section");
+  const [formattingMenuOpen, setFormattingMenuOpen] = useState(false);
   const LATEX_HISTORY_DEBOUNCE_MS = 450;
 
   latestLatexRef.current = latexCode;
@@ -202,9 +236,17 @@ export function LatexResumeTailorApp() {
   const resumeSections = useMemo(() => parseLatexResume(latexCode), [latexCode]);
   const previewSections = useMemo(() => parseLatexResume(committedLatex), [committedLatex]);
   const previewLayout = useMemo(() => derivePreviewLayoutFromLatex(committedLatex), [committedLatex]);
+  const previewFontSizes = useMemo((): PreviewFontSizes => ({
+    headerNamePt: getFormattingFontSize("header-name", committedLatex),
+    sectionPt: getFormattingFontSize("section", committedLatex),
+    subheadingPt: getFormattingFontSize("resumeSubheading", committedLatex),
+    projectHeadingPt: getFormattingFontSize("resumeProjectHeading", committedLatex),
+    bulletItemPt: getFormattingFontSize("resumeItem", committedLatex),
+    normalTextPt: getFormattingFontSize("normal-text", committedLatex),
+  }), [committedLatex]);
   const previewPages = useMemo(
-    () => paginateResumeSections(previewSections, previewLayout),
-    [previewSections, previewLayout],
+    () => paginateResumeSections(previewSections, previewLayout, previewFontSizes),
+    [previewSections, previewLayout, previewFontSizes],
   );
   const previewPageCount = previewPages.length;
   const activeProjectDrafts = useMemo(
@@ -1198,6 +1240,283 @@ export function LatexResumeTailorApp() {
     window.open(`/api/resume/preview/${previewId}`, "_blank");
   }
 
+  function wrapSelectionWith(prefix: string, suffix: string) {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const { state } = view;
+    const selection = state.selection.main;
+    const selectedText = state.sliceDoc(selection.from, selection.to);
+    const insert = selectedText
+      ? `${prefix}${selectedText}${suffix}`
+      : `${prefix}${suffix}`;
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert },
+      selection: {
+        anchor: selectedText
+          ? selection.from + insert.length
+          : selection.from + prefix.length,
+      },
+    });
+    view.focus();
+  }
+
+  function insertLatexBold() {
+    wrapSelectionWith("\\textbf{", "}");
+  }
+
+  function insertLatexItalic() {
+    wrapSelectionWith("\\textit{", "}");
+  }
+
+
+  function getDocumentBasePt(latex: string): number {
+    const m = latex.match(/\\documentclass\[[^\]]*?(\d+(?:\.\d+)?)pt[^\]]*\]/);
+    if (!m) return 11;
+    const raw = Number.parseFloat(m[1]);
+    if (raw <= 10.5) return 10;
+    if (raw <= 11.5) return 11;
+    return 12;
+  }
+
+  function extractSizeFromArgs(formatArgs: string, basePt: number = 11): number {
+    for (const { cmd } of [...LATEX_SIZE_COMMANDS].reverse()) {
+      if (formatArgs.includes(cmd)) return latexSizePtForBase(cmd, basePt);
+    }
+    return basePt;
+  }
+
+  function findCommandBody(latex: string, cmdName: string): { body: string; start: number; end: number } | null {
+    const prefix = `\\newcommand{\\${cmdName}}`;
+    const idx = latex.indexOf(prefix);
+    if (idx === -1) return null;
+    let pos = idx + prefix.length;
+    while (pos < latex.length && latex[pos] !== "{") pos++;
+    if (pos >= latex.length) return null;
+    let depth = 0;
+    const bodyStart = pos;
+    for (; pos < latex.length; pos++) {
+      if (latex[pos] === "{") depth++;
+      else if (latex[pos] === "}") {
+        depth--;
+        if (depth === 0) {
+          return { body: latex.slice(bodyStart + 1, pos), start: bodyStart + 1, end: pos };
+        }
+      }
+    }
+    return null;
+  }
+
+  function closestSizeCommand(targetPt: number, basePt: number = 11): string {
+    let closestCmd = LATEX_SIZE_COMMANDS[0].cmd as string;
+    let minDiff = Math.abs(targetPt - latexSizePtForBase(LATEX_SIZE_COMMANDS[0].cmd, basePt));
+    for (const entry of LATEX_SIZE_COMMANDS) {
+      const actualPt = latexSizePtForBase(entry.cmd, basePt);
+      const diff = Math.abs(targetPt - actualPt);
+      if (diff < minDiff) {
+        closestCmd = entry.cmd;
+        minDiff = diff;
+      }
+    }
+    return closestCmd;
+  }
+
+  function getFormattingFontSize(type: FormattingType, latex: string): number {
+    const basePt = getDocumentBasePt(latex);
+
+    switch (type) {
+      case "normal-text":
+        return basePt;
+      case "section": {
+        const matches = [...latex.matchAll(/\\titleformat\{\\section\}\{([^}]*)\}/g)];
+        const last = matches[matches.length - 1];
+        return last ? extractSizeFromArgs(last[1], basePt) : Math.round(basePt * 1.2);
+      }
+      case "header-name": {
+        const headerMatch = latex.match(/\\textbf\{(\\[A-Za-z]+)\s/)
+          ?? latex.match(/\{(\\Huge|\\huge|\\LARGE|\\Large|\\large)\s/);
+        return headerMatch ? extractSizeFromArgs(headerMatch[1], basePt) : 25;
+      }
+      case "resumeSubheading": {
+        const cmd = findCommandBody(latex, "resumeSubheading");
+        if (!cmd) return basePt;
+        return extractSizeFromArgs(cmd.body, basePt);
+      }
+      case "resumeProjectHeading": {
+        const cmd = findCommandBody(latex, "resumeProjectHeading");
+        if (!cmd) return basePt;
+        return extractSizeFromArgs(cmd.body, basePt);
+      }
+      case "resumeItem": {
+        const cmd = findCommandBody(latex, "resumeItem")
+          ?? findCommandBody(latex, "resumeItemNoBullet");
+        return cmd ? extractSizeFromArgs(cmd.body, basePt) : Math.round(basePt * 0.9);
+      }
+      default:
+        return basePt;
+    }
+  }
+
+  const SIZE_PATTERN = /\\(?:tiny|scriptsize|footnotesize|small|normalsize|large|Large|LARGE|huge|Huge)\b/;
+
+  function replaceSizeInBody(body: string, newCmd: string): string {
+    return SIZE_PATTERN.test(body) ? body.replace(SIZE_PATTERN, newCmd) : `${newCmd}${body}`;
+  }
+
+  function replaceSizeInCommandBody(latex: string, cmdName: string, newCmd: string): string {
+    const found = findCommandBody(latex, cmdName);
+    if (!found) return latex;
+    const newBody = replaceSizeInBody(found.body, newCmd);
+    return `${latex.slice(0, found.start)}${newBody}${latex.slice(found.end)}`;
+  }
+
+  function applyFormattingFontSize(type: FormattingType, newPt: number) {
+    let updated = latexCode;
+    const basePt = getDocumentBasePt(latexCode);
+    const newCmd = closestSizeCommand(newPt, basePt);
+
+    switch (type) {
+      case "normal-text": {
+        const validBase = [10, 11, 12].includes(newPt) ? newPt : 11;
+        updated = updated.replace(
+          /\\documentclass\[([^\]]*?)(\d+(?:\.\d+)?)pt([^\]]*)\]/,
+          `\\documentclass[$1${validBase}pt$3]`,
+        );
+        break;
+      }
+      case "section": {
+        const re = /(\\titleformat\{\\section\}\{)([^}]*)(\})/g;
+        const allMatches = [...updated.matchAll(re)];
+        if (allMatches.length > 0) {
+          const lastMatch = allMatches[allMatches.length - 1];
+          const lastIdx = lastMatch.index!;
+          const before = updated.slice(0, lastIdx);
+          const after = updated.slice(lastIdx + lastMatch[0].length);
+          updated = `${before}${lastMatch[1]}${replaceSizeInBody(lastMatch[2], newCmd)}${lastMatch[3]}${after}`;
+        } else {
+          const ins = updated.indexOf("\\begin{document}");
+          if (ins !== -1) {
+            const line = `\\titleformat{\\section}{${newCmd}\\bfseries}{}{0em}{}[\\titlerule]\n`;
+            updated = `${updated.slice(0, ins)}${line}${updated.slice(ins)}`;
+          }
+        }
+        break;
+      }
+      case "header-name": {
+        const textbfRe = /(\\textbf\{)(\\[A-Za-z]+)(\s)/;
+        const braceRe = /(\{)(\\Huge|\\huge|\\LARGE|\\Large|\\large)([\s\\])/;
+        if (textbfRe.test(updated)) {
+          updated = updated.replace(textbfRe, `$1${newCmd}$3`);
+        } else if (braceRe.test(updated)) {
+          updated = updated.replace(braceRe, `$1${newCmd}$3`);
+        }
+        break;
+      }
+      case "resumeSubheading": {
+        const result = replaceSizeInCommandBody(updated, "resumeSubheading", newCmd);
+        if (result !== updated) {
+          updated = result;
+        }
+        break;
+      }
+      case "resumeProjectHeading": {
+        const result = replaceSizeInCommandBody(updated, "resumeProjectHeading", newCmd);
+        if (result !== updated) {
+          updated = result;
+        }
+        break;
+      }
+      case "resumeItem": {
+        let result = replaceSizeInCommandBody(updated, "resumeItem", newCmd);
+        if (result === updated) {
+          result = replaceSizeInCommandBody(updated, "resumeItemNoBullet", newCmd);
+        }
+        updated = result;
+        break;
+      }
+    }
+
+    if (updated !== latexCode) {
+      replaceLatexContent(updated, { recordHistory: true });
+    }
+  }
+
+  function insertBulletList() {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const { state } = view;
+    const selection = state.selection.main;
+    const selectedText = state.sliceDoc(selection.from, selection.to);
+    const items = selectedText
+      ? selectedText.split("\n").map((line) => `  \\item ${line}`).join("\n")
+      : "  \\item ";
+    const insert = `\\begin{itemize}\n${items}\n\\end{itemize}`;
+    const cursorPos = selectedText
+      ? selection.from + insert.length
+      : selection.from + "\\begin{itemize}\n  \\item ".length;
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert },
+      selection: { anchor: cursorPos },
+    });
+    view.focus();
+  }
+
+  function insertNumberedList() {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const { state } = view;
+    const selection = state.selection.main;
+    const selectedText = state.sliceDoc(selection.from, selection.to);
+    const items = selectedText
+      ? selectedText.split("\n").map((line) => `  \\item ${line}`).join("\n")
+      : "  \\item ";
+    const insert = `\\begin{enumerate}\n${items}\n\\end{enumerate}`;
+    const cursorPos = selectedText
+      ? selection.from + insert.length
+      : selection.from + "\\begin{enumerate}\n  \\item ".length;
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert },
+      selection: { anchor: cursorPos },
+    });
+    view.focus();
+  }
+
+  function handleFindReplace() {
+    const view = editorViewRef.current;
+    if (!view) return;
+    openSearchPanel(view);
+  }
+
+  const currentFontSize = useMemo(() => {
+    return getFormattingFontSize(toolbarCommand, latexCode);
+  }, [toolbarCommand, latexCode]);
+
+  const [fontSizeInput, setFontSizeInput] = useState(String(currentFontSize));
+  const [isFontSizeEditing, setIsFontSizeEditing] = useState(false);
+  const fontSizeDragRef = useRef<{ startX: number; startVal: number } | null>(null);
+
+  useEffect(() => {
+    if (!isFontSizeEditing) {
+      setFontSizeInput(String(currentFontSize));
+    }
+  }, [currentFontSize, isFontSizeEditing]);
+
+  function commitFontSize(val: number) {
+    const clamped = Math.max(4, Math.min(40, val));
+    applyFormattingFontSize(toolbarCommand, clamped);
+  }
+
+  useEffect(() => {
+    if (!formattingMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-formatting-menu]")) {
+        setFormattingMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [formattingMenuOpen]);
+
   return (
     <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-[#f4f8f8]">
       <Toaster position="top-right" richColors />
@@ -1361,6 +1680,168 @@ export function LatexResumeTailorApp() {
                 priority
               />
             </div>
+
+            {/* Editor Toolbar */}
+            <div className="flex flex-1 flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <select
+                  value={toolbarCommand}
+                  onChange={(e) => setToolbarCommand(e.target.value as FormattingType)}
+                  className="h-8 rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="header-name">Header Name (\Huge)</option>
+                  <option value="section">Section (\section)</option>
+                  <option value="resumeSubheading">Subheading (\resumeSubheading)</option>
+                  <option value="resumeProjectHeading">Project Heading (\resumeProjectHeading)</option>
+                  <option value="resumeItem">Bullet Item (\resumeItem)</option>
+                  <option value="normal-text">Normal Text (base)</option>
+                </select>
+                <div
+                  className="relative flex h-8 w-20 items-center rounded-md border border-input bg-background text-sm select-none"
+                  style={{ cursor: "ew-resize" }}
+                  onPointerDown={(e) => {
+                    if (isFontSizeEditing) return;
+                    e.preventDefault();
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    fontSizeDragRef.current = { startX: e.clientX, startVal: currentFontSize };
+                  }}
+                  onPointerMove={(e) => {
+                    if (!fontSizeDragRef.current) return;
+                    const delta = Math.round((e.clientX - fontSizeDragRef.current.startX) / 4);
+                    const newVal = Math.max(4, Math.min(40, fontSizeDragRef.current.startVal + delta));
+                    setFontSizeInput(String(newVal));
+                    commitFontSize(newVal);
+                  }}
+                  onPointerUp={(e) => {
+                    if (!fontSizeDragRef.current) return;
+                    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+                    fontSizeDragRef.current = null;
+                  }}
+                >
+                  <input
+                    className="h-full w-full bg-transparent px-2 text-center text-sm outline-none"
+                    style={{ cursor: isFontSizeEditing ? "text" : "ew-resize" }}
+                    value={isFontSizeEditing ? fontSizeInput : `${currentFontSize}pt`}
+                    onFocus={() => {
+                      setIsFontSizeEditing(true);
+                      setFontSizeInput(String(currentFontSize));
+                    }}
+                    onBlur={() => {
+                      setIsFontSizeEditing(false);
+                      const pt = Number.parseInt(fontSizeInput, 10);
+                      if (Number.isFinite(pt)) commitFontSize(pt);
+                    }}
+                    onChange={(e) => setFontSizeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                      } else if (e.key === "Escape") {
+                        setFontSizeInput(String(currentFontSize));
+                        setIsFontSizeEditing(false);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 font-bold"
+                  onClick={insertLatexBold}
+                  title="Bold (\\textbf{})"
+                >
+                  B
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 italic"
+                  onClick={insertLatexItalic}
+                  title="Italic (\\textit{})"
+                >
+                  I
+                </Button>
+
+                <div className="relative" data-formatting-menu>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 px-2"
+                    onClick={() => setFormattingMenuOpen((v) => !v)}
+                    title="Formatting"
+                  >
+                    <Type className="h-3.5 w-3.5" />
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                  {formattingMenuOpen ? (
+                    <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border bg-white py-1 shadow-lg">
+                      {([
+                        { type: "header-name" as FormattingType, label: "Header Name" },
+                        { type: "section" as FormattingType, label: "Section" },
+                        { type: "resumeSubheading" as FormattingType, label: "Subheading" },
+                        { type: "resumeProjectHeading" as FormattingType, label: "Project Heading" },
+                        { type: "resumeItem" as FormattingType, label: "Bullet Item" },
+                        { type: "normal-text" as FormattingType, label: "Normal Text" },
+                      ]).map((item) => (
+                        <button
+                          key={item.type}
+                          type="button"
+                          className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-muted ${toolbarCommand === item.type ? "bg-muted/60 font-medium" : ""}`}
+                          onClick={() => {
+                            setToolbarCommand(item.type);
+                            setFormattingMenuOpen(false);
+                          }}
+                        >
+                          <span>{item.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {getFormattingFontSize(item.type, latexCode)}pt
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={insertBulletList}
+                  title="Bullet list (\\begin{itemize})"
+                >
+                  <List className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={insertNumberedList}
+                  title="Numbered list (\\begin{enumerate})"
+                >
+                  <ListOrdered className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1 px-2"
+                  onClick={handleFindReplace}
+                  title="Find & Replace"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -1799,6 +2280,7 @@ export function LatexResumeTailorApp() {
                       pages={previewPages}
                       layout={previewLayout}
                       zoom={previewZoom}
+                      fontSizes={previewFontSizes}
                       onNavigateToSource={navigateFromPreviewToSource}
                     />
                   </div>

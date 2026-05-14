@@ -12,10 +12,33 @@ const MIN_PREVIEW_VERTICAL_MARGIN_PX = 20;
 /** Allow fitting a bit past the estimator so pagination matches tighter browser layout. */
 const PAGE_BREAK_TOLERANCE_PX = 40;
 
+export type PreviewFontSizes = {
+  headerNamePt: number;
+  sectionPt: number;
+  subheadingPt: number;
+  projectHeadingPt: number;
+  bulletItemPt: number;
+  normalTextPt: number;
+};
+
+export const DEFAULT_PREVIEW_FONT_SIZES: PreviewFontSizes = {
+  headerNamePt: 25,
+  sectionPt: 12,
+  subheadingPt: 11,
+  projectHeadingPt: 11,
+  bulletItemPt: 10,
+  normalTextPt: 11,
+};
+
+function ptToPx(pt: number): number {
+  return pt;
+}
+
 type ResumePreviewProps = {
   pages: PaginatedPreviewPage[];
   layout: PreviewLayoutProfile;
   zoom: number;
+  fontSizes?: PreviewFontSizes;
   onNavigateToSource?: (selection: ResumePreviewSelection) => void;
 };
 
@@ -26,8 +49,9 @@ export type ResumePreviewSelection = {
 };
 
 export const ResumePreview = forwardRef<HTMLDivElement, ResumePreviewProps>(
-  function ResumePreviewInner({ pages, layout, zoom, onNavigateToSource }, ref) {
+  function ResumePreviewInner({ pages, layout, zoom, fontSizes, onNavigateToSource }, ref) {
     const zoomScale = zoom / 100;
+    const fs = fontSizes ?? DEFAULT_PREVIEW_FONT_SIZES;
 
     return (
       <div ref={ref} className="w-max min-w-full">
@@ -62,6 +86,7 @@ export const ResumePreview = forwardRef<HTMLDivElement, ResumePreviewProps>(
                       section={section}
                       showHeading={section.showHeading}
                       pageNumber={index + 1}
+                      fontSizes={fs}
                       onNavigateToSource={onNavigateToSource}
                     />
                   ))}
@@ -81,11 +106,13 @@ function PreviewSection({
   section,
   showHeading = true,
   pageNumber,
+  fontSizes,
   onNavigateToSource,
 }: {
   section: ResumeSection;
   showHeading?: boolean;
   pageNumber: number;
+  fontSizes: PreviewFontSizes;
   onNavigateToSource?: (selection: ResumePreviewSelection) => void;
 }) {
   const firstLine = section.lines[0];
@@ -103,17 +130,26 @@ function PreviewSection({
     return (
       <header className="mb-2 text-center">
         {nameLine ? (
-          <h1 className="text-[1.55rem] font-normal uppercase leading-none tracking-[0.18em]">
+          <h1
+            className="font-normal uppercase leading-none tracking-[0.18em]"
+            style={{ fontSize: `${ptToPx(fontSizes.headerNamePt)}px` }}
+          >
             {nameLine.text}
           </h1>
         ) : null}
         {locationLine ? (
-          <p className="mt-0.5 text-[11px] leading-[1.15] text-slate-900">
+          <p
+            className="mt-0.5 leading-[1.15] text-slate-900"
+            style={{ fontSize: `${ptToPx(fontSizes.normalTextPt)}px` }}
+          >
             {locationLine.text}
           </p>
         ) : null}
         {contacts.length > 0 ? (
-          <div className="mx-auto mt-0.5 flex max-w-[720px] flex-wrap justify-center gap-x-2 gap-y-0 text-[9px] leading-[1.1] text-slate-900">
+          <div
+            className="mx-auto mt-0.5 flex max-w-[720px] flex-wrap justify-center gap-x-2 gap-y-0 leading-[1.1] text-slate-900"
+            style={{ fontSize: `${ptToPx(fontSizes.normalTextPt) - 2}px` }}
+          >
             {contacts.map((contact, index) => (
               <span key={`${contact}-${index}`} className="break-all">
                 {index > 0 ? " | " : ""}
@@ -131,9 +167,10 @@ function PreviewSection({
       {showHeading ? (
         <div className="mb-1.5 flex items-center gap-3 pb-[2px]">
           <h2
-            className={`shrink-0 text-[0.69rem] font-bold uppercase leading-none tracking-normal ${
+            className={`shrink-0 font-bold uppercase leading-none tracking-normal ${
               canNavigateToSection ? "cursor-pointer" : ""
             }`}
+            style={{ fontSize: `${ptToPx(fontSizes.sectionPt)}px` }}
             onClick={() =>
               canNavigateToSection
                 ? onNavigateToSource?.({
@@ -173,6 +210,7 @@ function PreviewSection({
             line={line}
             section={section}
             pageNumber={pageNumber}
+            fontSizes={fontSizes}
             onNavigateToSource={onNavigateToSource}
           />
         ))}
@@ -185,11 +223,13 @@ function PreviewLine({
   line,
   section,
   pageNumber,
+  fontSizes,
   onNavigateToSource,
 }: {
   line: ResumeLine;
   section: ResumeSection;
   pageNumber: number;
+  fontSizes: PreviewFontSizes;
   onNavigateToSource?: (selection: ResumePreviewSelection) => void;
 }) {
   const labelValue = splitLabelValue(line.text);
@@ -197,32 +237,38 @@ function PreviewLine({
     Boolean(onNavigateToSource) &&
     (typeof line.sourceLine === "number" || typeof line.sourceEndLine === "number");
   const renderedText = renderLineText(line);
+
+  const headingPx = line.kind === "projectHeading"
+    ? ptToPx(fontSizes.projectHeadingPt)
+    : ptToPx(fontSizes.subheadingPt);
+  const bulletPx = ptToPx(fontSizes.bulletItemPt);
+
   const content =
     line.kind === "projectHeading" || line.kind === "subheading" ? (
       <div>
-        <div className="flex items-start justify-between gap-4 text-[0.64rem]">
+        <div className="flex items-start justify-between gap-4" style={{ fontSize: `${headingPx}px` }}>
           <strong>{renderedText}</strong>
           {line.rightText ? (
-            <span className="shrink-0 text-right text-[10px] font-semibold text-slate-700">
+            <span className="shrink-0 text-right font-semibold text-slate-700" style={{ fontSize: `${headingPx - 1}px` }}>
               {line.rightText}
             </span>
           ) : null}
         </div>
         {line.secondaryText ? (
-          <p className="text-[10px] italic leading-[1.2] text-slate-700">{line.secondaryText}</p>
+          <p className="italic leading-[1.2] text-slate-700" style={{ fontSize: `${headingPx - 1}px` }}>{line.secondaryText}</p>
         ) : null}
       </div>
     ) : line.kind === "bullet" ? (
-      <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-1 text-[11px] leading-[1.3]">
+      <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-1 leading-[1.3]" style={{ fontSize: `${bulletPx}px` }}>
         <span className="pt-[1px]">-</span>
         <p>{renderedText}</p>
       </div>
     ) : labelValue ? (
-      <p className="text-[11px] leading-[1.3]">
+      <p className="leading-[1.3]" style={{ fontSize: `${bulletPx}px` }}>
         <strong>{labelValue.label}:</strong> {labelValue.value}
       </p>
     ) : (
-      <p className="text-[11px] leading-[1.3]">{renderedText}</p>
+      <p className="leading-[1.3]" style={{ fontSize: `${bulletPx}px` }}>{renderedText}</p>
     );
 
   return (
@@ -373,6 +419,7 @@ export type PreviewLayoutProfile = {
 export function paginateResumeSections(
   sections: ResumeSection[],
   layout: PreviewLayoutProfile,
+  fontSizes: PreviewFontSizes = DEFAULT_PREVIEW_FONT_SIZES,
 ): PaginatedPreviewPage[] {
   const pages: PaginatedPreviewPage[] = [];
   let pageIndex = 1;
@@ -399,7 +446,7 @@ export function paginateResumeSections(
     }
 
     if (section.title === "Header") {
-      const sectionHeight = estimateHeaderSectionHeight(section);
+      const sectionHeight = estimateHeaderSectionHeight(section, fontSizes);
 
       if (sectionHeight > remainingHeight && currentPageSections.length > 0) {
         pushPage();
@@ -413,8 +460,7 @@ export function paginateResumeSections(
       return;
     }
 
-    /** Matches section heading row (~0.69rem + rule + mb-1.5) in `PreviewSection`. */
-    const sectionHeadingHeight = 22;
+    const sectionHeadingHeight = ptToPx(fontSizes.sectionPt) + 12;
     let headingRendered = false;
     let chunkLines: ResumeLine[] = [];
 
@@ -434,7 +480,7 @@ export function paginateResumeSections(
     };
 
     section.lines.forEach((line) => {
-      const lineHeight = estimatePreviewLineHeight(line, layout);
+      const lineHeight = estimatePreviewLineHeight(line, layout, fontSizes);
       const needsHeading = !headingRendered && chunkLines.length === 0;
       const requiredHeight = lineHeight + (needsHeading ? sectionHeadingHeight : 0);
 
@@ -462,35 +508,40 @@ export function paginateResumeSections(
   return pages;
 }
 
-function estimateHeaderSectionHeight(section: ResumeSection) {
+function estimateHeaderSectionHeight(section: ResumeSection, fontSizes: PreviewFontSizes) {
   const lineCount = section.lines.length;
-  return 66 + Math.max(0, lineCount - 3) * 10;
+  const nameHeight = ptToPx(fontSizes.headerNamePt) + 4;
+  const contactLineHeight = ptToPx(fontSizes.normalTextPt) + 2;
+  return nameHeight + Math.max(0, lineCount - 1) * contactLineHeight + 8;
 }
 
-function estimatePreviewLineHeight(line: ResumeLine, layout: PreviewLayoutProfile) {
+function estimatePreviewLineHeight(line: ResumeLine, layout: PreviewLayoutProfile, fontSizes: PreviewFontSizes) {
   const bodyWidth = layout.contentWidthPx;
   const mainText = line.text ?? "";
+  const bulletPx = ptToPx(fontSizes.bulletItemPt);
+  const avgCharWidth = bulletPx * 0.56;
   const wrappedRows = estimateWrappedRows(
     mainText,
     line.kind === "bullet" ? bodyWidth - 16 : bodyWidth,
-    6.2,
+    avgCharWidth,
   );
 
-  /** ~11px text, leading 1.3 → ~14.3px; keep slightly conservative for bullets/grid. */
-  const bodyRowHeightPx = 14;
-
   if (line.kind === "bullet") {
-    return wrappedRows * bodyRowHeightPx + 2;
+    const rowHeight = bulletPx * 1.3;
+    return wrappedRows * rowHeight + 2;
   }
 
   if (line.kind === "projectHeading" || line.kind === "subheading") {
+    const headingPx = line.kind === "projectHeading"
+      ? ptToPx(fontSizes.projectHeadingPt)
+      : ptToPx(fontSizes.subheadingPt);
     const secondaryRows = line.secondaryText
-      ? estimateWrappedRows(line.secondaryText, bodyWidth - 10, 5.2)
+      ? estimateWrappedRows(line.secondaryText, bodyWidth - 10, headingPx * 0.48)
       : 0;
-    return 16 + secondaryRows * 12 + 3;
+    return headingPx + 4 + secondaryRows * (headingPx - 1) + 3;
   }
 
-  return wrappedRows * bodyRowHeightPx + 2;
+  return wrappedRows * (bulletPx * 1.3) + 2;
 }
 
 function estimateWrappedRows(
