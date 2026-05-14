@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import { Toaster, toast } from "sonner";
 import {
   AlertTriangle,
@@ -185,6 +186,7 @@ export function LatexResumeTailorApp() {
   const [lastCompileSuccess, setLastCompileSuccess] = useState<boolean | null>(null);
   const [diagnosticsPanelOpen, setDiagnosticsPanelOpen] = useState(false);
   const [committedLatex, setCommittedLatex] = useState(DEFAULT_LATEX_RESUME);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const LATEX_HISTORY_DEBOUNCE_MS = 450;
 
   latestLatexRef.current = latexCode;
@@ -444,6 +446,7 @@ export function LatexResumeTailorApp() {
     setDiagnostics([]);
     setLastCompileSuccess(null);
     setDiagnosticsPanelOpen(false);
+    setPreviewId(null);
     setPdfUrl((currentUrl) => {
       if (currentUrl) {
         URL.revokeObjectURL(currentUrl);
@@ -1079,12 +1082,10 @@ export function LatexResumeTailorApp() {
         return;
       }
 
+      const newPreviewId = response.headers.get("X-Preview-Id");
       const blob = await response.blob();
       pdfBlobRef.current = blob;
-      setPdfUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return URL.createObjectURL(blob);
-      });
+      if (newPreviewId) setPreviewId(newPreviewId);
       setCommittedLatex(latexCode);
       setDiagnostics([]);
       setLastCompileSuccess(true);
@@ -1189,45 +1190,18 @@ export function LatexResumeTailorApp() {
     }
   }
 
-  async function renderPdfPreview() {
-    if (pdfUrl) {
-      setPdfFullscreen(true);
+  function renderPdfPreview() {
+    if (!previewId) {
+      toast.error("Compile first (Ctrl+S) to preview PDF.", { duration: 4000 });
       return;
     }
-
-    setRenderingPdf(true);
-    setError(null);
-
-    try {
-      const blob = await createPdfBlob();
-      pdfBlobRef.current = blob;
-      setPdfUrl(URL.createObjectURL(blob));
-      setPdfFullscreen(true);
-    } catch (previewError) {
-      setError(
-        previewError instanceof Error
-          ? previewError.message
-          : "Unable to create the PDF preview.",
-      );
-    } finally {
-      setRenderingPdf(false);
-    }
+    window.open(`/api/resume/preview/${previewId}`, "_blank");
   }
 
   return (
     <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-[#f4f8f8]">
       <Toaster position="top-right" richColors />
-      {pdfFullscreen ? (
-        <PdfFullscreenPreview
-          pdfUrl={pdfUrl}
-          rendering={renderingPdf}
-          zoom={previewZoom}
-          onZoomIn={() => setPreviewZoom((current) => clampPdfZoom(current + PDF_ZOOM_STEP))}
-          onZoomOut={() => setPreviewZoom((current) => clampPdfZoom(current - PDF_ZOOM_STEP))}
-          onZoomReset={() => setPreviewZoom(100)}
-          onClose={() => setPdfFullscreen(false)}
-        />
-      ) : null}
+      {null}
       {geminiSettingsOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-xl">
@@ -1377,11 +1351,15 @@ export function LatexResumeTailorApp() {
       <div className="mx-auto flex min-h-0 w-full flex-1 flex-col items-stretch gap-5 px-4 py-5 xl:flex-row xl:items-stretch">
         <section className="flex w-full min-w-0 flex-1 min-h-0 flex-col rounded-md border bg-white xl:min-h-0">
           <div className="flex flex-col gap-3 border-b bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-xl font-bold tracking-normal">Resume Tailor</h1>
-              <p className="text-sm text-muted-foreground">
-                Edit LaTeX source, review AI edits, preview the resume, export PDF.
-              </p>
+            <div className="flex items-center">
+              <Image
+                src="/resume-tailor.png"
+                alt="Resume Tailor"
+                width={160}
+                height={24}
+                className="h-11 w-auto"
+                priority
+              />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1604,6 +1582,46 @@ export function LatexResumeTailorApp() {
                     <Button
                       type="button"
                       variant="ghost"
+                      className={`relative h-7 gap-1.5 px-2 text-sm hover:bg-slate-700 hover:text-slate-100 ${lastCompileSuccess === false
+                        ? "text-red-400"
+                        : lastCompileSuccess === true
+                          ? "text-green-400"
+                          : "text-slate-100"
+                        }`}
+                      onClick={recompileLatex}
+                      disabled={isRecompiling || !canCompilePdf}
+                      title="Recompile LaTeX and show diagnostics"
+                    >
+                      {isRecompiling ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : lastCompileSuccess === true ? (
+                        <CircleCheck className="h-3.5 w-3.5" />
+                      ) : lastCompileSuccess === false ? (
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                      {lastCompileSuccess === false && diagnostics.filter((d) => d.severity === "error").length > 0 && (
+                        <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 text-[10px] leading-none">
+                          {diagnostics.filter((d) => d.severity === "error").length}
+                        </Badge>
+                      )}
+                    </Button>
+                    <span className="mx-1 h-6 w-px bg-slate-600" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-7 gap-1.5 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                      onClick={renderPdfPreview}
+                      disabled={!previewId}
+                      title={previewId ? "Open PDF in new tab" : "Compile first to preview PDF"}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="mx-1 h-6 w-px bg-slate-600" />
+                    <Button
+                      type="button"
+                      variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
                       onClick={() => goToPreviewPage(previewPage - 1)}
@@ -1664,50 +1682,7 @@ export function LatexResumeTailorApp() {
                     >
                       <Redo2 className="h-4 w-4" />
                     </Button>
-                    <span className="mx-1 h-6 w-px bg-slate-600" />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className={`relative h-7 gap-1.5 px-2 text-sm hover:bg-slate-700 hover:text-slate-100 ${lastCompileSuccess === false
-                        ? "text-red-400"
-                        : lastCompileSuccess === true
-                          ? "text-green-400"
-                          : "text-slate-100"
-                        }`}
-                      onClick={recompileLatex}
-                      disabled={isRecompiling || !canCompilePdf}
-                      title="Recompile LaTeX and show diagnostics"
-                    >
-                      {isRecompiling ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : lastCompileSuccess === true ? (
-                        <CircleCheck className="h-3.5 w-3.5" />
-                      ) : lastCompileSuccess === false ? (
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                      ) : (
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      )}
-                      {lastCompileSuccess === false && diagnostics.filter((d) => d.severity === "error").length > 0 && (
-                        <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 text-[10px] leading-none">
-                          {diagnostics.filter((d) => d.severity === "error").length}
-                        </Badge>
-                      )}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-7 gap-1.5 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
-                      onClick={renderPdfPreview}
-                      disabled={!canCompilePdf || renderingPdf}
-                      title="Preview compiled PDF fullscreen"
-                    >
-                      {renderingPdf ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    <span className="mx-1 h-6 w-px bg-slate-600" />
+
                     <Button
                       type="button"
                       variant="ghost"

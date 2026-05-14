@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { parseLatexLog } from "@/lib/latex-log-parser";
+import { generatePreviewId, storePdf } from "@/lib/pdf-cache";
 
 export const runtime = "nodejs";
 
@@ -88,12 +89,15 @@ export async function POST(request: Request) {
     }
 
     const pdf = await readFile(pdfPath);
+    const previewId = generatePreviewId();
+    storePdf(previewId, Buffer.from(pdf));
 
     return new NextResponse(pdf, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'inline; filename="resume.pdf"',
         "Cache-Control": "no-store",
+        "X-Preview-Id": previewId,
       },
     });
   } catch (error) {
@@ -154,12 +158,15 @@ async function compileViaCloud(latex: string) {
     }
 
     const pdf = Buffer.from(await response.arrayBuffer());
+    const previewId = generatePreviewId();
+    storePdf(previewId, pdf);
 
     return new NextResponse(pdf, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'inline; filename="resume.pdf"',
         "Cache-Control": "no-store",
+        "X-Preview-Id": previewId,
       },
     });
   } catch (error) {
