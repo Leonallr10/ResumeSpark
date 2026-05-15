@@ -593,9 +593,9 @@ export function LatexResumeTailorApp() {
     [],
   );
 
-  const undoRef = useRef<() => void>(() => {});
-  const redoRef = useRef<() => void>(() => {});
-  const recompileRef = useRef<() => void>(() => {});
+  const undoRef = useRef<() => void>(() => { });
+  const redoRef = useRef<() => void>(() => { });
+  const recompileRef = useRef<() => void>(() => { });
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -2629,10 +2629,10 @@ export function LatexResumeTailorApp() {
                             )}
                           </div>
 
-                          <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+                          {/* <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
                             Suggestions update the LaTeX source, so the editable .tex remains the
                             source of truth.
-                          </div>
+                          </div> */}
                         </div>
                       </motion.div>
                     )}
