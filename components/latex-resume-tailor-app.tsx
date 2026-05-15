@@ -213,6 +213,7 @@ export function LatexResumeTailorApp() {
   const typingIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [polishState, setPolishState] = useState<PolishState>(null);
   const polishAbortRef = useRef<AbortController | null>(null);
+  const suggestAbortRef = useRef<AbortController | null>(null);
   const [diagnostics, setDiagnostics] = useState<LatexDiagnostic[]>([]);
   const [isRecompiling, setIsRecompiling] = useState(false);
   const [lastCompileSuccess, setLastCompileSuccess] = useState<boolean | null>(null);
@@ -587,6 +588,7 @@ export function LatexResumeTailorApp() {
         clearTimeout(typingIdleTimerRef.current);
       }
       polishAbortRef.current?.abort();
+      suggestAbortRef.current?.abort();
     },
     [],
   );
@@ -764,6 +766,10 @@ export function LatexResumeTailorApp() {
       return;
     }
 
+    suggestAbortRef.current?.abort();
+    const controller = new AbortController();
+    suggestAbortRef.current = controller;
+
     setError(null);
     setSuggesting(true);
 
@@ -782,6 +788,7 @@ export function LatexResumeTailorApp() {
           model: llmModel.trim(),
           apiKey: (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim() || undefined,
         }),
+        signal: controller.signal,
       });
 
       const payload = (await response.json()) as SuggestionResponse & {
@@ -797,14 +804,24 @@ export function LatexResumeTailorApp() {
       setSectionReviews(payload.sectionReviews);
       setViewMode("preview");
     } catch (requestError) {
+      if (requestError instanceof DOMException && requestError.name === "AbortError") {
+        return;
+      }
       setError(
         requestError instanceof Error
           ? requestError.message
           : "Unable to generate suggestions.",
       );
     } finally {
+      suggestAbortRef.current = null;
       setSuggesting(false);
     }
+  }
+
+  function cancelSuggestions() {
+    suggestAbortRef.current?.abort();
+    suggestAbortRef.current = null;
+    setSuggesting(false);
   }
 
   function acceptSuggestion(suggestion: AiSuggestion) {
@@ -2046,6 +2063,7 @@ export function LatexResumeTailorApp() {
               <CodeMirror
                 value={latexCode}
                 height="100%"
+                readOnly={suggesting}
                 extensions={[latexLanguage, latexSuggestionExtension, latexPolishExtension]}
                 onCreateEditor={(view) => {
                   editorViewRef.current = view;
@@ -2057,7 +2075,7 @@ export function LatexResumeTailorApp() {
                   highlightSelectionMatches: true,
                 }}
                 onChange={handleLatexEditorChange}
-                className="min-h-0 flex-1 text-sm [&_.cm-editor]:h-full"
+                className={`min-h-0 flex-1 text-sm [&_.cm-editor]:h-full${suggesting ? " opacity-60 pointer-events-none" : ""}`}
               />
             </div>
 
@@ -2584,24 +2602,31 @@ export function LatexResumeTailorApp() {
                             <div className="dot bottom right"></div>
                             <div className="dot bottom left"></div>
 
-                            <button
-                              type="button"
-                              className="btn"
-                              disabled={!canSubmit || suggesting}
-                              onClick={requestSuggestions}
-                            >
-                              {suggesting ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
+                            {suggesting ? (
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={cancelSuggestions}
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Cancel
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn"
+                                disabled={!canSubmit}
+                                onClick={requestSuggestions}
+                              >
                                 <svg className="btn-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                   <path d="M17.6744 11.4075L15.7691 17.1233C15.7072 17.309 15.5586 17.4529 15.3709 17.5087L3.69348 20.9803C3.22819 21.1186 2.79978 20.676 2.95328 20.2155L6.74467 8.84131C6.79981 8.67588 6.92419 8.54263 7.08543 8.47624L12.472 6.25822C12.696 6.166 12.9535 6.21749 13.1248 6.38876L17.5294 10.7935C17.6901 10.9542 17.7463 11.1919 17.6744 11.4075Z" />
                                   <path d="M3.2959 20.6016L9.65986 14.2376" />
                                   <path d="M17.7917 11.0557L20.6202 8.22724C21.4012 7.44619 21.4012 6.17986 20.6202 5.39881L18.4989 3.27749C17.7178 2.49645 16.4515 2.49645 15.6704 3.27749L12.842 6.10592" />
                                   <path d="M11.7814 12.1163C11.1956 11.5305 10.2458 11.5305 9.66004 12.1163C9.07426 12.7021 9.07426 13.6519 9.66004 14.2376C10.2458 14.8234 11.1956 14.8234 11.7814 14.2376C12.3671 13.6519 12.3671 12.7021 11.7814 12.1163Z" />
                                 </svg>
-                              )}
-                              Suggest resume changes
-                            </button>
+                                Suggest resume changes
+                              </button>
+                            )}
                           </div>
 
                           <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">

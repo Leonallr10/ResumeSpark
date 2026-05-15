@@ -201,17 +201,18 @@ export function canInsertProject(project: ProjectDraft) {
 
 export function buildProjectLatexBlock(
   project: ProjectDraft,
-  options?: { useTechStackCommand?: boolean },
+  options?: { useTechStackCommand?: boolean; useProjectHeadingCommand?: boolean; useNoBulletItems?: boolean; hasXcolor?: boolean },
 ) {
   const heading = escapeLatexText(project.heading.trim());
   const bullets = splitExplanationIntoBullets(project.explanation.trim());
   const techStack = escapeLatexText(stripTechStackLabel(project.techStack));
   const dateRange = escapeLatexText(formatProjectDateRange(project));
   const link = normalizeProjectLink(project.link);
-  const headingWithLink = buildHeadingWithLink(heading, link);
+  const headingWithLink = buildHeadingWithLink(heading, link, { hasXcolor: options?.hasXcolor });
+  const bulletCommand = options?.useNoBulletItems ? "\\resumeItemNoBullet" : "\\resumeItem";
   const techStackLine = options?.useTechStackCommand
     ? `\\techstack{${techStack}}`
-    : `  \\resumeItem{\\textbf{Tech Stack:} ${techStack}}`;
+    : `  ${bulletCommand}{\\textbf{Tech Stack:} ${techStack}}`;
 
   if (link) {
     const subheadingTechStack = options?.useTechStackCommand
@@ -221,15 +222,19 @@ export function buildProjectLatexBlock(
     return [
       `\\resumeSubheading{${headingWithLink}}{${dateRange}}{${subheadingTechStack}}{}`,
       "\\resumeItemListStart",
-      ...bullets.map((b) => `  \\resumeItemNoBullet{${escapeLatexText(b)}}`),
+      ...bullets.map((b) => `  ${bulletCommand}{${escapeLatexText(b)}}`),
       "\\resumeItemListEnd",
     ].join("\n");
   }
 
+  const headingLine = options?.useProjectHeadingCommand !== false
+    ? `\\resumeProjectHeading{${heading}}{${dateRange}}`
+    : `\\resumeSubheading{${heading}}{${dateRange}}{}{}`;
+
   return [
-    `\\resumeProjectHeading{${heading}}{${dateRange}}`,
+    headingLine,
     "\\resumeItemListStart",
-    ...bullets.map((b) => `  \\resumeItem{${escapeLatexText(b)}}`),
+    ...bullets.map((b) => `  ${bulletCommand}{${escapeLatexText(b)}}`),
     techStackLine,
     "\\resumeItemListEnd",
   ].join("\n");
@@ -258,9 +263,12 @@ export function insertProjectIntoLatex(latex: string, project: ProjectDraft) {
 
 export function insertProjectsIntoLatex(latex: string, projects: ProjectDraft[]) {
   const useTechStackCommand = shouldUseTechStackCommand(latex);
+  const useProjectHeadingCommand = hasProjectHeadingCommand(latex);
+  const useNoBulletItems = usesNoBulletInProjects(latex);
+  const hasXcolor = hasXcolorPackage(latex);
   const blocks = projects
     .filter(canInsertProject)
-    .map((project) => buildProjectLatexBlock(project, { useTechStackCommand }));
+    .map((project) => buildProjectLatexBlock(project, { useTechStackCommand, useProjectHeadingCommand, useNoBulletItems, hasXcolor }));
 
   if (blocks.length === 0) {
     return latex;
@@ -328,6 +336,9 @@ export function applySuggestionToLatex(
 
   const lines = latex.replace(/\r\n/g, "\n").split("\n");
   const useTechStackCommand = shouldUseTechStackCommand(latex);
+  const useProjectHeadingCommand = hasProjectHeadingCommand(latex);
+  const useNoBulletItems = usesNoBulletInProjects(latex);
+  const hasXcolor = hasXcolorPackage(latex);
   const targetIndex = targetLine.sourceLine;
   const targetEndIndex = targetLine.sourceEndLine ?? targetIndex;
   const targetLength = Math.max(1, targetEndIndex - targetIndex + 1);
@@ -351,6 +362,9 @@ export function applySuggestionToLatex(
     if (targetSection?.title.toLowerCase().includes("project") && projectSuggestion) {
       return replaceProjectBlockInLatex(lines, targetIndex, projectSuggestion, {
         useTechStackCommand,
+        useProjectHeadingCommand,
+        useNoBulletItems,
+        hasXcolor,
       }).join("\n");
     }
 
@@ -377,7 +391,7 @@ export function applySuggestionToLatex(
     lines[targetIndex],
     suggestion.suggestedText,
     targetSection?.title,
-    { useTechStackCommand },
+    { useTechStackCommand, useProjectHeadingCommand, useNoBulletItems, hasXcolor },
   );
   const insertionIndex =
     targetSection?.title.toLowerCase().includes("project") &&
@@ -732,8 +746,9 @@ function replaceVisibleLatexLine(
   const subheading = parseCommand(trimmed, "resumeSubheading");
 
   if (subheading) {
+    const headingOnly = extractSubheadingName(cleanSuggestion, subheading.args);
     return `${indent}\\resumeSubheading{${escapeLatexText(
-      stripLabelPrefix(cleanSuggestion),
+      headingOnly,
     )}}{${escapeLatexText(
       subheading.args[1] ?? "",
     )}}{${escapeLatexText(subheading.args[2] ?? "")}}{${escapeLatexText(
@@ -789,7 +804,7 @@ function createInsertedLatexLine(
   source: string,
   suggestedText: string,
   sectionTitle?: string,
-  options?: { useTechStackCommand?: boolean },
+  options?: { useTechStackCommand?: boolean; useProjectHeadingCommand?: boolean; useNoBulletItems?: boolean; hasXcolor?: boolean },
 ) {
   const indent = source.match(/^\s*/)?.[0] ?? "";
   const trimmed = source.trim();
@@ -861,6 +876,28 @@ function stripLatexCommandWrapper(value: string): string {
   }
 
   return value;
+}
+
+function extractSubheadingName(suggestion: string, originalArgs: string[]): string {
+  const originalRight = cleanLatexText(originalArgs[1] ?? "");
+  const originalSub = cleanLatexText(originalArgs[2] ?? "");
+  const originalDate = cleanLatexText(originalArgs[3] ?? "");
+
+  let result = suggestion;
+
+  for (const fragment of [originalRight, originalSub, originalDate]) {
+    if (!fragment) continue;
+    const escaped = fragment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result.replace(new RegExp(`\\s*[-|,]?\\s*${escaped}\\s*`, "gi"), " ");
+  }
+
+  result = result
+    .replace(/\s*\([^)]*\)\s*$/g, " ")
+    .replace(/\s*[-|]+\s*(?:[\w,.\s]+\s*[-|]+\s*)*$/g, "")
+    .replace(/\s*[-|]+\s*$/, "")
+    .trim();
+
+  return result || stripLabelPrefix(suggestion);
 }
 
 function stripLabelPrefix(value: string) {
@@ -947,7 +984,7 @@ function normalizeProjectLink(value: string) {
   return normalized;
 }
 
-function buildHeadingWithLink(heading: string, link: string) {
+function buildHeadingWithLink(heading: string, link: string, options?: { hasXcolor?: boolean }) {
   if (!link) {
     return heading;
   }
@@ -955,7 +992,11 @@ function buildHeadingWithLink(heading: string, link: string) {
   const escapedUrl = escapeLatexHref(link);
   const linkText = inferLinkText(link);
 
-  return `${heading}\\hspace{0.1cm} \\textcolor{blue}{\\href{${escapedUrl}}{\\textit{\\small ${linkText}}}}`;
+  if (options?.hasXcolor !== false) {
+    return `${heading}\\hspace{0.1cm} \\textcolor{blue}{\\href{${escapedUrl}}{\\textit{\\small ${linkText}}}}`;
+  }
+
+  return `${heading}\\hspace{0.1cm} \\href{${escapedUrl}}{\\textit{\\small ${linkText}}}`;
 }
 
 function inferLinkText(url: string): string {
@@ -974,6 +1015,21 @@ function escapeLatexHref(value: string) {
 
 function shouldUseTechStackCommand(latex: string) {
   return /\\(?:re)?newcommand\{\\techstack\}/.test(latex) || /\\techstack\{/.test(latex);
+}
+
+function hasProjectHeadingCommand(latex: string) {
+  return (
+    /\\(?:re)?newcommand\{\\resumeProjectHeading\}/.test(latex) ||
+    /\\resumeProjectHeading\{/.test(latex)
+  );
+}
+
+function usesNoBulletInProjects(latex: string) {
+  return /\\(?:re)?newcommand\{\\resumeItemNoBullet\}/.test(latex);
+}
+
+function hasXcolorPackage(latex: string) {
+  return /\\usepackage(?:\[.*?\])?\{xcolor\}/.test(latex) || /\\textcolor\{/.test(latex);
 }
 
 function formatProjectDateRange(project: ProjectDraft) {
@@ -1027,7 +1083,7 @@ function replaceProjectBlockInLatex(
   lines: string[],
   targetIndex: number,
   projectSuggestion: NonNullable<ReturnType<typeof parseProjectSuggestion>>,
-  options?: { useTechStackCommand?: boolean },
+  options?: { useTechStackCommand?: boolean; useProjectHeadingCommand?: boolean; useNoBulletItems?: boolean; hasXcolor?: boolean },
 ) {
   const projectStartIndex = findProjectBlockStart(lines, targetIndex);
 
