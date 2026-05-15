@@ -27,10 +27,16 @@ import {
   Download,
   Eye,
   FileText,
+  FilePlus,
+  FolderOpen,
   List,
   ListOrdered,
   Loader2,
+  LogIn,
+  LogOut,
+  Menu,
   Minus,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -39,6 +45,7 @@ import {
   Settings2,
   KeyRound,
   Redo2,
+  Trash2,
   Type,
   Undo2,
   Upload,
@@ -50,9 +57,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import type { LatexDiagnostic } from "@/types/latex-diagnostics";
 import { createLatexSuggestionExtension } from "@/components/latex-editor-suggestions";
@@ -84,8 +93,10 @@ import {
   type ProjectDraft,
 } from "@/lib/latex-resume";
 import { getDownloadFilename, sanitizeFilename } from "@/lib/resume";
+import { createClient } from "@/lib/supabase";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
+import type { User } from "@supabase/supabase-js";
 import type {
   AiSuggestion,
   LlmProvider,
@@ -121,6 +132,16 @@ type LlmSettings = {
   geminiApiKey: string;
   groqApiKey: string;
   claudeApiKey: string;
+};
+
+type ResumeProject = {
+  id: string;
+  name: string;
+  latex_code: string;
+  company_role: string;
+  jd: string;
+  created_at: string;
+  updated_at: string;
 };
 
 const MODEL_OPTIONS: { provider: LlmProvider; model: string; label: string }[] = [
@@ -222,6 +243,24 @@ export function LatexResumeTailorApp() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [toolbarCommand, setToolbarCommand] = useState<FormattingType>("section");
   const [formattingMenuOpen, setFormattingMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [supabaseProjects, setSupabaseProjects] = useState<ResumeProject[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [editingProjectName, setEditingProjectName] = useState(false);
+  const [projectNameInput, setProjectNameInput] = useState("");
+  const [savingProject, setSavingProject] = useState(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const LATEX_HISTORY_DEBOUNCE_MS = 450;
 
   latestLatexRef.current = latexCode;
@@ -284,6 +323,269 @@ export function LatexResumeTailorApp() {
     setGroqApiKey(cached.groqApiKey);
     setClaudeApiKey(cached.claudeApiKey);
   }, []);
+
+  // Auth listener
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: { user: User } | null } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: { user: User } | null) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load projects and settings when user signs in
+  useEffect(() => {
+    if (!user) {
+      setSupabaseProjects([]);
+      setActiveProjectId(null);
+      return;
+    }
+    loadUserProjects();
+    loadUserSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Auto-save to Supabase
+  useEffect(() => {
+    if (!user || !activeProjectId) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveProjectToSupabase(activeProjectId, {
+        latex_code: latexCode,
+        company_role: companyRole,
+        jd: jd,
+      });
+    }, 2000);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeProjectId, latexCode, companyRole, jd]);
+
+  // Auto-save project drafts to Supabase
+  useEffect(() => {
+    if (!user || !activeProjectId) return;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      saveProjectDraftsToSupabase(activeProjectId, projectDrafts);
+    }, 2000);
+    return () => { if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeProjectId, projectDrafts]);
+
+  async function loadUserProjects() {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("resume_projects")
+      .select("*")
+      .order("updated_at", { ascending: false });
+    if (data && data.length > 0) {
+      setSupabaseProjects(data as ResumeProject[]);
+      loadProjectIntoEditor(data[0] as ResumeProject);
+    } else {
+      setSupabaseProjects([]);
+    }
+  }
+
+  async function loadUserSettings() {
+    if (!user) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("resume_settings")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+    if (data) {
+      setLlmProvider(data.provider as LlmProvider);
+      setLlmModel(data.model);
+      setGeminiApiKey(data.gemini_api_key);
+      setGroqApiKey(data.groq_api_key);
+      setClaudeApiKey(data.claude_api_key);
+    }
+  }
+
+  async function saveProjectToSupabase(projectId: string, updates: Partial<Pick<ResumeProject, "latex_code" | "company_role" | "jd" | "name">>) {
+    setSavingProject(true);
+    const supabase = createClient();
+    await supabase
+      .from("resume_projects")
+      .update(updates)
+      .eq("id", projectId);
+    setSavingProject(false);
+  }
+
+  async function saveProjectDraftsToSupabase(projectId: string, drafts: ProjectDraft[]) {
+    const supabase = createClient();
+    await supabase.from("resume_project_drafts").delete().eq("project_id", projectId);
+    if (drafts.length > 0) {
+      await supabase.from("resume_project_drafts").insert(
+        drafts.map((d, i) => ({
+          project_id: projectId,
+          heading: d.heading,
+          explanation: d.explanation,
+          tech_stack: d.techStack,
+          link: d.link,
+          from_date: d.fromDate,
+          to_date: d.toDate,
+          sort_order: i,
+        })),
+      );
+    }
+  }
+
+  async function saveSettingsToSupabase(settings: LlmSettings) {
+    if (!user) return;
+    const supabase = createClient();
+    await supabase.from("resume_settings").upsert({
+      user_id: user.id,
+      provider: settings.provider,
+      model: settings.model,
+      gemini_api_key: settings.geminiApiKey,
+      groq_api_key: settings.groqApiKey,
+      claude_api_key: settings.claudeApiKey,
+    }, { onConflict: "user_id" });
+  }
+
+  async function loadProjectIntoEditor(project: ResumeProject) {
+    // Flush pending auto-save for the current project
+    if (activeProjectId && activeProjectId !== project.id) {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+      await saveProjectToSupabase(activeProjectId, {
+        latex_code: latexCode,
+        company_role: companyRole,
+        jd: jd,
+      });
+      await saveProjectDraftsToSupabase(activeProjectId, projectDrafts);
+    }
+
+    setActiveProjectId(project.id);
+    setSuggestions([]);
+    setSectionReviews([]);
+    pastLatexRef.current = [];
+    futureLatexRef.current = [];
+    setHistoryVersion((v) => v + 1);
+
+    // Fetch fresh project data from Supabase
+    const supabase = createClient();
+    const { data: freshProject } = await supabase
+      .from("resume_projects")
+      .select("*")
+      .eq("id", project.id)
+      .single();
+
+    if (freshProject) {
+      const p = freshProject as ResumeProject;
+      setLatexCode(p.latex_code || DEFAULT_LATEX_RESUME);
+      setCommittedLatex(p.latex_code || DEFAULT_LATEX_RESUME);
+      setCompanyRole(p.company_role || "");
+      setJd(p.jd || "");
+    } else {
+      setLatexCode(project.latex_code || DEFAULT_LATEX_RESUME);
+      setCommittedLatex(project.latex_code || DEFAULT_LATEX_RESUME);
+      setCompanyRole(project.company_role || "");
+      setJd(project.jd || "");
+    }
+
+    // Fetch project drafts
+    const { data: drafts } = await supabase
+      .from("resume_project_drafts")
+      .select("*")
+      .eq("project_id", project.id)
+      .order("sort_order");
+
+    const mapped = (drafts ?? []).map((d: Record<string, string>) => ({
+      heading: d.heading || "",
+      explanation: d.explanation || "",
+      techStack: d.tech_stack || "",
+      link: d.link || "",
+      fromDate: d.from_date || "",
+      toDate: d.to_date || "",
+    }));
+    setProjectDraft(mapped[0] ?? emptyProjectDraft);
+    setProjectDrafts(mapped);
+  }
+
+  async function createNewProject() {
+    if (!user) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("resume_projects")
+      .insert({ user_id: user.id, name: "Untitled Resume", latex_code: DEFAULT_LATEX_RESUME })
+      .select()
+      .single();
+    if (data) {
+      const project = data as ResumeProject;
+      setSupabaseProjects((prev) => [project, ...prev]);
+      loadProjectIntoEditor(project);
+    }
+  }
+
+  async function renameProject(projectId: string, newName: string) {
+    const supabase = createClient();
+    await supabase.from("resume_projects").update({ name: newName }).eq("id", projectId);
+    setSupabaseProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, name: newName } : p));
+  }
+
+  async function deleteProject(projectId: string) {
+    const supabase = createClient();
+    await supabase.from("resume_projects").delete().eq("id", projectId);
+    const remaining = supabaseProjects.filter((p) => p.id !== projectId);
+    setSupabaseProjects(remaining);
+    if (activeProjectId === projectId) {
+      if (remaining.length > 0) {
+        loadProjectIntoEditor(remaining[0]);
+      } else {
+        setActiveProjectId(null);
+        setLatexCode(DEFAULT_LATEX_RESUME);
+        setCommittedLatex(DEFAULT_LATEX_RESUME);
+        setCompanyRole("");
+        setJd("");
+        setProjectDraft(emptyProjectDraft);
+        setProjectDrafts([]);
+      }
+    }
+  }
+
+  async function handleAuthSubmit() {
+    setAuthError(null);
+    setAuthSubmitting(true);
+    const supabase = createClient();
+    try {
+      if (authMode === "signup") {
+        const { error: err } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
+        if (err) { setAuthError(err.message); return; }
+        toast.success("Account created! Check your email to confirm.");
+        setAuthModalOpen(false);
+      } else {
+        const { error: err } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+        if (err) { setAuthError(err.message); return; }
+        toast.success("Signed in successfully!");
+        setAuthModalOpen(false);
+      }
+    } catch {
+      setAuthError("An unexpected error occurred.");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUser(null);
+    setSupabaseProjects([]);
+    setActiveProjectId(null);
+    setSidebarOpen(false);
+    toast.success("Signed out.");
+  }
+
+  const currentProjectName = useMemo(() => {
+    if (!activeProjectId) return "";
+    return supabaseProjects.find((p) => p.id === activeProjectId)?.name ?? "Untitled Resume";
+  }, [activeProjectId, supabaseProjects]);
 
   useEffect(() => {
     const maxPage = Math.max(1, previewPageCount);
@@ -1571,47 +1873,122 @@ export function LatexResumeTailorApp() {
   return (
     <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-[#f4f8f8]">
       <Toaster position="top-right" richColors />
-      {null}
-      {geminiSettingsOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-xl">
-            <div className="mb-4">
-              <h2 className="text-base font-semibold">AI Model Settings</h2>
-              <p className="text-sm text-muted-foreground">
-                Choose a model and save API keys locally in this browser.
-              </p>
+      {authModalOpen ? (
+        <DialogContent onClose={() => { setAuthModalOpen(false); setAuthError(null); }} className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{authMode === "signup" ? "Create Account" : "Welcome back"}</DialogTitle>
+            <DialogDescription>
+              {authMode === "signup" ? "Sign up to save your projects in the cloud." : "Sign in to access your saved projects."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="flex rounded-lg border bg-muted/40 p-1">
+              <button
+                type="button"
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${authMode === "signin" ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => { setAuthMode("signin"); setAuthError(null); }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${authMode === "signup" ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => { setAuthMode("signup"); setAuthError(null); }}
+              >
+                Sign Up
+              </button>
             </div>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="llmModel">Model</Label>
-                <select
-                  id="llmModel"
-                  value={llmModel}
-                  onChange={(event) => {
-                    setLlmModel(event.target.value);
-                    setLlmProvider(providerForModel(event.target.value));
-                  }}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <optgroup label="Gemini">
-                    {MODEL_OPTIONS.filter((o) => o.provider === "gemini").map((o) => (
-                      <option key={o.model} value={o.model}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Groq">
-                    {MODEL_OPTIONS.filter((o) => o.provider === "groq").map((o) => (
-                      <option key={o.model} value={o.model}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Claude">
-                    {MODEL_OPTIONS.filter((o) => o.provider === "claude").map((o) => (
-                      <option key={o.model} value={o.model}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                </select>
+                <Label htmlFor="authEmail">Email</Label>
+                <Input
+                  id="authEmail"
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  className="h-10"
+                />
               </div>
-              <div className={`space-y-1.5 rounded-md p-2 ${llmProvider === "gemini" ? "bg-emerald-50 ring-1 ring-emerald-200" : ""}`}>
-                <Label htmlFor="geminiApiKey">Gemini API Key</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="authPassword">Password</Label>
+                <Input
+                  id="authPassword"
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete={authMode === "signup" ? "new-password" : "current-password"}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAuthSubmit(); }}
+                  className="h-10"
+                />
+              </div>
+            </div>
+            {authError ? (
+              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {authError}
+              </div>
+            ) : null}
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setAuthModalOpen(false); setAuthError(null); }}>Cancel</Button>
+            <Button type="button" onClick={handleAuthSubmit} disabled={authSubmitting} className="min-w-[100px]">
+              {authSubmitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              {authMode === "signup" ? "Create Account" : "Sign In"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      ) : null}
+      {geminiSettingsOpen ? (
+        <DialogContent onClose={() => { setGeminiSettingsOpen(false); setTestKeyResult(null); }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-muted-foreground" />
+              AI Model Settings
+            </DialogTitle>
+            <DialogDescription>
+              Choose a model and configure API keys. {user ? "Settings sync across devices." : "Saved locally in this browser."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="llmModel" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Model</Label>
+              <select
+                id="llmModel"
+                value={llmModel}
+                onChange={(event) => {
+                  setLlmModel(event.target.value);
+                  setLlmProvider(providerForModel(event.target.value));
+                }}
+                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <optgroup label="Gemini">
+                  {MODEL_OPTIONS.filter((o) => o.provider === "gemini").map((o) => (
+                    <option key={o.model} value={o.model}>{o.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Groq">
+                  {MODEL_OPTIONS.filter((o) => o.provider === "groq").map((o) => (
+                    <option key={o.model} value={o.model}>{o.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Claude">
+                  {MODEL_OPTIONS.filter((o) => o.provider === "claude").map((o) => (
+                    <option key={o.model} value={o.model}>{o.label}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+            <Separator />
+            <div className="space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">API Keys</p>
+              <div className={`space-y-1.5 rounded-lg border p-3 transition-colors ${llmProvider === "gemini" ? "border-emerald-300 bg-emerald-50/50" : "border-transparent bg-muted/30"}`}>
+                <Label htmlFor="geminiApiKey" className="flex items-center gap-1.5 text-sm">
+                  Gemini
+                  {llmProvider === "gemini" ? <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Active</Badge> : null}
+                </Label>
                 <Input
                   id="geminiApiKey"
                   type="password"
@@ -1619,10 +1996,14 @@ export function LatexResumeTailorApp() {
                   onChange={(event) => setGeminiApiKey(event.target.value)}
                   placeholder="AIza..."
                   autoComplete="off"
+                  className="h-9"
                 />
               </div>
-              <div className={`space-y-1.5 rounded-md p-2 ${llmProvider === "groq" ? "bg-emerald-50 ring-1 ring-emerald-200" : ""}`}>
-                <Label htmlFor="groqApiKey">Groq API Key</Label>
+              <div className={`space-y-1.5 rounded-lg border p-3 transition-colors ${llmProvider === "groq" ? "border-emerald-300 bg-emerald-50/50" : "border-transparent bg-muted/30"}`}>
+                <Label htmlFor="groqApiKey" className="flex items-center gap-1.5 text-sm">
+                  Groq
+                  {llmProvider === "groq" ? <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Active</Badge> : null}
+                </Label>
                 <Input
                   id="groqApiKey"
                   type="password"
@@ -1630,10 +2011,14 @@ export function LatexResumeTailorApp() {
                   onChange={(event) => setGroqApiKey(event.target.value)}
                   placeholder="gsk_..."
                   autoComplete="off"
+                  className="h-9"
                 />
               </div>
-              <div className={`space-y-1.5 rounded-md p-2 ${llmProvider === "claude" ? "bg-emerald-50 ring-1 ring-emerald-200" : ""}`}>
-                <Label htmlFor="claudeApiKey">Claude API Key</Label>
+              <div className={`space-y-1.5 rounded-lg border p-3 transition-colors ${llmProvider === "claude" ? "border-emerald-300 bg-emerald-50/50" : "border-transparent bg-muted/30"}`}>
+                <Label htmlFor="claudeApiKey" className="flex items-center gap-1.5 text-sm">
+                  Claude
+                  {llmProvider === "claude" ? <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Active</Badge> : null}
+                </Label>
                 <Input
                   id="claudeApiKey"
                   type="password"
@@ -1641,607 +2026,746 @@ export function LatexResumeTailorApp() {
                   onChange={(event) => setClaudeApiKey(event.target.value)}
                   placeholder="sk-ant-..."
                   autoComplete="off"
+                  className="h-9"
                 />
               </div>
             </div>
             {testKeyResult ? (
-              <div className={`mt-3 rounded-md px-3 py-2 text-sm ${testKeyResult.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}>
-                {testKeyResult.ok ? "✓ " : "✗ "}{testKeyResult.message}
+              <div className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm ${testKeyResult.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
+                {testKeyResult.ok ? <CircleCheck className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}
+                <span className="line-clamp-2">{testKeyResult.message}</span>
               </div>
             ) : null}
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={testingKey}
-                onClick={async () => {
-                  const activeKey = (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim();
-                  if (!activeKey) {
-                    setTestKeyResult({ ok: false, message: `No ${llmProvider} API key entered.` });
-                    return;
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={testingKey}
+              onClick={async () => {
+                const activeKey = (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim();
+                if (!activeKey) {
+                  setTestKeyResult({ ok: false, message: `No ${llmProvider} API key entered.` });
+                  return;
+                }
+                setTestingKey(true);
+                setTestKeyResult(null);
+                try {
+                  const res = await fetch("/api/resume/test-key", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ provider: llmProvider, model: llmModel, apiKey: activeKey }),
+                  });
+                  const data = await res.json() as { ok: boolean; error?: string; reply?: string };
+                  if (data.ok) {
+                    setTestKeyResult({ ok: true, message: `Key works! Response: "${data.reply}"` });
+                    toast.success(`${llmProvider.toUpperCase()} API key is valid!`);
+                  } else {
+                    setTestKeyResult({ ok: false, message: data.error || "Test failed." });
+                    toast.error(`API key test failed: ${data.error || "Unknown error"}`);
                   }
-                  setTestingKey(true);
-                  setTestKeyResult(null);
-                  try {
-                    const res = await fetch("/api/resume/test-key", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ provider: llmProvider, model: llmModel, apiKey: activeKey }),
-                    });
-                    const data = await res.json() as { ok: boolean; error?: string; reply?: string };
-                    if (data.ok) {
-                      setTestKeyResult({ ok: true, message: `Key works! Response: "${data.reply}"` });
-                      toast.success(`${llmProvider.toUpperCase()} API key is valid!`);
-                    } else {
-                      setTestKeyResult({ ok: false, message: data.error || "Test failed." });
-                      toast.error(`API key test failed: ${data.error || "Unknown error"}`);
-                    }
-                  } catch {
-                    setTestKeyResult({ ok: false, message: "Network error." });
-                    toast.error("Network error during API key test.");
-                  } finally {
-                    setTestingKey(false);
-                  }
-                }}
-              >
-                {testingKey ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-                Test Key
-              </Button>
-              <Button type="button" variant="outline" onClick={() => { setGeminiSettingsOpen(false); setTestKeyResult(null); }}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  const nextSettings: LlmSettings = {
-                    provider: llmProvider,
-                    model: llmModel.trim() || "gemini-2.5-pro",
-                    geminiApiKey: geminiApiKey.trim(),
-                    groqApiKey: groqApiKey.trim(),
-                    claudeApiKey: claudeApiKey.trim(),
-                  };
-
-                  setLlmProvider(nextSettings.provider);
-                  setLlmModel(nextSettings.model);
-                  setGeminiApiKey(nextSettings.geminiApiKey);
-                  setGroqApiKey(nextSettings.groqApiKey);
-                  setClaudeApiKey(nextSettings.claudeApiKey);
-                  writeCachedLlmSettings(nextSettings);
-                  setGeminiSettingsOpen(false);
-                  setTestKeyResult(null);
-                  toast.success("AI model settings saved successfully!");
-                }}
-              >
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
+                } catch {
+                  setTestKeyResult({ ok: false, message: "Network error." });
+                  toast.error("Network error during API key test.");
+                } finally {
+                  setTestingKey(false);
+                }
+              }}
+            >
+              {testingKey ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+              Test Key
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const nextSettings: LlmSettings = {
+                  provider: llmProvider,
+                  model: llmModel.trim() || "gemini-2.5-pro",
+                  geminiApiKey: geminiApiKey.trim(),
+                  groqApiKey: groqApiKey.trim(),
+                  claudeApiKey: claudeApiKey.trim(),
+                };
+                setLlmProvider(nextSettings.provider);
+                setLlmModel(nextSettings.model);
+                setGeminiApiKey(nextSettings.geminiApiKey);
+                setGroqApiKey(nextSettings.groqApiKey);
+                setClaudeApiKey(nextSettings.claudeApiKey);
+                writeCachedLlmSettings(nextSettings);
+                saveSettingsToSupabase(nextSettings);
+                setGeminiSettingsOpen(false);
+                setTestKeyResult(null);
+                toast.success("AI model settings saved successfully!");
+              }}
+            >
+              Save Settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       ) : null}
-      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col items-stretch gap-5 px-4 py-5 xl:flex-row xl:items-stretch">
-        <section className="flex w-full min-w-0 flex-1 min-h-0 flex-col rounded-md border bg-white xl:min-h-0">
-          <div className="flex flex-col gap-3 border-b bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center">
-              <Image
-                src="/resume-tailor.png"
-                alt="Resume Tailor"
-                width={160}
-                height={24}
-                className="h-11 w-auto"
-                priority
-              />
-            </div>
-
-            {/* Editor Toolbar */}
-            <div className="flex flex-1 flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2">
-                <select
-                  value={toolbarCommand}
-                  onChange={(e) => setToolbarCommand(e.target.value as FormattingType)}
-                  className="h-8 w-32 truncate rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="header-name">Header Name</option>
-                  <option value="section">Section</option>
-                  <option value="resumeSubheading">Subheading</option>
-                  <option value="resumeProjectHeading">Project Head</option>
-                  <option value="resumeItem">Bullet Item</option>
-                  <option value="normal-text">Normal Text</option>
-                </select>
-                <div
-                  className="relative flex h-8 w-20 items-center rounded-md border border-input bg-background text-sm select-none"
-                  style={{ cursor: "ew-resize" }}
-                  onPointerDown={(e) => {
-                    if (isFontSizeEditing) return;
-                    e.preventDefault();
-                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                    fontSizeDragRef.current = { startX: e.clientX, startVal: currentFontSize };
-                  }}
-                  onPointerMove={(e) => {
-                    if (!fontSizeDragRef.current) return;
-                    const delta = Math.round((e.clientX - fontSizeDragRef.current.startX) / 4);
-                    const newVal = Math.max(4, Math.min(40, fontSizeDragRef.current.startVal + delta));
-                    setFontSizeInput(String(newVal));
-                    commitFontSize(newVal);
-                  }}
-                  onPointerUp={(e) => {
-                    if (!fontSizeDragRef.current) return;
-                    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-                    fontSizeDragRef.current = null;
-                  }}
-                >
-                  <input
-                    className="h-full w-full bg-transparent px-2 text-center text-sm outline-none"
-                    style={{ cursor: isFontSizeEditing ? "text" : "ew-resize" }}
-                    value={isFontSizeEditing ? fontSizeInput : `${currentFontSize}pt`}
-                    onFocus={() => {
-                      setIsFontSizeEditing(true);
-                      setFontSizeInput(String(currentFontSize));
-                    }}
-                    onBlur={() => {
-                      setIsFontSizeEditing(false);
-                      const pt = Number.parseInt(fontSizeInput, 10);
-                      if (Number.isFinite(pt)) commitFontSize(pt);
-                    }}
-                    onChange={(e) => setFontSizeInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.currentTarget.blur();
-                      } else if (e.key === "Escape") {
-                        setFontSizeInput(String(currentFontSize));
-                        setIsFontSizeEditing(false);
-                      }
-                    }}
-                  />
+      <div className="flex flex-1 min-h-0">
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.aside
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 280, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="flex h-full flex-col overflow-hidden border-r bg-white"
+              style={{ minWidth: 0 }}
+            >
+              <div className="flex items-center justify-between border-b px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold">Projects</h2>
+                </div>
+                <div className="flex items-center gap-1">
+                  {user ? (
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={createNewProject} title="New Project">
+                      <FilePlus className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  {/* <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSidebarOpen(false)}>
+                    <X className="h-4 w-4" />
+                  </Button> */}
                 </div>
               </div>
+              {user ? (
+                <>
+                  <ScrollArea className="flex-1">
+                    <div className="p-2">
+                      {supabaseProjects.length === 0 ? (
+                        <p className="px-2 py-4 text-center text-sm text-muted-foreground">No projects yet. Create one to get started.</p>
+                      ) : (
+                        supabaseProjects.map((project) => (
+                          <div
+                            key={project.id}
+                            className={`group flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted ${activeProjectId === project.id ? "bg-muted font-medium" : ""}`}
+                            onClick={() => { if (renamingProjectId !== project.id) loadProjectIntoEditor(project); }}
+                          >
+                            {renamingProjectId === project.id ? (
+                              <input
+                                className="flex-1 rounded border bg-background px-1.5 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onBlur={() => { if (renameValue.trim()) renameProject(project.id, renameValue.trim()); setRenamingProjectId(null); }}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.currentTarget.blur(); } if (e.key === "Escape") setRenamingProjectId(null); }}
+                                autoFocus
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              <>
+                                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate">{project.name}</p>
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {new Date(project.updated_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setRenamingProjectId(project.id); setRenameValue(project.name); }}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                  <div className="border-t p-2">
+                    <Button type="button" variant="ghost" size="sm" className="w-full gap-2 text-muted-foreground" onClick={handleSignOut}>
+                      <LogOut className="h-3.5 w-3.5" />
+                      Sign Out
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4">
+                  <p className="text-center text-sm text-muted-foreground">Sign in to save and manage your resume projects in the cloud.</p>
+                  <Button type="button" className="gap-2" onClick={() => { setAuthModalOpen(true); setAuthMode("signin"); }}>
+                    <LogIn className="h-4 w-4" />
+                    Sign In
+                  </Button>
+                </div>
+              )}
+            </motion.aside>
+          )}
+        </AnimatePresence>
+        <div className="flex flex-1 min-h-0 min-w-0 flex-col">
+          <div className="mx-auto flex min-h-0 w-full flex-1 flex-col items-stretch gap-5 px-4 py-5 xl:flex-row xl:items-stretch">
+            <section className="flex w-full min-w-0 flex-1 min-h-0 flex-col rounded-md border bg-white xl:min-h-0">
+              <div className="flex flex-wrap items-center gap-2 border-b bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => setSidebarOpen((prev) => !prev)}
+                    aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+                  >
+                    {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                  </Button>
+                  <Image
+                    src="/resume-tailor.png"
+                    alt="Resume Tailor"
+                    width={120}
+                    height={18}
+                    className="h-8 w-auto"
+                    priority
+                  />
+                </div>
 
-              <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+                <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
 
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0 font-bold"
-                  onClick={insertLatexBold}
-                  title="Bold (\\textbf{})"
-                >
-                  B
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0 italic"
-                  onClick={insertLatexItalic}
-                  title="Italic (\\textit{})"
-                >
-                  I
-                </Button>
+                {/* Editor Toolbar */}
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={toolbarCommand}
+                      onChange={(e) => setToolbarCommand(e.target.value as FormattingType)}
+                      className="h-8 w-32 truncate rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="header-name">Header Name</option>
+                      <option value="section">Section</option>
+                      <option value="resumeSubheading">Subheading</option>
+                      <option value="resumeProjectHeading">Project Head</option>
+                      <option value="resumeItem">Bullet Item</option>
+                      <option value="normal-text">Normal Text</option>
+                    </select>
+                    <div
+                      className="relative flex h-8 w-20 items-center rounded-md border border-input bg-background text-sm select-none"
+                      style={{ cursor: "ew-resize" }}
+                      onPointerDown={(e) => {
+                        if (isFontSizeEditing) return;
+                        e.preventDefault();
+                        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                        fontSizeDragRef.current = { startX: e.clientX, startVal: currentFontSize };
+                      }}
+                      onPointerMove={(e) => {
+                        if (!fontSizeDragRef.current) return;
+                        const delta = Math.round((e.clientX - fontSizeDragRef.current.startX) / 4);
+                        const newVal = Math.max(4, Math.min(40, fontSizeDragRef.current.startVal + delta));
+                        setFontSizeInput(String(newVal));
+                        commitFontSize(newVal);
+                      }}
+                      onPointerUp={(e) => {
+                        if (!fontSizeDragRef.current) return;
+                        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+                        fontSizeDragRef.current = null;
+                      }}
+                    >
+                      <input
+                        className="h-full w-full bg-transparent px-2 text-center text-sm outline-none"
+                        style={{ cursor: isFontSizeEditing ? "text" : "ew-resize" }}
+                        value={isFontSizeEditing ? fontSizeInput : `${currentFontSize}pt`}
+                        onFocus={() => {
+                          setIsFontSizeEditing(true);
+                          setFontSizeInput(String(currentFontSize));
+                        }}
+                        onBlur={() => {
+                          setIsFontSizeEditing(false);
+                          const pt = Number.parseInt(fontSizeInput, 10);
+                          if (Number.isFinite(pt)) commitFontSize(pt);
+                        }}
+                        onChange={(e) => setFontSizeInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.currentTarget.blur();
+                          } else if (e.key === "Escape") {
+                            setFontSizeInput(String(currentFontSize));
+                            setIsFontSizeEditing(false);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
 
-                <div className="relative" data-formatting-menu>
+                  <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 font-bold"
+                      onClick={insertLatexBold}
+                      title="Bold (\\textbf{})"
+                    >
+                      B
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 italic"
+                      onClick={insertLatexItalic}
+                      title="Italic (\\textit{})"
+                    >
+                      I
+                    </Button>
+
+                    <div className="relative" data-formatting-menu>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 px-2"
+                        onClick={() => setFormattingMenuOpen((v) => !v)}
+                        title="Formatting"
+                      >
+                        <Type className="h-3.5 w-3.5" />
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                      {formattingMenuOpen ? (
+                        <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border bg-white py-1 shadow-lg">
+                          {([
+                            { type: "header-name" as FormattingType, label: "Header Name" },
+                            { type: "section" as FormattingType, label: "Section" },
+                            { type: "resumeSubheading" as FormattingType, label: "Subheading" },
+                            { type: "resumeProjectHeading" as FormattingType, label: "Project Heading" },
+                            { type: "resumeItem" as FormattingType, label: "Bullet Item" },
+                            { type: "normal-text" as FormattingType, label: "Normal Text" },
+                          ]).map((item) => (
+                            <button
+                              key={item.type}
+                              type="button"
+                              className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-muted ${toolbarCommand === item.type ? "bg-muted/60 font-medium" : ""}`}
+                              onClick={() => {
+                                setToolbarCommand(item.type);
+                                setFormattingMenuOpen(false);
+                              }}
+                            >
+                              <span>{item.label}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {getFormattingFontSize(item.type, latexCode)}pt
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={insertBulletList}
+                      title="Bullet list (\\begin{itemize})"
+                    >
+                      <List className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={insertNumberedList}
+                      title="Numbered list (\\begin{enumerate})"
+                    >
+                      <ListOrdered className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 px-2"
+                      onClick={handleFindReplace}
+                      title="Find & Replace"
+                    >
+                      <Search className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {user && activeProjectId ? (
+                  <>
+                    <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
+                    <div className="flex items-center gap-1">
+                      {editingProjectName ? (
+                        <input
+                          className="h-7 w-40 rounded border border-input bg-background px-2 text-center text-xs outline-none focus:ring-1 focus:ring-ring"
+                          value={projectNameInput}
+                          onChange={(e) => setProjectNameInput(e.target.value)}
+                          onBlur={() => { if (projectNameInput.trim()) { renameProject(activeProjectId, projectNameInput.trim()); } setEditingProjectName(false); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") setEditingProjectName(false); }}
+                          autoFocus
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          onClick={() => { setEditingProjectName(true); setProjectNameInput(currentProjectName); }}
+                        >
+                          <span className="max-w-[160px] truncate">{currentProjectName}</span>
+                          <Pencil className="h-2.5 w-2.5" />
+                        </button>
+                      )}
+                      {savingProject ? <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" /> : null}
+                    </div>
+                  </>
+                ) : null}
+
+                <div className="ml-auto flex items-center gap-1">
+                  {!user && !authLoading ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 px-2.5"
+                      onClick={() => { setAuthModalOpen(true); setAuthMode("signin"); }}
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline text-xs">Sign In</span>
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1 px-2"
-                    onClick={() => setFormattingMenuOpen((v) => !v)}
-                    title="Formatting"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setGeminiSettingsOpen(true)}
+                    title="AI Model Settings"
                   >
-                    <Type className="h-3.5 w-3.5" />
-                    <ChevronDown className="h-3 w-3" />
+                    <KeyRound className="h-3.5 w-3.5" />
                   </Button>
-                  {formattingMenuOpen ? (
-                    <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border bg-white py-1 shadow-lg">
-                      {([
-                        { type: "header-name" as FormattingType, label: "Header Name" },
-                        { type: "section" as FormattingType, label: "Section" },
-                        { type: "resumeSubheading" as FormattingType, label: "Subheading" },
-                        { type: "resumeProjectHeading" as FormattingType, label: "Project Heading" },
-                        { type: "resumeItem" as FormattingType, label: "Bullet Item" },
-                        { type: "normal-text" as FormattingType, label: "Normal Text" },
-                      ]).map((item) => (
-                        <button
-                          key={item.type}
-                          type="button"
-                          className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-muted ${toolbarCommand === item.type ? "bg-muted/60 font-medium" : ""}`}
-                          onClick={() => {
-                            setToolbarCommand(item.type);
-                            setFormattingMenuOpen(false);
-                          }}
-                        >
-                          <span>{item.label}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {getFormattingFontSize(item.type, latexCode)}pt
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
+                  <label className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm shadow-sm hover:bg-muted" title="Upload .tex file">
+                    <input
+                      type="file"
+                      accept=".tex,application/x-tex,text/x-tex,text/plain"
+                      className="sr-only"
+                      onChange={handleFileChange}
+                    />
+                    {loadingFile ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5" />
+                    )}
+                  </label>
+                  <Button type="button" variant="outline" size="sm" className="h-8 w-8 p-0" onClick={downloadLatexSource} title="Download .tex source">
+                    <Code2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={auditResume}
+                    disabled={auditing || resumeSections.length === 0}
+                    title="ATS Audit"
+                  >
+                    {auditing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <SearchCheck className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={downloadResumePdf}
+                    disabled={!canCompilePdf || downloading}
+                    title={
+                      compilerStatus?.available
+                        ? `Download PDF via ${compilerStatus.compiler}`
+                        : "No LaTeX compiler found"
+                    }
+                  >
+                    {downloading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={isInputPanelOpen ? "default" : "outline"}
+                    onClick={() => setIsInputPanelOpen((current) => !current)}
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    aria-label={isInputPanelOpen ? "Hide input panel" : "Show input panel"}
+                    title={isInputPanelOpen ? "Hide input panel" : "Show input panel"}
+                  >
+                    {isInputPanelOpen ? (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
                 </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={insertBulletList}
-                  title="Bullet list (\\begin{itemize})"
-                >
-                  <List className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={insertNumberedList}
-                  title="Numbered list (\\begin{enumerate})"
-                >
-                  <ListOrdered className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1 px-2"
-                  onClick={handleFindReplace}
-                  title="Find & Replace"
-                >
-                  <Search className="h-3.5 w-3.5" />
-                </Button>
               </div>
-            </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 gap-2"
-                onClick={() => setGeminiSettingsOpen(true)}
-              >
-                <KeyRound className="h-4 w-4" />
-              </Button>
-              <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-muted">
-                <input
-                  type="file"
-                  accept=".tex,application/x-tex,text/x-tex,text/plain"
-                  className="sr-only"
-                  onChange={handleFileChange}
-                />
-                {loadingFile ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4" />
-                )}
-              </label>
-              {/* <Button
-                type="button"
-                variant={viewMode === "pdf" ? "default" : "outline"}
-                onClick={renderPdfPreview}
-                disabled={!canCompilePdf || renderingPdf}
-              >
-                {renderingPdf ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4" />
-                )}
-              </Button> */}
-              <Button type="button" variant="outline" onClick={downloadLatexSource}>
-                <Code2 className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={auditResume}
-                disabled={auditing || resumeSections.length === 0}
-                title="ATS Audit: Check for missing metrics, repetition, and grammar issues"
-              >
-                {auditing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <SearchCheck className="h-4 w-4" />
-                )}
-              </Button>
-              <Button
-                type="button"
-                onClick={downloadResumePdf}
-                disabled={!canCompilePdf || downloading}
-                title={
-                  compilerStatus?.available
-                    ? `Download PDF via ${compilerStatus.compiler} (ATS-compatible)`
-                    : "No LaTeX compiler found"
-                }
-              >
-                {downloading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant={isInputPanelOpen ? "default" : "outline"}
-                onClick={() => setIsInputPanelOpen((current) => !current)}
-                size="icon"
-                className="h-10 w-10"
-                aria-label={isInputPanelOpen ? "Hide input panel" : "Show input panel"}
-                title={isInputPanelOpen ? "Hide input panel" : "Show input panel"}
-              >
-                {isInputPanelOpen ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {error ? (
-            <div className="px-4 pt-4">
-              <Alert className="border-destructive/40 bg-destructive/5">
-                <AlertTitle>Something needs attention</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            </div>
-          ) : null}
-
-          {!compilerStatus?.available && !checkingCompiler ? (
-            <div className="px-4 pt-2">
-              <CompilerNotice status={compilerStatus} checking={checkingCompiler} />
-            </div>
-          ) : null}
-
-          <div
-            ref={paneGridRef}
-            className="grid min-h-0 flex-1 grid-rows-[1fr_1fr] gap-0 overflow-hidden lg:grid-cols-[minmax(320px,var(--editor-pane-width))_10px_minmax(380px,1fr)] lg:grid-rows-1"
-            style={
-              {
-                "--editor-pane-width": `${editorPaneWidth}%`,
-              } as CSSProperties
-            }
-          >
-            <div className="flex min-h-0 flex-col border-b lg:h-full lg:border-b-0 lg:border-r">
-              {orderedSuggestions.length > 0 ? (
-                <div className="flex min-h-[57px] flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-sm font-semibold">LaTeX source</h2>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {`Suggestion ${Math.max(activeSuggestionIndex + 1, 1)} of ${orderedSuggestions.length}`}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="outline"
-                      className="h-7 w-7"
-                      onClick={() => focusSuggestionAtIndex(activeSuggestionIndex - 1)}
-                      disabled={orderedSuggestions.length === 0}
-                      aria-label="Previous suggested change"
-                      title="Previous suggested change"
-                    >
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="outline"
-                      className="h-7 w-7"
-                      onClick={() => focusSuggestionAtIndex(activeSuggestionIndex + 1)}
-                      disabled={orderedSuggestions.length === 0}
-                      aria-label="Next suggested change"
-                      title="Next suggested change"
-                    >
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-7 gap-1 px-2 text-xs"
-                      onClick={acceptAllSuggestions}
-                      disabled={orderedSuggestions.length === 0}
-                    >
-                      <CheckCheck className="h-3.5 w-3.5" />
-                      Accept all
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1 px-2 text-xs"
-                      onClick={declineAllSuggestions}
-                      disabled={orderedSuggestions.length === 0}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      Decline all
-                    </Button>
-                  </div>
+              {error ? (
+                <div className="px-4 pt-4">
+                  <Alert className="border-destructive/40 bg-destructive/5">
+                    <AlertTitle>Something needs attention</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 </div>
               ) : null}
-              <CodeMirror
-                value={latexCode}
-                height="100%"
-                readOnly={suggesting}
-                extensions={[latexLanguage, latexSuggestionExtension, latexPolishExtension]}
-                onCreateEditor={(view) => {
-                  editorViewRef.current = view;
-                }}
-                basicSetup={{
-                  lineNumbers: true,
-                  foldGutter: true,
-                  highlightActiveLine: true,
-                  highlightSelectionMatches: true,
-                }}
-                onChange={handleLatexEditorChange}
-                className={`min-h-0 flex-1 text-sm [&_.cm-editor]:h-full${suggesting ? " opacity-60 pointer-events-none" : ""}`}
-              />
-            </div>
 
-            <div
-              role="separator"
-              aria-label="Resize LaTeX editor and preview panes"
-              aria-orientation="vertical"
-              aria-valuemin={MIN_EDITOR_PANE_WIDTH}
-              aria-valuemax={MAX_EDITOR_PANE_WIDTH}
-              aria-valuenow={Math.round(editorPaneWidth)}
-              tabIndex={0}
-              className={`hidden h-full min-h-0 cursor-col-resize items-center justify-center self-stretch border-r bg-border/60 transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex ${isPaneResizing ? "bg-primary/20" : ""
-                }`}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                setIsPaneResizing(true);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowLeft") {
-                  event.preventDefault();
-                  setEditorPaneWidth((current) => clampPaneWidth(current - 4));
+              {!compilerStatus?.available && !checkingCompiler ? (
+                <div className="px-4 pt-2">
+                  <CompilerNotice status={compilerStatus} checking={checkingCompiler} />
+                </div>
+              ) : null}
+
+              <div
+                ref={paneGridRef}
+                className="grid min-h-0 flex-1 grid-rows-[1fr_1fr] gap-0 overflow-hidden lg:grid-cols-[minmax(320px,var(--editor-pane-width))_10px_minmax(380px,1fr)] lg:grid-rows-1"
+                style={
+                  {
+                    "--editor-pane-width": `${editorPaneWidth}%`,
+                  } as CSSProperties
                 }
+              >
+                <div className="flex min-h-0 flex-col border-b lg:h-full lg:border-b-0 lg:border-r">
+                  {orderedSuggestions.length > 0 ? (
+                    <div className="flex min-h-[57px] flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2">
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-semibold">LaTeX source</h2>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {`Suggestion ${Math.max(activeSuggestionIndex + 1, 1)} of ${orderedSuggestions.length}`}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() => focusSuggestionAtIndex(activeSuggestionIndex - 1)}
+                          disabled={orderedSuggestions.length === 0}
+                          aria-label="Previous suggested change"
+                          title="Previous suggested change"
+                        >
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() => focusSuggestionAtIndex(activeSuggestionIndex + 1)}
+                          disabled={orderedSuggestions.length === 0}
+                          aria-label="Next suggested change"
+                          title="Next suggested change"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-xs"
+                          onClick={acceptAllSuggestions}
+                          disabled={orderedSuggestions.length === 0}
+                        >
+                          <CheckCheck className="h-3.5 w-3.5" />
+                          Accept all
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1 px-2 text-xs"
+                          onClick={declineAllSuggestions}
+                          disabled={orderedSuggestions.length === 0}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Decline all
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <CodeMirror
+                    value={latexCode}
+                    height="100%"
+                    readOnly={suggesting}
+                    extensions={[latexLanguage, latexSuggestionExtension, latexPolishExtension]}
+                    onCreateEditor={(view) => {
+                      editorViewRef.current = view;
+                    }}
+                    basicSetup={{
+                      lineNumbers: true,
+                      foldGutter: true,
+                      highlightActiveLine: true,
+                      highlightSelectionMatches: true,
+                    }}
+                    onChange={handleLatexEditorChange}
+                    className={`min-h-0 flex-1 text-sm [&_.cm-editor]:h-full${suggesting ? " opacity-60 pointer-events-none" : ""}`}
+                  />
+                </div>
 
-                if (event.key === "ArrowRight") {
-                  event.preventDefault();
-                  setEditorPaneWidth((current) => clampPaneWidth(current + 4));
-                }
-              }}
-            >
-              <span className="h-16 w-1 rounded-sm bg-muted-foreground/35" />
-            </div>
+                <div
+                  role="separator"
+                  aria-label="Resize LaTeX editor and preview panes"
+                  aria-orientation="vertical"
+                  aria-valuemin={MIN_EDITOR_PANE_WIDTH}
+                  aria-valuemax={MAX_EDITOR_PANE_WIDTH}
+                  aria-valuenow={Math.round(editorPaneWidth)}
+                  tabIndex={0}
+                  className={`hidden h-full min-h-0 cursor-col-resize items-center justify-center self-stretch border-r bg-border/60 transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex ${isPaneResizing ? "bg-primary/20" : ""
+                    }`}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    setIsPaneResizing(true);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowLeft") {
+                      event.preventDefault();
+                      setEditorPaneWidth((current) => clampPaneWidth(current - 4));
+                    }
 
-            <div className="h-full min-h-0 bg-[#e8eeee]">
-              <div className="flex h-full min-h-0 flex-col">
-                <div className="flex items-center justify-between border-b bg-slate-800 px-2 py-1 text-slate-100">
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className={`relative h-7 gap-1.5 px-2 text-sm hover:bg-slate-700 hover:text-slate-100 ${lastCompileSuccess === false
-                        ? "text-red-400"
-                        : lastCompileSuccess === true
-                          ? "text-green-400"
-                          : "text-slate-100"
-                        }`}
-                      onClick={recompileLatex}
-                      disabled={isRecompiling || !canCompilePdf}
-                      title="Recompile LaTeX and show diagnostics"
-                    >
-                      {isRecompiling ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : lastCompileSuccess === true ? (
-                        <CircleCheck className="h-3.5 w-3.5" />
-                      ) : lastCompileSuccess === false ? (
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                      ) : (
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      )}
-                      {lastCompileSuccess === false && diagnostics.filter((d) => d.severity === "error").length > 0 && (
-                        <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 text-[10px] leading-none">
-                          {diagnostics.filter((d) => d.severity === "error").length}
-                        </Badge>
-                      )}
-                    </Button>
-                    <span className="mx-1 h-6 w-px bg-slate-600" />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-7 gap-1.5 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
-                      onClick={renderPdfPreview}
-                      disabled={!previewId}
-                      title={previewId ? "Open PDF in new tab" : "Compile first to preview PDF"}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="mx-1 h-6 w-px bg-slate-600" />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
-                      onClick={() => goToPreviewPage(previewPage - 1)}
-                      aria-label="Previous page"
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
-                      onClick={() => goToPreviewPage(previewPage + 1)}
-                      aria-label="Next page"
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      value={previewPageInput}
-                      onChange={(event) => {
-                        const digitsOnly = event.target.value.replace(/[^\d]/g, "");
-                        setPreviewPageInput(digitsOnly);
-                      }}
-                      onBlur={() => goToPreviewPage(Number.parseInt(previewPageInput || "1", 10))}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          goToPreviewPage(Number.parseInt(previewPageInput || "1", 10));
-                        }
-                      }}
-                      className="h-7 w-12 border-slate-500 bg-slate-700 px-2 text-center text-sm text-white"
-                      aria-label="Preview page number"
-                    />
-                    <span className="text-sm text-slate-200">/ {previewPageCount}</span>
-                    <span className="mx-1 h-6 w-px bg-slate-600" />
+                    if (event.key === "ArrowRight") {
+                      event.preventDefault();
+                      setEditorPaneWidth((current) => clampPaneWidth(current + 4));
+                    }
+                  }}
+                >
+                  <span className="h-16 w-1 rounded-sm bg-muted-foreground/35" />
+                </div>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
-                      onClick={undoLatex}
-                      disabled={!canUndoLatex}
-                      aria-label="Undo LaTeX edit"
-                      title="Undo LaTeX edit"
-                    >
-                      <Undo2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
-                      onClick={redoLatex}
-                      disabled={!canRedoLatex}
-                      aria-label="Redo LaTeX edit"
-                      title="Redo LaTeX edit"
-                    >
-                      <Redo2 className="h-4 w-4" />
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
-                      onClick={() =>
-                        setPreviewZoom((current) => clampPdfZoom(current - PDF_ZOOM_STEP))
-                      }
-                      aria-label="Zoom out preview"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
-                      onClick={() =>
-                        setPreviewZoom((current) => clampPdfZoom(current + PDF_ZOOM_STEP))
-                      }
-                      aria-label="Zoom in preview"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button
+                <div className="h-full min-h-0 bg-[#e8eeee]">
+                  <div className="flex h-full min-h-0 flex-col">
+                    <div className="flex items-center justify-between border-b bg-slate-800 px-2 py-1 text-slate-100">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
+                          onClick={() => goToPreviewPage(previewPage - 1)}
+                          aria-label="Previous page"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
+                          onClick={() => goToPreviewPage(previewPage + 1)}
+                          aria-label="Next page"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          value={previewPageInput}
+                          onChange={(event) => {
+                            const digitsOnly = event.target.value.replace(/[^\d]/g, "");
+                            setPreviewPageInput(digitsOnly);
+                          }}
+                          onBlur={() => goToPreviewPage(Number.parseInt(previewPageInput || "1", 10))}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              goToPreviewPage(Number.parseInt(previewPageInput || "1", 10));
+                            }
+                          }}
+                          className="h-7 w-12 border-slate-500 bg-slate-700 px-2 text-center text-sm text-white"
+                          aria-label="Preview page number"
+                        />
+                        <span className="text-sm text-slate-200">/ {previewPageCount}</span>
+                        <span className="mx-1 h-6 w-px bg-slate-600" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                          onClick={undoLatex}
+                          disabled={!canUndoLatex}
+                          aria-label="Undo LaTeX edit"
+                          title="Undo LaTeX edit"
+                        >
+                          <Undo2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                          onClick={redoLatex}
+                          disabled={!canRedoLatex}
+                          aria-label="Redo LaTeX edit"
+                          title="Redo LaTeX edit"
+                        >
+                          <Redo2 className="h-4 w-4" />
+                        </Button>
+                        <span className="mx-1 h-6 w-px bg-slate-600" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
+                          onClick={() =>
+                            setPreviewZoom((current) => clampPdfZoom(current - PDF_ZOOM_STEP))
+                          }
+                          aria-label="Zoom out preview"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
+                          onClick={() =>
+                            setPreviewZoom((current) => clampPdfZoom(current + PDF_ZOOM_STEP))
+                          }
+                          aria-label="Zoom in preview"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-7 gap-1.5 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                          onClick={renderPdfPreview}
+                          disabled={!previewId}
+                          title={previewId ? "Open PDF in new tab" : "Compile first to preview PDF"}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className={`relative h-7 gap-1.5 px-2 text-sm hover:bg-slate-700 hover:text-slate-100 ${lastCompileSuccess === false
+                            ? "text-red-400"
+                            : lastCompileSuccess === true
+                              ? "text-green-400"
+                              : "text-slate-100"
+                            }`}
+                          onClick={recompileLatex}
+                          disabled={isRecompiling || !canCompilePdf}
+                          title="Recompile LaTeX and show diagnostics"
+                        >
+                          {isRecompiling ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : lastCompileSuccess === true ? (
+                            <CircleCheck className="h-3.5 w-3.5" />
+                          ) : lastCompileSuccess === false ? (
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          {lastCompileSuccess === false && diagnostics.filter((d) => d.severity === "error").length > 0 && (
+                            <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 text-[10px] leading-none">
+                              {diagnostics.filter((d) => d.severity === "error").length}
+                            </Badge>
+                          )}
+                        </Button>
+                      </div>
+                      {/* <Button
                     type="button"
                     variant="ghost"
                     className="h-7 gap-1 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100"
@@ -2250,202 +2774,202 @@ export function LatexResumeTailorApp() {
                   >
                     {previewZoom}%
                     <ChevronDown className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                  </Button> */}
+                    </div>
 
-                {/* Diagnostics Panel */}
-                <AnimatePresence>
-                  {diagnosticsPanelOpen && diagnostics.length > 0 && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden border-t border-slate-700 bg-slate-900"
-                    >
-                      <div className="flex items-center justify-between px-3 py-1.5">
-                        <div className="flex items-center gap-3 text-xs">
-                          {diagnostics.filter((d) => d.severity === "error").length > 0 && (
-                            <span className="flex items-center gap-1 text-red-400">
-                              <AlertTriangle className="h-3 w-3" />
-                              {diagnostics.filter((d) => d.severity === "error").length} error{diagnostics.filter((d) => d.severity === "error").length > 1 ? "s" : ""}
-                            </span>
-                          )}
-                          {diagnostics.filter((d) => d.severity === "warning").length > 0 && (
-                            <span className="flex items-center gap-1 text-amber-400">
-                              <AlertTriangle className="h-3 w-3" />
-                              {diagnostics.filter((d) => d.severity === "warning").length} warning{diagnostics.filter((d) => d.severity === "warning").length > 1 ? "s" : ""}
-                            </span>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 text-slate-400 hover:bg-slate-700 hover:text-slate-100"
-                          onClick={() => setDiagnosticsPanelOpen(false)}
+                    {/* Diagnostics Panel */}
+                    <AnimatePresence>
+                      {diagnosticsPanelOpen && diagnostics.length > 0 && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden border-t border-slate-700 bg-slate-900"
                         >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <ScrollArea className="max-h-48">
-                        <div className="space-y-0.5 px-3 pb-2">
-                          {diagnostics.map((diag) => (
-                            <div
-                              key={diag.id}
-                              className="flex items-start gap-2 rounded px-1.5 py-1 text-xs hover:bg-slate-800"
-                            >
-                              <AlertTriangle
-                                className={`mt-0.5 h-3 w-3 shrink-0 ${diag.severity === "error" ? "text-red-400" : "text-amber-400"
-                                  }`}
-                              />
-                              <button
-                                type="button"
-                                className="shrink-0 font-mono text-blue-400 hover:underline"
-                                onClick={() => focusEditorAtSourceLine(diag.line - 1)}
-                                title={`Go to line ${diag.line}`}
-                              >
-                                L{diag.line}
-                              </button>
-                              <span className="text-slate-300">{diag.message}</span>
-                              {diag.context && (
-                                <code className="ml-auto shrink-0 truncate rounded bg-slate-800 px-1 text-[10px] text-slate-500">
-                                  {diag.context}
-                                </code>
+                          <div className="flex items-center justify-between px-3 py-1.5">
+                            <div className="flex items-center gap-3 text-xs">
+                              {diagnostics.filter((d) => d.severity === "error").length > 0 && (
+                                <span className="flex items-center gap-1 text-red-400">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  {diagnostics.filter((d) => d.severity === "error").length} error{diagnostics.filter((d) => d.severity === "error").length > 1 ? "s" : ""}
+                                </span>
+                              )}
+                              {diagnostics.filter((d) => d.severity === "warning").length > 0 && (
+                                <span className="flex items-center gap-1 text-amber-400">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  {diagnostics.filter((d) => d.severity === "warning").length} warning{diagnostics.filter((d) => d.severity === "warning").length > 1 ? "s" : ""}
+                                </span>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-slate-400 hover:bg-slate-700 hover:text-slate-100"
+                              onClick={() => setDiagnosticsPanelOpen(false)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <ScrollArea className="max-h-48">
+                            <div className="space-y-0.5 px-3 pb-2">
+                              {diagnostics.map((diag) => (
+                                <div
+                                  key={diag.id}
+                                  className="flex items-start gap-2 rounded px-1.5 py-1 text-xs hover:bg-slate-800"
+                                >
+                                  <AlertTriangle
+                                    className={`mt-0.5 h-3 w-3 shrink-0 ${diag.severity === "error" ? "text-red-400" : "text-amber-400"
+                                      }`}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="shrink-0 font-mono text-blue-400 hover:underline"
+                                    onClick={() => focusEditorAtSourceLine(diag.line - 1)}
+                                    title={`Go to line ${diag.line}`}
+                                  >
+                                    L{diag.line}
+                                  </button>
+                                  <span className="text-slate-300">{diag.message}</span>
+                                  {diag.context && (
+                                    <code className="ml-auto shrink-0 truncate rounded bg-slate-800 px-1 text-[10px] text-slate-500">
+                                      {diag.context}
+                                    </code>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                <div ref={previewPaneRef} className="min-h-0 flex-1 overflow-hidden">
-                  <div
-                    ref={previewScrollRef}
-                    className="h-full overflow-x-auto overflow-y-scroll px-3 py-4"
-                    style={{ scrollbarGutter: "stable both-edges" }}
-                  >
-                    <ResumePreview
-                      ref={previewRef}
-                      pages={previewPages}
-                      layout={previewLayout}
-                      zoom={previewZoom}
-                      fontSizes={previewFontSizes}
-                      onNavigateToSource={navigateFromPreviewToSource}
-                    />
+                    <div ref={previewPaneRef} className="min-h-0 flex-1 overflow-hidden">
+                      <div
+                        ref={previewScrollRef}
+                        className="h-full overflow-x-auto overflow-y-scroll px-3 py-4"
+                        style={{ scrollbarGutter: "stable both-edges" }}
+                      >
+                        <ResumePreview
+                          ref={previewRef}
+                          pages={previewPages}
+                          layout={previewLayout}
+                          zoom={previewZoom}
+                          fontSizes={previewFontSizes}
+                          onNavigateToSource={navigateFromPreviewToSource}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
+            </section>
 
-        <AnimatePresence mode="wait">
-          {isInputPanelOpen && (
-            <motion.aside
-              initial={{ opacity: 0, x: 20, width: 0 }}
-              animate={{ opacity: 1, x: 0, width: "100%" }}
-              exit={{ opacity: 0, x: 20, width: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="flex w-full min-h-0 flex-col xl:w-[450px] xl:max-w-[450px] xl:self-stretch overflow-hidden"
-            >
-              <Card className="sticky top-5 min-h-0 flex-1 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
-                <CardContent className="space-y-5 pt-5 xl:flex xl:flex-1 xl:flex-col xl:overflow-y-auto">
-                  <div
-                    className="grid grid-cols-2 rounded-lg border bg-muted p-1"
-                    role="tablist"
-                    aria-label="Input panel tabs"
-                  >
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={inputSidebarTab === "project" ? "secondary" : "ghost"}
-                      className={`h-8 text-xs ${inputSidebarTab === "project"
-                        ? "bg-background text-foreground shadow-sm hover:bg-background"
-                        : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      onClick={() => setInputSidebarTab("project")}
-                      role="tab"
-                      aria-selected={inputSidebarTab === "project"}
-                    >
-                      Project
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={inputSidebarTab === "jd" ? "secondary" : "ghost"}
-                      className={`h-8 text-xs ${inputSidebarTab === "jd"
-                        ? "bg-background text-foreground shadow-sm hover:bg-background"
-                        : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      onClick={() => setInputSidebarTab("jd")}
-                      role="tab"
-                      aria-selected={inputSidebarTab === "jd"}
-                    >
-                      JD
-                    </Button>
-                  </div>
-
-                  <AnimatePresence mode="wait">
-                    {inputSidebarTab === "project" ? (
-                      <motion.div
-                        key="project"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 10 }}
-                        transition={{ duration: 0.2, ease: "easeInOut" }}
-                        className="w-full"
+            <AnimatePresence mode="wait">
+              {isInputPanelOpen && (
+                <motion.aside
+                  initial={{ opacity: 0, x: 20, width: 0 }}
+                  animate={{ opacity: 1, x: 0, width: "100%" }}
+                  exit={{ opacity: 0, x: 20, width: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  className="flex w-full min-h-0 flex-col xl:w-[450px] xl:max-w-[450px] xl:self-stretch overflow-hidden"
+                >
+                  <Card className="sticky top-5 min-h-0 flex-1 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+                    <CardContent className="space-y-5 pt-5 xl:flex xl:flex-1 xl:flex-col xl:overflow-y-auto">
+                      <div
+                        className="grid grid-cols-2 rounded-lg border bg-muted p-1"
+                        role="tablist"
+                        aria-label="Input panel tabs"
                       >
-                        <LatexProjectFields
-                          project={projectDraft}
-                          projects={projectDrafts}
-                          onProjectChange={updateProjectDraft}
-                          onProjectsChange={applyProjectDrafts}
-                          onSaveProjects={saveProjectDrafts}
-                          onDeleteProject={deleteProjectDraft}
-                          onInsertProject={insertProject}
-                          onInsertSingleProject={insertSingleProject}
-                        />
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="jd"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
-                        transition={{ duration: 0.2, ease: "easeInOut" }}
-                        className="w-full"
-                      >
-                        <div className="w-full space-y-3 rounded-md border bg-white p-3 shadow-sm">
-                          <div className="space-y-2">
-                            <Label htmlFor="companyRole">Company name with role</Label>
-                            <Input
-                              id="companyRole"
-                              value={companyRole}
-                              onChange={(event) => setCompanyRole(event.target.value)}
-                              placeholder="Acme - Frontend Developer"
-                              maxLength={COMPANY_ROLE_LIMIT}
-                            />
-                            <FieldCounter value={companyRole.length} max={COMPANY_ROLE_LIMIT} />
-                          </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={inputSidebarTab === "project" ? "secondary" : "ghost"}
+                          className={`h-8 text-xs ${inputSidebarTab === "project"
+                            ? "bg-background text-foreground shadow-sm hover:bg-background"
+                            : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          onClick={() => setInputSidebarTab("project")}
+                          role="tab"
+                          aria-selected={inputSidebarTab === "project"}
+                        >
+                          Project
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={inputSidebarTab === "jd" ? "secondary" : "ghost"}
+                          className={`h-8 text-xs ${inputSidebarTab === "jd"
+                            ? "bg-background text-foreground shadow-sm hover:bg-background"
+                            : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          onClick={() => setInputSidebarTab("jd")}
+                          role="tab"
+                          aria-selected={inputSidebarTab === "jd"}
+                        >
+                          JD
+                        </Button>
+                      </div>
 
-                          <div className="space-y-2">
-                            <Label htmlFor="jd">JD</Label>
-                            <Textarea
-                              id="jd"
-                              value={jd}
-                              onChange={(event) => setJd(event.target.value)}
-                              placeholder="Paste the job description here."
-                              className="min-h-32"
-                              maxLength={JD_LIMIT}
+                      <AnimatePresence mode="wait">
+                        {inputSidebarTab === "project" ? (
+                          <motion.div
+                            key="project"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 10 }}
+                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                            className="w-full"
+                          >
+                            <LatexProjectFields
+                              project={projectDraft}
+                              projects={projectDrafts}
+                              onProjectChange={updateProjectDraft}
+                              onProjectsChange={applyProjectDrafts}
+                              onSaveProjects={saveProjectDrafts}
+                              onDeleteProject={deleteProjectDraft}
+                              onInsertProject={insertProject}
+                              onInsertSingleProject={insertSingleProject}
                             />
-                            <FieldCounter value={jd.length} max={JD_LIMIT} />
-                          </div>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="jd"
+                            initial={{ opacity: 0, x: 10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                            className="w-full"
+                          >
+                            <div className="w-full space-y-3 rounded-md border bg-white p-3 shadow-sm">
+                              <div className="space-y-2">
+                                <Label htmlFor="companyRole">Company name with role</Label>
+                                <Input
+                                  id="companyRole"
+                                  value={companyRole}
+                                  onChange={(event) => setCompanyRole(event.target.value)}
+                                  placeholder="Acme - Frontend Developer"
+                                  maxLength={COMPANY_ROLE_LIMIT}
+                                />
+                                <FieldCounter value={companyRole.length} max={COMPANY_ROLE_LIMIT} />
+                              </div>
 
-                          <div className="btn-wrapper group relative flex w-full items-center justify-center py-4">
-                            <style>{`
+                              <div className="space-y-2">
+                                <Label htmlFor="jd">JD</Label>
+                                <Textarea
+                                  id="jd"
+                                  value={jd}
+                                  onChange={(event) => setJd(event.target.value)}
+                                  placeholder="Paste the job description here."
+                                  className="min-h-32"
+                                  maxLength={JD_LIMIT}
+                                />
+                                <FieldCounter value={jd.length} max={JD_LIMIT} />
+                              </div>
+
+                              <div className="btn-wrapper group relative flex w-full items-center justify-center py-4">
+                                <style>{`
                               .btn-wrapper {
                                 --dot-size: 8px;
                                 --line-weight: 1px;
@@ -2592,56 +3116,58 @@ export function LatexResumeTailorApp() {
                               }
                             `}</style>
 
-                            <div className="line horizontal top"></div>
-                            <div className="line vertical right"></div>
-                            <div className="line horizontal bottom"></div>
-                            <div className="line vertical left"></div>
+                                <div className="line horizontal top"></div>
+                                <div className="line vertical right"></div>
+                                <div className="line horizontal bottom"></div>
+                                <div className="line vertical left"></div>
 
-                            <div className="dot top left"></div>
-                            <div className="dot top right"></div>
-                            <div className="dot bottom right"></div>
-                            <div className="dot bottom left"></div>
+                                <div className="dot top left"></div>
+                                <div className="dot top right"></div>
+                                <div className="dot bottom right"></div>
+                                <div className="dot bottom left"></div>
 
-                            {suggesting ? (
-                              <button
-                                type="button"
-                                className="btn"
-                                onClick={cancelSuggestions}
-                              >
-                                <X className="mr-2 h-4 w-4" />
-                                Cancel
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="btn"
-                                disabled={!canSubmit}
-                                onClick={requestSuggestions}
-                              >
-                                <svg className="btn-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M17.6744 11.4075L15.7691 17.1233C15.7072 17.309 15.5586 17.4529 15.3709 17.5087L3.69348 20.9803C3.22819 21.1186 2.79978 20.676 2.95328 20.2155L6.74467 8.84131C6.79981 8.67588 6.92419 8.54263 7.08543 8.47624L12.472 6.25822C12.696 6.166 12.9535 6.21749 13.1248 6.38876L17.5294 10.7935C17.6901 10.9542 17.7463 11.1919 17.6744 11.4075Z" />
-                                  <path d="M3.2959 20.6016L9.65986 14.2376" />
-                                  <path d="M17.7917 11.0557L20.6202 8.22724C21.4012 7.44619 21.4012 6.17986 20.6202 5.39881L18.4989 3.27749C17.7178 2.49645 16.4515 2.49645 15.6704 3.27749L12.842 6.10592" />
-                                  <path d="M11.7814 12.1163C11.1956 11.5305 10.2458 11.5305 9.66004 12.1163C9.07426 12.7021 9.07426 13.6519 9.66004 14.2376C10.2458 14.8234 11.1956 14.8234 11.7814 14.2376C12.3671 13.6519 12.3671 12.7021 11.7814 12.1163Z" />
-                                </svg>
-                                Suggest resume changes
-                              </button>
-                            )}
-                          </div>
+                                {suggesting ? (
+                                  <button
+                                    type="button"
+                                    className="btn"
+                                    onClick={cancelSuggestions}
+                                  >
+                                    <X className="mr-2 h-4 w-4" />
+                                    Cancel
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="btn"
+                                    disabled={!canSubmit}
+                                    onClick={requestSuggestions}
+                                  >
+                                    <svg className="btn-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M17.6744 11.4075L15.7691 17.1233C15.7072 17.309 15.5586 17.4529 15.3709 17.5087L3.69348 20.9803C3.22819 21.1186 2.79978 20.676 2.95328 20.2155L6.74467 8.84131C6.79981 8.67588 6.92419 8.54263 7.08543 8.47624L12.472 6.25822C12.696 6.166 12.9535 6.21749 13.1248 6.38876L17.5294 10.7935C17.6901 10.9542 17.7463 11.1919 17.6744 11.4075Z" />
+                                      <path d="M3.2959 20.6016L9.65986 14.2376" />
+                                      <path d="M17.7917 11.0557L20.6202 8.22724C21.4012 7.44619 21.4012 6.17986 20.6202 5.39881L18.4989 3.27749C17.7178 2.49645 16.4515 2.49645 15.6704 3.27749L12.842 6.10592" />
+                                      <path d="M11.7814 12.1163C11.1956 11.5305 10.2458 11.5305 9.66004 12.1163C9.07426 12.7021 9.07426 13.6519 9.66004 14.2376C10.2458 14.8234 11.1956 14.8234 11.7814 14.2376C12.3671 13.6519 12.3671 12.7021 11.7814 12.1163Z" />
+                                    </svg>
+                                    Suggest resume changes
+                                  </button>
+                                )}
+                              </div>
 
-                          {/* <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+                              {/* <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
                             Suggestions update the LaTeX source, so the editable .tex remains the
                             source of truth.
                           </div> */}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </CardContent>
-              </Card>
-            </motion.aside>
-          )}
-        </AnimatePresence>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </CardContent>
+                  </Card>
+                </motion.aside>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
     </main>
   );
