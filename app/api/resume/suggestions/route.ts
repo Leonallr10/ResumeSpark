@@ -323,6 +323,7 @@ App compatibility rules:
 - For kind=subheading, only improve the company/project/school heading text. Do not put a bullet, sentence, achievement, metric, tool list, or period-ending paragraph into suggestedText.
 - For kind=projectHeading, only improve the project title. Do not put project explanation bullets into suggestedText.
 - For kind=text skill rows that look like "Label: values", return the same label once followed by improved values, matching the exact format of the original resume (e.g., "Programming Languages: JavaScript, TypeScript, Python"). Do not duplicate the old values.
+- CRITICAL: suggestedText must ALWAYS be plain text content, NEVER LaTeX commands. Do NOT include \\resumeSubItem{}{}, \\resumeItem{}, \\textbf{}, or any LaTeX commands in suggestedText. The app wraps plain text in the correct LaTeX command automatically. For example, write "Programming Languages: Python, JavaScript" NOT "\\resumeSubItem{Programming Languages}{Python, JavaScript}".
 - Ensure any tech stack content exactly aligns with the template of the resume given by the user. Match the existing prefixes and formatting.
 - For kind=bullet, return only the bullet body text without a leading bullet symbol. Keep one concise achievement per suggestion.
 - Insertions should target existing bullet lines only. Do not insert raw text around subheading/projectHeading structural lines.

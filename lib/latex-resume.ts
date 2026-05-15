@@ -716,7 +716,7 @@ function replaceVisibleLatexLine(
 ) {
   const indent = source.match(/^\s*/)?.[0] ?? "";
   const trimmed = source.trim();
-  const cleanSuggestion = stripSuggestionBullet(suggestedText);
+  const cleanSuggestion = stripLatexCommandWrapper(stripSuggestionBullet(suggestedText));
   const text = escapeLatexText(cleanSuggestion);
   const normalizedTechStack = escapeLatexText(stripTechStackLabel(cleanSuggestion));
   const projectHeading = parseCommand(trimmed, "resumeProjectHeading");
@@ -793,7 +793,7 @@ function createInsertedLatexLine(
 ) {
   const indent = source.match(/^\s*/)?.[0] ?? "";
   const trimmed = source.trim();
-  const strippedText = stripSuggestionBullet(suggestedText);
+  const strippedText = stripLatexCommandWrapper(stripSuggestionBullet(suggestedText));
   const projectSuggestion = parseProjectSuggestion(strippedText);
 
   if (sectionTitle?.toLowerCase().includes("project") && projectSuggestion) {
@@ -831,6 +831,36 @@ function createInsertedLatexLine(
 
 function stripSuggestionBullet(value: string) {
   return value.replace(/^(?:[-*]|\u2022)\s*/, "").trim();
+}
+
+function stripLatexCommandWrapper(value: string): string {
+  const trimmed = value.trim();
+
+  for (const command of visibleCommandNames) {
+    const parsed = parseCommand(trimmed, command);
+    if (!parsed) continue;
+
+    const expectedArgCount = visibleCommandArgCounts[command];
+    const args = parsed.args.map((arg) => cleanLatexText(arg));
+
+    if (command === "resumeSubItem" && args.length >= 2) {
+      return `${args[0]}: ${args[1]}`;
+    }
+    if (command === "resumeSubheading" && args.length >= 1) {
+      return args[0];
+    }
+    if (command === "resumeProjectHeading" && args.length >= 1) {
+      return args[0];
+    }
+    if (expectedArgCount === 1 && args.length >= 1) {
+      return args[0];
+    }
+    if (args.length >= 1) {
+      return args[0];
+    }
+  }
+
+  return value;
 }
 
 function stripLabelPrefix(value: string) {

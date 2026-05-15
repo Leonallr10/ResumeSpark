@@ -591,6 +591,31 @@ export function LatexResumeTailorApp() {
     [],
   );
 
+  const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
+  const recompileRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const isCtrlOrMeta = event.ctrlKey || event.metaKey;
+      if (!isCtrlOrMeta) return;
+
+      if (event.key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undoRef.current();
+      } else if (event.key === "y") {
+        event.preventDefault();
+        redoRef.current();
+      } else if (event.key === "s") {
+        event.preventDefault();
+        recompileRef.current();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   function bumpLatexHistory() {
     setHistoryVersion((current) => current + 1);
   }
@@ -652,6 +677,9 @@ export function LatexResumeTailorApp() {
     latestLatexRef.current = next;
     bumpLatexHistory();
   }
+
+  undoRef.current = undoLatex;
+  redoRef.current = redoLatex;
 
   function replaceLatexContent(value: string, options?: { recordHistory?: boolean }) {
     cancelTypingHistoryDebounce({ flushPending: true });
@@ -1141,6 +1169,12 @@ export function LatexResumeTailorApp() {
       setIsRecompiling(false);
     }
   }
+
+  recompileRef.current = () => {
+    if (!isRecompiling && canCompilePdf) {
+      recompileLatex();
+    }
+  };
 
   async function downloadResumePdf() {
     setDownloading(true);
