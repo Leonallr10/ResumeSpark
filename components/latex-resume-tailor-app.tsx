@@ -73,8 +73,6 @@ import {
 } from "@/components/latex-project-fields";
 import {
   clampPdfZoom,
-  PdfFullscreenPreview,
-  PdfPreview,
 } from "@/components/latex-pdf-preview";
 import {
   PdfCanvasViewer,
@@ -85,9 +83,7 @@ import { forwardSync, type SynctexMapping, type SynctexRect } from "@/lib/syncte
 import {
   derivePreviewLayoutFromLatex,
   paginateResumeSections,
-  ResumePreview,
   type PreviewFontSizes,
-  type ResumePreviewSelection,
 } from "@/components/latex-resume-preview";
 import {
   applySuggestionToLatex,
@@ -204,7 +200,7 @@ export function LatexResumeTailorApp() {
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("pdf");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfFullscreen, setPdfFullscreen] = useState(false);
+  const [, setPdfFullscreen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [previewPage, setPreviewPage] = useState(1);
   const [previewPageInput, setPreviewPageInput] = useState("1");
@@ -227,7 +223,6 @@ export function LatexResumeTailorApp() {
   const [forwardHighlight, setForwardHighlight] = useState<SynctexRect | null>(null);
   const pdfViewerRef = useRef<PdfCanvasViewerHandle>(null);
   const pdfBlobRef = useRef<Blob | null>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const paneGridRef = useRef<HTMLDivElement>(null);
@@ -282,6 +277,7 @@ export function LatexResumeTailorApp() {
       canUndoLatex: pastLatexRef.current.length > 0,
       canRedoLatex: futureLatexRef.current.length > 0,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [historyVersion],
   );
 
@@ -295,6 +291,7 @@ export function LatexResumeTailorApp() {
     projectHeadingPt: getFormattingFontSize("resumeProjectHeading", committedLatex),
     bulletItemPt: getFormattingFontSize("resumeItem", committedLatex),
     normalTextPt: getFormattingFontSize("normal-text", committedLatex),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [committedLatex]);
   const previewPages = useMemo(
     () => paginateResumeSections(previewSections, previewLayout, previewFontSizes),
@@ -679,29 +676,6 @@ export function LatexResumeTailorApp() {
     });
     view.focus();
   }, []);
-
-  const navigateFromPreviewToSource = useCallback(
-    (selection: ResumePreviewSelection) => {
-      const sourceLine =
-        selection.line?.sourceLine ??
-        selection.line?.sourceEndLine ??
-        selection.section.lines[0]?.sourceLine ??
-        selection.section.lines[0]?.sourceEndLine;
-
-      if (typeof sourceLine !== "number") {
-        return;
-      }
-
-      // Keep the current preview scroll position stable on click.
-      // Only update page indicator + jump the editor to source.
-      setPreviewPage(selection.page);
-      setPreviewPageInput(String(selection.page));
-      window.requestAnimationFrame(() => {
-        focusEditorAtSourceLine(sourceLine);
-      });
-    },
-    [focusEditorAtSourceLine],
-  );
 
   const handleInverseSync = useCallback(
     (synctexLine: number) => {
@@ -1349,6 +1323,7 @@ export function LatexResumeTailorApp() {
       isApplyingHistoryRef.current = false;
       setPolishState(null);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [revokePdfPreview],
   );
 
@@ -1890,6 +1865,7 @@ export function LatexResumeTailorApp() {
 
   const currentFontSize = useMemo(() => {
     return getFormattingFontSize(toolbarCommand, latexCode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toolbarCommand, latexCode]);
 
   const [fontSizeInput, setFontSizeInput] = useState(String(currentFontSize));
@@ -2775,7 +2751,7 @@ export function LatexResumeTailorApp() {
                         </Button>
                       </div>
                       <div className="flex items-center gap-1">
-                        {/* <Button
+                        <Button
                           type="button"
                           variant="ghost"
                           size="icon"
@@ -2786,7 +2762,7 @@ export function LatexResumeTailorApp() {
                         >
                           <Crosshair className="h-3.5 w-3.5" />
                         </Button>
-                        <span className="mx-1 h-6 w-px bg-slate-600" /> */}
+                        <span className="mx-1 h-6 w-px bg-slate-600" />
                         <Button
                           type="button"
                           variant="ghost"

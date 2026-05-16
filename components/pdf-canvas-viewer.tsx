@@ -44,6 +44,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
     const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
     const pageWrappersRef = useRef<Map<number, HTMLDivElement>>(new Map());
     const [pages, setPages] = useState<PageInfo[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfDocRef = useRef<any>(null);
     const renderTaskRef = useRef<number>(0);
     const renderedZoomRef = useRef<number>(100);
@@ -164,8 +165,6 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
 
       wrapper.style.transform = factor === 1 ? "" : `scale(${factor})`;
       wrapper.style.transformOrigin = "top center";
-      // Update wrapper dimensions so scroll container knows the visual size
-      const naturalWidth = wrapper.scrollWidth / (parseFloat(wrapper.style.transform ? String(factor) : "1"));
       wrapper.style.width = "";
       wrapper.style.height = "";
     }
@@ -176,6 +175,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
         renderedZoomRef.current = 0; // force re-render
         renderSharp(zoom);
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pages, renderSharp]);
 
     // When zoom prop changes (from toolbar buttons), debounce sharp render

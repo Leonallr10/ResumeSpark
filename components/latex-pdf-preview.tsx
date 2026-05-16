@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
