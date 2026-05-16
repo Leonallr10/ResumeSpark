@@ -24,6 +24,7 @@ import {
   ChevronUp,
   CircleCheck,
   Code2,
+  Crosshair,
   Download,
   Eye,
   FileText,
@@ -75,6 +76,12 @@ import {
   PdfFullscreenPreview,
   PdfPreview,
 } from "@/components/latex-pdf-preview";
+import {
+  PdfCanvasViewer,
+  type PdfCanvasViewerHandle,
+} from "@/components/pdf-canvas-viewer";
+import { fetchSynctexMapping } from "@/lib/synctex-client";
+import { forwardSync, type SynctexMapping, type SynctexRect } from "@/lib/synctex-parser";
 import {
   derivePreviewLayoutFromLatex,
   paginateResumeSections,
@@ -195,7 +202,7 @@ export function LatexResumeTailorApp() {
   const [auditing, setAuditing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [renderingPdf, setRenderingPdf] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("preview");
+  const [viewMode, setViewMode] = useState<ViewMode>("pdf");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfFullscreen, setPdfFullscreen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
@@ -214,6 +221,11 @@ export function LatexResumeTailorApp() {
   const [claudeApiKey, setClaudeApiKey] = useState("");
   const [testingKey, setTestingKey] = useState(false);
   const [testKeyResult, setTestKeyResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [pdfArrayBuffer, setPdfArrayBuffer] = useState<ArrayBuffer | null>(null);
+  const [synctexMapping, setSynctexMapping] = useState<SynctexMapping | null>(null);
+  const [synctexLineOffset, setSynctexLineOffset] = useState(0);
+  const [forwardHighlight, setForwardHighlight] = useState<SynctexRect | null>(null);
+  const pdfViewerRef = useRef<PdfCanvasViewerHandle>(null);
   const pdfBlobRef = useRef<Blob | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
@@ -396,7 +408,7 @@ export function LatexResumeTailorApp() {
       .from("resume_settings")
       .select("*")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
     if (data) {
       setLlmProvider(data.provider as LlmProvider);
       setLlmModel(data.model);
@@ -690,6 +702,28 @@ export function LatexResumeTailorApp() {
     },
     [focusEditorAtSourceLine],
   );
+
+  const handleInverseSync = useCallback(
+    (synctexLine: number) => {
+      focusEditorAtSourceLine(synctexLine - 1);
+    },
+    [focusEditorAtSourceLine],
+  );
+
+  const handleForwardSync = useCallback(() => {
+    const view = editorViewRef.current;
+    if (!view || !synctexMapping) return;
+
+    const cursorLine = view.state.doc.lineAt(view.state.selection.main.head).number;
+    const adjustedLine = cursorLine + synctexLineOffset;
+    const rect = forwardSync(synctexMapping, adjustedLine);
+
+    if (rect) {
+      setForwardHighlight(rect);
+      pdfViewerRef.current?.scrollToPage(rect.page);
+      if (viewMode !== "pdf") setViewMode("pdf");
+    }
+  }, [synctexMapping, synctexLineOffset, viewMode]);
 
   const canSubmit =
     resumeSections.length > 0 &&
@@ -1472,13 +1506,28 @@ export function LatexResumeTailorApp() {
       }
 
       const newPreviewId = response.headers.get("X-Preview-Id");
+      const hasSynctex = response.headers.get("X-Synctex-Available") === "1";
       const blob = await response.blob();
       pdfBlobRef.current = blob;
+      const arrayBuffer = await blob.arrayBuffer();
+      setPdfArrayBuffer(arrayBuffer);
       if (newPreviewId) setPreviewId(newPreviewId);
       setCommittedLatex(latexCode);
       setDiagnostics([]);
       setLastCompileSuccess(true);
       setDiagnosticsPanelOpen(false);
+      setViewMode("pdf");
+
+      if (hasSynctex && newPreviewId) {
+        fetchSynctexMapping(newPreviewId).then(({ mapping, lineOffset }) => {
+          setSynctexMapping(mapping);
+          setSynctexLineOffset(lineOffset);
+        });
+      } else {
+        setSynctexMapping(null);
+        setSynctexLineOffset(0);
+      }
+
       toast.success("Compiled successfully.", { duration: 3000 });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Compilation failed.");
@@ -2726,6 +2775,18 @@ export function LatexResumeTailorApp() {
                         </Button>
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                          onClick={handleForwardSync}
+                          disabled={!synctexMapping || viewMode !== "pdf"}
+                          title={synctexMapping ? "Locate current line in PDF (forward sync)" : "SyncTeX unavailable"}
+                        >
+                          <Crosshair className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="mx-1 h-6 w-px bg-slate-600" /> */}
                         <Button
                           type="button"
                           variant="ghost"
@@ -2845,21 +2906,18 @@ export function LatexResumeTailorApp() {
                       )}
                     </AnimatePresence>
 
-                    <div ref={previewPaneRef} className="min-h-0 flex-1 overflow-hidden">
-                      <div
-                        ref={previewScrollRef}
-                        className="h-full overflow-x-auto overflow-y-scroll px-3 py-4"
-                        style={{ scrollbarGutter: "stable both-edges" }}
-                      >
-                        <ResumePreview
-                          ref={previewRef}
-                          pages={previewPages}
-                          layout={previewLayout}
-                          zoom={previewZoom}
-                          fontSizes={previewFontSizes}
-                          onNavigateToSource={navigateFromPreviewToSource}
-                        />
-                      </div>
+                    <div ref={previewPaneRef} className="min-h-0 flex-1">
+                      <PdfCanvasViewer
+                        ref={pdfViewerRef}
+                        pdfData={pdfArrayBuffer}
+                        zoom={previewZoom}
+                        onZoomChange={(z) => setPreviewZoom(clampPdfZoom(z))}
+                        synctexMapping={synctexMapping}
+                        lineOffset={synctexLineOffset}
+                        highlightRect={forwardHighlight}
+                        onPdfClick={handleInverseSync}
+                        onHighlightFade={() => setForwardHighlight(null)}
+                      />
                     </div>
                   </div>
                 </div>

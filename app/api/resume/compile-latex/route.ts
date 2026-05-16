@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { NextResponse } from "next/server";
@@ -89,8 +89,17 @@ export async function POST(request: Request) {
     }
 
     const pdf = await readFile(pdfPath);
+    const synctexPath = path.join(workdir, "resume.synctex.gz");
+    let synctexBuffer: Buffer | null = null;
+    try {
+      await access(synctexPath);
+      synctexBuffer = await readFile(synctexPath);
+    } catch {
+      // synctex.gz not generated — graceful fallback
+    }
+
     const previewId = generatePreviewId();
-    storePdf(previewId, Buffer.from(pdf));
+    storePdf(previewId, Buffer.from(pdf), synctexBuffer, lineOffset);
 
     return new NextResponse(pdf, {
       headers: {
@@ -98,6 +107,7 @@ export async function POST(request: Request) {
         "Content-Disposition": 'inline; filename="resume.pdf"',
         "Cache-Control": "no-store",
         "X-Preview-Id": previewId,
+        "X-Synctex-Available": synctexBuffer ? "1" : "0",
       },
     });
   } catch (error) {
@@ -205,7 +215,7 @@ function runCompiler(engine: string, sourcePath: string, workdir: string) {
   if (engine === "tectonic" || engine.includes("tectonic")) {
     return runProcess(
       engine,
-      ["--outdir", workdir, "--keep-logs", sourcePath],
+      ["--outdir", workdir, "--keep-logs", "--synctex", sourcePath],
       workdir,
       120000,
     );
@@ -218,6 +228,7 @@ function runCompiler(engine: string, sourcePath: string, workdir: string) {
       "-halt-on-error",
       "-file-line-error",
       "-no-shell-escape",
+      "-synctex=1",
       "-output-directory",
       workdir,
       sourcePath,
