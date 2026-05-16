@@ -33,12 +33,17 @@ A production-grade Next.js web application for tailoring resumes to specific job
 - **AI-Powered Suggestions** — JD-specific resume improvements via Gemini, Claude, or Groq
 - **Inline Text Polish** — Select text and apply actions: improve, elaborate, professional, concise, quantify
 - **ATS Audit** — Automated audit for quantified impact, repetition, and spelling/grammar
-- **Real-time Preview** — Parsed A4 resume preview with pagination and interactive source navigation
-- **PDF Compilation** — Local (pdflatex/xelatex/tectonic) or cloud (texlive.net) LaTeX compilation
-- **Project Management** — Add/edit projects with structured fields or bulk JSON editing
+- **SyncTeX Bidirectional Navigation** — Click PDF to jump to source line (inverse sync), click editor line to highlight PDF position (forward sync), Overleaf-style
+- **Canvas PDF Viewer** — PDF.js-based canvas renderer with hybrid zoom (CSS transform for smooth live zoom + debounced sharp re-render), pinch-to-zoom, Ctrl+wheel zoom
+- **PDF Compilation** — Local (pdflatex/xelatex/tectonic) or cloud (texlive.net) LaTeX compilation with SyncTeX data generation
+- **ATS Compatibility Engine** — Auto-injects `\pdfgentounicode=1` and `\input{glyphtounicode}` for ATS-parseable PDFs, engine-specific LaTeX normalization
+- **Supabase Auth & Persistence** — User authentication (email/password), multi-project management with auto-save, per-user LLM settings storage
+- **Project Management** — Create, rename, delete, and switch between multiple resume projects with persistent cloud storage
 - **Multi-Provider LLM** — Switch between Gemini, Claude, and Groq with per-provider API key management
 - **PDF Upload** — Upload existing PDF resumes with automatic text extraction and structure detection
 - **Download** — Export as compiled PDF or raw `.tex` source
+- **Formatting Toolbar** — Insert LaTeX commands for sections, subheadings, project headings, bullet items, and text formatting
+- **Diagnostics Panel** — Clickable compilation errors/warnings with line numbers for direct editor navigation
 - **Dark Mode** — Full dark theme support via Tailwind CSS class strategy
 - **Responsive Layout** — Adjustable split-pane editor/preview with resizable panels
 
@@ -53,7 +58,9 @@ A production-grade Next.js web application for tailoring resumes to specific job
 | UI | React 19, Tailwind CSS 3, Radix UI, shadcn/ui patterns |
 | Editor | CodeMirror 6 (@uiw/react-codemirror) |
 | AI/LLM | @google/genai (Gemini), @anthropic-ai/sdk (Claude), groq-sdk (Groq) |
-| PDF | pdfjs-dist (extraction), html2pdf.js (export) |
+| PDF Rendering | pdfjs-dist (canvas-based viewer + text extraction) |
+| PDF Sync | SyncTeX (bidirectional source ↔ PDF navigation) |
+| Backend | Supabase (@supabase/supabase-js, @supabase/ssr) — Auth, PostgreSQL, RLS |
 | Validation | Zod |
 | Animation | Framer Motion |
 | Icons | Lucide React, React Icons |
@@ -65,34 +72,41 @@ A production-grade Next.js web application for tailoring resumes to specific job
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Client (Browser)                          │
-│                                                                 │
-│  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
-│  │ LaTeX Editor │  │  Resume Preview  │  │   PDF Preview    │  │
-│  │ (CodeMirror) │  │  (Parsed A4)     │  │   (iframe)       │  │
-│  └──────┬───────┘  └────────┬─────────┘  └────────┬─────────┘  │
-│         │                   │                      │            │
-│  ┌──────┴───────────────────┴──────────────────────┴─────────┐  │
-│  │              LatexResumeTailorApp (Main State)             │  │
-│  │  - LaTeX source, suggestions, reviews, projects, LLM cfg  │  │
-│  └────────────────────────────┬──────────────────────────────┘  │
-│                               │                                 │
-└───────────────────────────────┼─────────────────────────────────┘
-                                │ HTTP (fetch)
-┌───────────────────────────────┼─────────────────────────────────┐
-│                        Server (Next.js API)                      │
-│                               │                                 │
-│  ┌────────────┐  ┌───────────┴──┐  ┌───────────┐  ┌─────────┐ │
-│  │ /suggestions│  │ /compile-latex│  │  /polish  │  │  /audit │ │
-│  │ (JSON)     │  │ (PDF binary) │  │ (stream)  │  │ (JSON)  │ │
-│  └─────┬──────┘  └──────┬───────┘  └─────┬─────┘  └────┬────┘ │
-│        │                │                 │              │      │
-│  ┌─────┴────────────────┴─────────────────┴──────────────┴───┐  │
-│  │          LLM Providers (Gemini / Claude / Groq)           │  │
-│  │          LaTeX Compilers (pdflatex / xelatex / tectonic)  │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                          Client (Browser)                              │
+│                                                                       │
+│  ┌──────────────┐  ┌───────────────────────────────────────────────┐  │
+│  │ LaTeX Editor │  │         PDF Canvas Viewer (PDF.js)            │  │
+│  │ (CodeMirror) │◀─┼──── SyncTeX Inverse Sync (click PDF → line) │  │
+│  │              │──┼────▶ SyncTeX Forward Sync (line → PDF highlight)│ │
+│  └──────┬───────┘  └───────────────────────┬─────────────────────┘  │
+│         │                                   │                        │
+│  ┌──────┴───────────────────────────────────┴────────────────────┐   │
+│  │              LatexResumeTailorApp (Main State)                 │   │
+│  │  - LaTeX source, suggestions, SyncTeX mapping, auth, projects │   │
+│  └──────────────────────────┬────────────────────────────────────┘   │
+│                             │                                        │
+└─────────────────────────────┼────────────────────────────────────────┘
+                              │ HTTP (fetch)
+┌─────────────────────────────┼────────────────────────────────────────┐
+│                      Server (Next.js API)                             │
+│                             │                                        │
+│  ┌────────────┐  ┌─────────┴────┐  ┌──────────┐  ┌───────────────┐  │
+│  │/suggestions│  │/compile-latex │  │ /polish  │  │ /synctex/[id] │  │
+│  │ (JSON)     │  │(PDF+SyncTeX) │  │ (stream) │  │ (.synctex.gz) │  │
+│  └─────┬──────┘  └──────┬───────┘  └────┬─────┘  └───────────────┘  │
+│        │                │                │                           │
+│  ┌─────┴────────────────┴────────────────┴───────────────────────┐   │
+│  │          LLM Providers (Gemini / Claude / Groq)               │   │
+│  │          LaTeX Compilers (pdflatex / xelatex / tectonic)      │   │
+│  │          SyncTeX Engine (--synctex=1 flag)                    │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │          Supabase (Auth, PostgreSQL, RLS)                     │   │
+│  │          - resume_projects, resume_settings, resume_drafts    │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -108,16 +122,18 @@ resume-generator/
 │   └── api/resume/               # Backend API routes
 │       ├── suggestions/route.ts  # AI resume suggestion generation
 │       ├── polish/route.ts       # Streaming text polish
-│       ├── compile-latex/route.ts# LaTeX → PDF compilation
+│       ├── compile-latex/route.ts# LaTeX → PDF compilation (+ SyncTeX)
 │       ├── audit/route.ts        # ATS resume audit
 │       ├── preview/[id]/route.ts # Cached PDF preview retrieval
+│       ├── synctex/[id]/route.ts # SyncTeX mapping data endpoint
 │       └── test-key/route.ts     # API key validation
 ├── components/                   # React components
-│   ├── latex-resume-tailor-app.tsx    # Main application (2898 lines)
+│   ├── latex-resume-tailor-app.tsx    # Main application (orchestrator)
+│   ├── pdf-canvas-viewer.tsx          # PDF.js canvas viewer with SyncTeX
 │   ├── latex-resume-preview.tsx       # A4 resume preview renderer
 │   ├── latex-project-fields.tsx       # Project draft form/JSON editor
 │   ├── latex-suggestion-panel.tsx     # Suggestion review panel
-│   ├── latex-pdf-preview.tsx          # PDF iframe viewer
+│   ├── latex-pdf-preview.tsx          # PDF iframe viewer (legacy)
 │   ├── latex-editor-suggestions.ts    # CodeMirror suggestion extension
 │   ├── latex-polish-extension.ts      # CodeMirror polish extension
 │   ├── home-resume-loader.tsx         # Dynamic import loader
@@ -126,15 +142,20 @@ resume-generator/
 │       ├── badge.tsx
 │       ├── button.tsx
 │       ├── card.tsx
+│       ├── dialog.tsx
 │       ├── input.tsx
 │       ├── label.tsx
 │       ├── scroll-area.tsx
+│       ├── separator.tsx
 │       └── textarea.tsx
 ├── lib/                          # Core logic and utilities
 │   ├── latex-resume.ts           # LaTeX parsing, manipulation, templates
 │   ├── resume.ts                 # Resume data structures and operations
 │   ├── pdf.ts                    # PDF text extraction and layout analysis
-│   ├── pdf-cache.ts              # In-memory PDF preview cache
+│   ├── pdf-cache.ts              # In-memory PDF + SyncTeX cache
+│   ├── synctex-parser.ts         # SyncTeX format parser + forward/inverse sync
+│   ├── synctex-client.ts         # Browser-side SyncTeX fetch + decompress
+│   ├── supabase.ts               # Supabase browser client singleton
 │   ├── latex-log-parser.ts       # LaTeX compiler log parser
 │   ├── schemas.ts                # Zod validation schemas
 │   └── utils.ts                  # Tailwind class merge utility
@@ -200,11 +221,15 @@ pnpm dev
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GEMINI_API_KEY` | At least one | Google Gemini API key |
-| `GROQ_API_KEY` | At least one | Groq API key |
-| `ANTHROPIC_API_KEY` | At least one | Anthropic Claude API key |
+| `GEMINI_API_KEY` | At least one LLM key | Google Gemini API key |
+| `GROQ_API_KEY` | At least one LLM key | Groq API key |
+| `ANTHROPIC_API_KEY` | At least one LLM key | Anthropic Claude API key |
+| `NEXT_PUBLIC_SUPABASE_URL` | For auth/persistence | Supabase project URL (e.g., `https://<ref>.supabase.co`) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | For auth/persistence | Supabase publishable anon key |
 
-At minimum, one provider key is needed. Users can also supply keys via the in-app settings panel (stored in localStorage, sent per-request).
+At minimum, one LLM provider key is needed. Users can also supply LLM keys via the in-app settings panel (stored per-user in Supabase, sent per-request).
+
+Supabase variables are optional — without them, the app runs in local-only mode (localStorage persistence, no auth).
 
 ---
 
@@ -351,8 +376,9 @@ Compiles LaTeX source to PDF.
 
 **Success Response:** PDF binary with headers:
 - `Content-Type: application/pdf`
-- `X-Preview-Id: <id>` (for cached retrieval)
+- `X-Preview-Id: <id>` (for cached retrieval and SyncTeX fetch)
 - `X-Compiler: <engine>`
+- `X-Synctex-Available: true|false` (indicates if SyncTeX data was generated)
 
 **Error Response:**
 ```json
@@ -372,12 +398,14 @@ Compiles LaTeX source to PDF.
 3. For local compilation:
    - Creates temp directory
    - Normalizes LaTeX source (strips pdflatex-specific commands for XeTeX/Tectonic, wraps bare URLs)
-   - Runs compiler (2 passes for pdflatex to resolve cross-references)
+   - Runs compiler with `--synctex=1` (pdflatex/xelatex) or `--synctex` (tectonic) for SyncTeX generation
+   - Two passes for pdflatex (cross-reference resolution)
+   - Reads `resume.synctex.gz` from workdir if it exists
    - Parses log file for diagnostics
-   - Caches PDF for preview retrieval
+   - Caches PDF + SyncTeX data together via `storePdf(id, pdf, synctexBuffer, lineOffset)`
 4. For cloud compilation:
    - Sends source to texlive.net API
-   - Returns compiled PDF
+   - Returns compiled PDF (SyncTeX unavailable for cloud compiles)
 
 ---
 
@@ -428,6 +456,27 @@ Retrieves a previously compiled and cached PDF preview.
 
 **Success:** PDF binary (`Content-Type: application/pdf`, 30-minute cache)
 **Error:** `404` if preview expired or not found
+
+---
+
+### GET `/api/resume/synctex/[id]`
+
+Retrieves the SyncTeX mapping data for a compiled PDF preview.
+
+**URL Parameter:** `id` — Preview ID (same as used for PDF preview)
+
+**Success Response:** Raw `.synctex.gz` binary with headers:
+- `Content-Type: application/gzip`
+- `Cache-Control: private, max-age=1800`
+- `X-Line-Offset: <number>` — Number of lines added by `normalizeLatexForPdf()` before compilation (used to offset line numbers back to editor coordinates)
+
+**Error:** `404` if preview not found, expired, or SyncTeX data unavailable (cloud compile)
+
+**Client Usage:**
+1. Fetch this endpoint after successful compilation
+2. Decompress gzip via browser `DecompressionStream` API
+3. Parse decompressed text with `parseSynctex()` into `SynctexMapping`
+4. Use `lineOffset` to adjust between editor lines and compiled-document lines
 
 ---
 
@@ -526,19 +575,95 @@ PDF text extraction and layout analysis using pdfjs-dist.
 
 ### `lib/pdf-cache.ts`
 
-In-memory PDF preview cache with TTL-based eviction.
+In-memory PDF + SyncTeX cache with TTL-based eviction.
 
 | Export | Description |
 |--------|-------------|
-| `generatePreviewId(): string` | Creates a 12-character hex ID |
-| `storePdf(id: string, pdf: Buffer): void` | Stores compiled PDF with timestamp (triggers eviction) |
+| `generatePreviewId(): string` | Creates a 12-character hex ID via `crypto.randomUUID()` |
+| `storePdf(id, pdf, synctex?, lineOffset?): void` | Stores compiled PDF + optional SyncTeX buffer (triggers eviction) |
 | `getPdf(id: string): Buffer \| null` | Retrieves PDF if within 30-minute TTL, returns null otherwise |
+| `getSynctex(id): { data: Buffer; lineOffset: number } \| null` | Retrieves SyncTeX gzip data + line offset if available and within TTL |
+
+**Cache Entry Structure:**
+```typescript
+{ pdf: Buffer; synctex: Buffer | null; lineOffset: number; createdAt: number }
+```
 
 **Behavior:**
 - Uses `globalThis` for persistence across hot reloads in development
 - 30-minute TTL per entry
 - Auto-evicts expired entries on every `storePdf()` call
-- No size limit (bounded by TTL and server memory)
+- SyncTeX data is co-located with its PDF (same cache key = preview ID)
+- `lineOffset` tracks lines prepended by LaTeX normalization for coordinate translation
+
+---
+
+### `lib/synctex-parser.ts`
+
+Client-side SyncTeX format parser with forward and inverse sync lookup algorithms.
+
+| Export | Description |
+|--------|-------------|
+| `SynctexRect` | Type: `{ page, x, y, width, height }` — PDF rectangle in points |
+| `SynctexElement` | Type: `{ page, line, x, y, width, height }` — Element with source line number |
+| `SynctexMapping` | Type: `{ forwardMap: Map<number, SynctexRect[]>; pageElements: SynctexElement[] }` |
+| `parseSynctex(raw: string): SynctexMapping` | Parses decompressed SyncTeX text into lookup structures |
+| `forwardSync(mapping, line): SynctexRect \| null` | Editor line → PDF rect (with ±5 line fuzzy fallback) |
+| `inverseSync(mapping, page, x, y): number \| null` | PDF click → source line (nearest-neighbor by Euclidean distance) |
+
+**SyncTeX Coordinate System:**
+- SyncTeX uses scaled points (sp): 1 PDF point = 65,536 sp
+- Scale formula: `(unit / 65536) * (1000 / magnification)`
+- Preamble values (magnification, unit, x/y offset) are parsed from file header
+
+**Parsing Logic:**
+1. Parse preamble for `magnification`, `unit`, `x offset`, `y offset`
+2. Skip to `Content:` section
+3. Parse page starts (`{pageNumber`), box records (`[`/`(` for vbox/hbox), kern/glue records (`h`)
+4. Box records: `[tag,line:x,y,w,h,d` — extracts source line, converts coordinates via scale + offsets
+5. Kern/glue records: `htag,line:x,y` — point elements with default 10×10 size
+
+**Forward Sync Algorithm:** Direct lookup in `forwardMap` by line number. On miss, searches ±5 nearby lines alternating above/below for the closest match.
+
+**Inverse Sync Algorithm:** Filters elements by page, computes Euclidean distance from click point to each element's center (`(x + width/2, y + height/2)`), returns the line of the nearest element.
+
+---
+
+### `lib/synctex-client.ts`
+
+Browser-side helper to fetch, decompress, and parse SyncTeX data.
+
+| Export | Description |
+|--------|-------------|
+| `fetchSynctexMapping(previewId): Promise<{ mapping: SynctexMapping \| null; lineOffset: number }>` | Fetches `/api/resume/synctex/{id}`, decompresses gzip, parses into mapping |
+
+**Decompression Pipeline:**
+1. Fetch raw `.synctex.gz` as `ArrayBuffer`
+2. Wrap in `Blob`, create `ReadableStream` via `.stream()`
+3. Pipe through `DecompressionStream("gzip")` (Web Streams API)
+4. Collect chunks, merge into single `Uint8Array`, decode as UTF-8 text
+5. Pass to `parseSynctex()` for structured mapping
+
+Returns `{ mapping: null, lineOffset: 0 }` on any failure (graceful degradation).
+
+---
+
+### `lib/supabase.ts`
+
+Supabase browser client singleton using `@supabase/ssr`.
+
+| Export | Description |
+|--------|-------------|
+| `createClient(): SupabaseClient` | Returns a singleton Supabase browser client configured from environment variables |
+
+Uses `createBrowserClient()` from `@supabase/ssr` with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The singleton pattern ensures a single client instance across the React component tree.
+
+**Supabase Tables:**
+| Table | Purpose | RLS |
+|-------|---------|-----|
+| `resume_projects` | Per-user resume projects (LaTeX source, company/role, JD) | Yes — `user_id = auth.uid()` |
+| `resume_settings` | Per-user LLM provider/model/API key preferences | Yes — `user_id = auth.uid()` |
+| `resume_drafts` | Per-user project draft data | Yes — `user_id = auth.uid()` |
 
 ---
 
@@ -614,7 +739,11 @@ The primary application component (2898 lines). Manages all state and orchestrat
 | `companyRole` | `string` | Target company/role text |
 | `jd` | `string` | Job description text |
 | `pdfUrl` | `string \| null` | URL to compiled PDF preview |
-| `viewMode` | `"preview" \| "pdf"` | Current preview mode |
+| `pdfArrayBuffer` | `ArrayBuffer \| null` | Raw PDF binary for canvas viewer |
+| `synctexMapping` | `SynctexMapping \| null` | Parsed SyncTeX bidirectional mapping |
+| `synctexLineOffset` | `number` | Line offset for editor ↔ compiled coordinate translation |
+| `forwardHighlight` | `SynctexRect \| null` | Current forward sync highlight rectangle |
+| `viewMode` | `"pdf"` | Preview mode (defaults to PDF canvas viewer) |
 | `previewZoom` | `number` | Preview zoom percentage |
 | `llmProvider` | `LlmProvider` | Selected AI provider |
 | `llmModel` | `string` | Selected model ID |
@@ -639,6 +768,60 @@ The primary application component (2898 lines). Manages all state and orchestrat
 | Gemini | gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash |
 | Claude | claude-sonnet-4-20250514 |
 | Groq | llama-3.3-70b-versatile |
+
+---
+
+### `PdfCanvasViewer` — PDF.js Canvas Renderer with SyncTeX
+
+Canvas-based PDF viewer using `pdfjs-dist` with bidirectional SyncTeX navigation and hybrid zoom.
+
+**Props:**
+| Prop | Type | Description |
+|------|------|-------------|
+| `pdfData` | `ArrayBuffer \| null` | Compiled PDF binary data |
+| `zoom` | `number` | Current zoom percentage (50–300) |
+| `onZoomChange` | `(zoom: number) => void` | Callback when zoom changes (pinch/wheel) |
+| `synctexMapping` | `SynctexMapping \| null` | Parsed SyncTeX data for navigation |
+| `lineOffset` | `number` | Line offset for editor ↔ compiled coordinate translation |
+| `highlightRect` | `SynctexRect \| null` | Forward sync highlight rectangle to display |
+| `onPdfClick` | `(line: number) => void` | Inverse sync callback (PDF click → source line) |
+| `onHighlightFade` | `() => void` | Called after highlight auto-fades (2s timeout) |
+| `onPageCount` | `(n: number) => void` | Reports total page count on load |
+
+**Imperative Handle:**
+- `scrollToPage(page: number)` — Smoothly scrolls the container to bring a specific page into view
+
+**Hybrid Zoom Architecture:**
+1. **Instant visual zoom** via CSS `transform: scale()` on the wrapper div — no re-render, no React state change
+2. **Debounced sharp render** (300ms idle) — full PDF.js canvas re-render at target resolution
+3. **React bypass pattern** — `liveZoomRef` holds current zoom, `onZoomChangeRef` avoids stale closures, wheel handler reads from refs not state
+
+**Zoom Interaction:**
+- Ctrl+Wheel / Cmd+Wheel: zoom in/out
+- Trackpad pinch: detected via `e.ctrlKey` (browser synthesizes ctrlKey for pinch gestures)
+- Toolbar +/- buttons: prop-driven zoom change
+- Range: 50%–300%, step adapts to input magnitude (small for trackpad, larger for mouse wheel)
+
+**Canvas Rendering Pipeline:**
+1. Load PDF: `pdfjs.getDocument({ data: pdfData.slice(0) })`
+2. Configure worker: `pdfjs-dist/build/pdf.worker.min.mjs`
+3. Get page dimensions: `page.getViewport({ scale: 1 })`
+4. Render at HiDPI: `viewport = page.getViewport({ scale: zoom/100 * devicePixelRatio })`
+5. Canvas physical size: `viewport.width × viewport.height`
+6. Canvas CSS size: `viewport.width/dpr × viewport.height/dpr`
+
+**Inverse Sync (Click → Source):**
+1. Capture click coordinates relative to canvas
+2. Account for CSS scale transform and display zoom: `clickX / displayScale / scaleOnScreen`
+3. Call `inverseSync(mapping, pageNumber, pdfX, pdfY)`
+4. Subtract `lineOffset` from result
+5. Fire `onPdfClick(adjustedLine)`
+
+**Forward Sync Highlight:**
+- Absolutely positioned `<div>` over the target page canvas
+- Style: `bg-yellow-300/40` (semi-transparent yellow overlay)
+- Position computed from `highlightRect` coordinates × zoom scale
+- Auto-fades after 2 seconds via `useEffect` + `setTimeout`
 
 ---
 
@@ -893,12 +1076,51 @@ LaTeX Input → parseLatexResume() splits by \section{}
    c. If none available: uses texlive.net cloud API
 4. For local compilation:
    a. Creates temp directory
-   b. Normalizes LaTeX (XeTeX/Tectonic compatibility)
-   c. Writes source file, runs compiler (2 passes for pdflatex)
-   d. On success: reads PDF, stores in cache, returns binary
+   b. Normalizes LaTeX (XeTeX/Tectonic compatibility), records lineOffset
+   c. Writes source file, runs compiler with --synctex=1 (2 passes for pdflatex)
+   d. On success: reads PDF + resume.synctex.gz, stores both in cache
    e. On failure: parses log, returns diagnostics
-5. Client receives PDF blob → creates object URL → displays in iframe
-6. Diagnostics (if any) shown as inline editor annotations
+5. Client receives PDF blob → stores as ArrayBuffer → renders via PdfCanvasViewer
+6. Client auto-fetches SyncTeX mapping in background:
+   GET /api/resume/synctex/{previewId} → decompress gzip → parseSynctex()
+7. Diagnostics (if any) shown as inline editor annotations
+```
+
+### SyncTeX Bidirectional Sync Flow
+
+```
+Forward Sync (editor → PDF):
+1. User clicks crosshair button in toolbar (or cursor-based trigger)
+2. Get current editor line from EditorView.state.selection.main
+3. Add lineOffset to convert editor line → compiled-document line
+4. Call forwardSync(mapping, adjustedLine) → SynctexRect
+5. Set forwardHighlight state → yellow overlay rendered on target page
+6. Call pdfViewerRef.scrollToPage(rect.page)
+7. Highlight auto-fades after 2 seconds
+
+Inverse Sync (PDF → editor):
+1. User clicks on PDF canvas
+2. PdfCanvasViewer converts click coordinates to PDF points
+3. Call inverseSync(mapping, page, x, y) → source line number
+4. Subtract lineOffset to convert compiled line → editor line
+5. Call focusEditorAtSourceLine(line) → editor scrolls and highlights
+```
+
+### Supabase Auth & Persistence Flow
+
+```
+Authentication:
+1. User signs up/signs in via email + password
+2. Supabase Auth issues JWT, stored in browser cookie (via @supabase/ssr)
+3. All subsequent Supabase queries include JWT automatically
+4. RLS policies on all tables enforce user_id = auth.uid()
+
+Project Save/Load:
+1. On auth: fetch user's resume_projects list from Supabase
+2. On project switch: load LaTeX source, company/role, JD from selected project
+3. On edit: debounced auto-save updates resume_projects row
+4. Settings (LLM provider, model, API keys): stored in resume_settings (per-user)
+5. Uses .maybeSingle() for settings queries (returns null for new users)
 ```
 
 ---
@@ -916,16 +1138,29 @@ Non-render-critical state uses refs to avoid unnecessary re-renders:
 - `futureLatexRef` — Redo stack
 - `editorViewRef` — CodeMirror EditorView instance
 - `abortControllerRef` — AbortController for cancellable requests
+- `pdfViewerRef` — PdfCanvasViewer imperative handle (for `scrollToPage()`)
+- `liveZoomRef` — Current zoom level (bypasses React during active pinch/wheel)
+- `onZoomChangeRef` — Stable callback ref for zoom commit (avoids stale closures)
+- `renderedZoomRef` — Last zoom level at which canvases were rasterized (prevents redundant re-renders)
 
 ### Memoization (`useMemo`, `useCallback`)
 - `useMemo` for expensive computations: LaTeX parsing, section pagination, layout derivation
 - `useCallback` for event handlers passed to child components
 
-### Persistence (localStorage)
+### Persistence
+
+**Supabase (primary, when authenticated):**
+| Table | Data |
+|-------|------|
+| `resume_projects` | LaTeX source, company/role, JD, project name per user |
+| `resume_settings` | LLM provider, model, API keys per user |
+| `resume_drafts` | Project draft data per user |
+
+**localStorage (fallback / supplementary):**
 | Key | Data |
 |-----|------|
-| `resume-tailor-projects-v1` | Project drafts array (JSON) |
-| `resume-tailor-llm-settings-v1` | Provider, model, and API keys per provider |
+| `resume-tailor-projects-v1` | Project drafts array (JSON) — used when not authenticated |
+| `resume-tailor-llm-settings-v1` | Provider, model, and API keys per provider — legacy fallback |
 
 ### History/Undo System
 - Debounced tracking: LaTeX changes are recorded to the undo stack after 450ms of inactivity
@@ -1066,8 +1301,11 @@ Uses `pdfjs-dist` to extract text and positioning from uploaded PDF resumes:
 | Cache | Location | TTL | Purpose |
 |-------|----------|-----|---------|
 | PDF Preview | In-memory (server) | 30 minutes | Serve compiled PDFs via `/preview/[id]` without recompilation |
-| Project Drafts | localStorage | Permanent | Persist user's project inputs across sessions |
-| LLM Settings | localStorage | Permanent | Persist provider, model, and API key selections |
+| SyncTeX Data | In-memory (server) | 30 minutes | Co-located with PDF cache entry, served via `/synctex/[id]` |
+| SyncTeX Mapping | In-memory (client) | Session | Parsed `SynctexMapping` struct for forward/inverse sync lookups |
+| Resume Projects | Supabase (PostgreSQL) | Permanent | Per-user project data with RLS |
+| LLM Settings | Supabase (PostgreSQL) | Permanent | Per-user provider, model, API key preferences |
+| Project Drafts | localStorage (fallback) | Permanent | Persist user's project inputs when not authenticated |
 | Editor History | In-memory (refs) | Session | Undo/redo stack for LaTeX editor |
 
 ---
@@ -1104,9 +1342,12 @@ Minimal configuration — empty `NextConfig` object (Next.js defaults).
 
 ## Development Notes
 
-- The app is **stateless on the server** — no database, no authentication, no sessions
-- All user data lives in the browser (localStorage + component state)
-- API keys can be provided per-request or via environment variables
+- **Server state:** PDF and SyncTeX data are cached in-memory (30-minute TTL) for preview access; no persistent server-side state
+- **Authentication:** Supabase Auth (email/password) with Row Level Security on all user tables; app works without auth in local-only mode
+- **User data:** Stored in Supabase PostgreSQL when authenticated, falls back to localStorage for unauthenticated use
+- API keys can be provided per-request or via environment variables; user-supplied keys stored in Supabase `resume_settings`
 - PDF compilation creates temporary directories that are cleaned up after each request
-- The app dynamically imports the main component with SSR disabled since it relies on browser APIs (Canvas, File, localStorage)
+- SyncTeX `.synctex.gz` files are generated alongside PDFs and cached together; unavailable for cloud compiles
+- The app dynamically imports the main component with SSR disabled since it relies on browser APIs (Canvas, File, localStorage, DecompressionStream)
 - CodeMirror extensions are rebuilt on each relevant state change via `useMemo`
+- The PDF canvas viewer uses a React-bypass pattern for smooth zoom: refs hold live state, direct DOM manipulation during active gestures, debounced React state commits after gesture ends
