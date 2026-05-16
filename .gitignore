@@ -12,3 +12,4 @@ tectonic-bin/
 *.log
 *.pdf
 *.tex
+projects.json
