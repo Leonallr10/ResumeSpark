@@ -10,6 +10,14 @@ export type ProjectDraft = {
   toDate: string;
 };
 
+export interface ProjectTemplate {
+  headerTemplate: string;
+  bulletTemplate: string;
+  techStackTemplate: string | null;
+  listStart: string;
+  listEnd: string;
+}
+
 export const DEFAULT_LATEX_RESUME = String.raw`\documentclass[letterpaper,11pt]{article}
 \usepackage[empty]{fullpage}
 \usepackage{titlesec}
@@ -65,6 +73,7 @@ export const DEFAULT_LATEX_RESUME = String.raw`\documentclass[letterpaper,11pt]{
 
 type ParsedCommand = {
   args: string[];
+  argNodes: { value: string; startIndex: number; endIndex: number }[];
 };
 
 const visibleCommandNames = [
@@ -201,43 +210,92 @@ export function canInsertProject(project: ProjectDraft) {
 
 export function buildProjectLatexBlock(
   project: ProjectDraft,
-  options?: { useTechStackCommand?: boolean; useProjectHeadingCommand?: boolean; useNoBulletItems?: boolean; hasXcolor?: boolean },
+  options?: { 
+    useTechStackCommand?: boolean; 
+    useProjectHeadingCommand?: boolean; 
+    useNoBulletItems?: boolean; 
+    hasXcolor?: boolean;
+    useTextbfForProjectHeading?: boolean;
+    showTechStack?: boolean;
+  },
+  template?: ProjectTemplate | null,
 ) {
-  const heading = escapeLatexText(project.heading.trim());
+  const headingStr = project.heading.trim();
+  const escapedHeading = escapeLatexText(headingStr);
   const bullets = splitExplanationIntoBullets(project.explanation.trim());
   const techStack = escapeLatexText(stripTechStackLabel(project.techStack));
   const dateRange = escapeLatexText(formatProjectDateRange(project));
   const link = normalizeProjectLink(project.link);
+
+  if (template) {
+    const includeTechStack = techStack.length > 0;
+    
+    let renderedHeader = template.headerTemplate
+      .replace("__HEADING__", escapedHeading)
+      .replace("__DATES__", dateRange);
+
+    if (includeTechStack && renderedHeader.includes("__TECH_STACK__")) {
+      renderedHeader = renderedHeader.replace("__TECH_STACK__", techStack);
+    } else if (!includeTechStack && renderedHeader.includes("__TECH_STACK__")) {
+      renderedHeader = renderedHeader.replace("__TECH_STACK__", "");
+    }
+
+    const renderedBullets = bullets.map(b => template.bulletTemplate.replace("__BULLET__", escapeLatexText(b)));
+    
+    const lines = [
+      renderedHeader,
+      template.listStart,
+      ...renderedBullets
+    ];
+
+    if (includeTechStack && template.techStackTemplate && !template.headerTemplate.includes("__TECH_STACK__")) {
+      lines.push(template.techStackTemplate.replace("__TECH_STACK__", techStack));
+    }
+
+    lines.push(template.listEnd);
+    return lines.join("\n");
+  }
+
+  // Fallback to old heuristic logic if no template is available
+  const heading = options?.useTextbfForProjectHeading ? `\\textbf{${escapedHeading}}` : escapedHeading;
   const headingWithLink = buildHeadingWithLink(heading, link, { hasXcolor: options?.hasXcolor });
   const bulletCommand = options?.useNoBulletItems ? "\\resumeItemNoBullet" : "\\resumeItem";
   const techStackLine = options?.useTechStackCommand
     ? `\\techstack{${techStack}}`
     : `  ${bulletCommand}{\\textbf{Tech Stack:} ${techStack}}`;
 
-  if (link) {
-    const subheadingTechStack = options?.useTechStackCommand
-      ? `\\techstack{${techStack}}`
-      : `Tech Stack: ${techStack}`;
+  const includeTechStack = options?.showTechStack !== false && techStack.length > 0;
+  const preferProjectHeading = options?.useProjectHeadingCommand !== false;
 
-    return [
-      `\\resumeSubheading{${headingWithLink}}{${dateRange}}{${subheadingTechStack}}{}`,
-      "\\resumeItemListStart",
-      ...bullets.map((b) => `  ${bulletCommand}{${escapeLatexText(b)}}`),
-      "\\resumeItemListEnd",
-    ].join("\n");
+  const lines = [];
+
+  if (preferProjectHeading) {
+    lines.push(`\\resumeProjectHeading{${headingWithLink}}{${dateRange}}`);
+    lines.push("\\resumeItemListStart");
+    for (const b of bullets) {
+      lines.push(`  ${bulletCommand}{${escapeLatexText(b)}}`);
+    }
+    if (includeTechStack) {
+      lines.push(techStackLine);
+    }
+    lines.push("\\resumeItemListEnd");
+  } else {
+    const subheadingTechStack = includeTechStack ? (options?.useTechStackCommand
+      ? `\\techstack{${techStack}}`
+      : `Tech Stack: ${techStack}`) : "";
+    
+    lines.push(`\\resumeSubheading{${headingWithLink}}{${dateRange}}{${subheadingTechStack}}{}`);
+    lines.push("\\resumeItemListStart");
+    for (const b of bullets) {
+      lines.push(`  ${bulletCommand}{${escapeLatexText(b)}}`);
+    }
+    if (includeTechStack && !link) {
+      lines.push(techStackLine);
+    }
+    lines.push("\\resumeItemListEnd");
   }
 
-  const headingLine = options?.useProjectHeadingCommand !== false
-    ? `\\resumeProjectHeading{${heading}}{${dateRange}}`
-    : `\\resumeSubheading{${heading}}{${dateRange}}{}{}`;
-
-  return [
-    headingLine,
-    "\\resumeItemListStart",
-    ...bullets.map((b) => `  ${bulletCommand}{${escapeLatexText(b)}}`),
-    techStackLine,
-    "\\resumeItemListEnd",
-  ].join("\n");
+  return lines.join("\n");
 }
 
 function splitExplanationIntoBullets(explanation: string): string[] {
@@ -257,18 +315,27 @@ function splitExplanationIntoBullets(explanation: string): string[] {
   return [explanation];
 }
 
-export function insertProjectIntoLatex(latex: string, project: ProjectDraft) {
-  return insertProjectsIntoLatex(latex, [project]);
+export function insertProjectIntoLatex(latex: string, project: ProjectDraft, template?: ProjectTemplate | null) {
+  return insertProjectsIntoLatex(latex, [project], template);
 }
 
-export function insertProjectsIntoLatex(latex: string, projects: ProjectDraft[]) {
+export function insertProjectsIntoLatex(latex: string, projects: ProjectDraft[], template?: ProjectTemplate | null) {
   const useTechStackCommand = shouldUseTechStackCommand(latex);
   const useProjectHeadingCommand = hasProjectHeadingCommand(latex);
   const useNoBulletItems = usesNoBulletInProjects(latex);
   const hasXcolor = hasXcolorPackage(latex);
+  const useTextbfForProjectHeading = usesTextbfInProjectHeading(latex);
+  const showTechStack = hasTechStackInProjects(latex);
   const blocks = projects
     .filter(canInsertProject)
-    .map((project) => buildProjectLatexBlock(project, { useTechStackCommand, useProjectHeadingCommand, useNoBulletItems, hasXcolor }));
+    .map((project) => buildProjectLatexBlock(project, { 
+      useTechStackCommand, 
+      useProjectHeadingCommand, 
+      useNoBulletItems, 
+      hasXcolor,
+      useTextbfForProjectHeading,
+      showTechStack
+    }, template));
 
   if (blocks.length === 0) {
     return latex;
@@ -277,7 +344,7 @@ export function insertProjectsIntoLatex(latex: string, projects: ProjectDraft[])
   const block = blocks.join("\n");
   const lines = latex.replace(/\r\n/g, "\n").split("\n");
   const projectsIndex = lines.findIndex((line) =>
-    /^\\section\*?\{projects\}/i.test(line.trim()),
+    /^\\section\*?\s*\{projects\}/i.test(line.trim()),
   );
 
   if (projectsIndex === -1) {
@@ -339,6 +406,8 @@ export function applySuggestionToLatex(
   const useProjectHeadingCommand = hasProjectHeadingCommand(latex);
   const useNoBulletItems = usesNoBulletInProjects(latex);
   const hasXcolor = hasXcolorPackage(latex);
+  const useTextbfForProjectHeading = usesTextbfInProjectHeading(latex);
+  const showTechStack = hasTechStackInProjects(latex);
   const targetIndex = targetLine.sourceLine;
   const targetEndIndex = targetLine.sourceEndLine ?? targetIndex;
   const targetLength = Math.max(1, targetEndIndex - targetIndex + 1);
@@ -360,12 +429,15 @@ export function applySuggestionToLatex(
     const projectSuggestion = parseProjectSuggestion(strippedText);
 
     if (targetSection?.title.toLowerCase().includes("project") && projectSuggestion) {
+      const template = extractProjectTemplate(latex, sections);
       return replaceProjectBlockInLatex(lines, targetIndex, projectSuggestion, {
         useTechStackCommand,
         useProjectHeadingCommand,
         useNoBulletItems,
         hasXcolor,
-      }).join("\n");
+        useTextbfForProjectHeading,
+        showTechStack,
+      }, template).join("\n");
     }
 
     if (isProjectReplacementFormat(strippedText)) {
@@ -387,11 +459,13 @@ export function applySuggestionToLatex(
   const targetSection = sections.find((section) =>
     section.lines.some((line) => line.id === suggestion.targetLineId),
   );
+  const template = extractProjectTemplate(latex, sections);
   const insertedLine = createInsertedLatexLine(
     lines[targetIndex],
     suggestion.suggestedText,
     targetSection?.title,
-    { useTechStackCommand, useProjectHeadingCommand, useNoBulletItems, hasXcolor },
+    { useTechStackCommand, useProjectHeadingCommand, useNoBulletItems, hasXcolor, useTextbfForProjectHeading, showTechStack },
+    template
   );
   const insertionIndex =
     targetSection?.title.toLowerCase().includes("project") &&
@@ -410,6 +484,7 @@ export function previewSuggestionLatexLine(
   suggestedText: string,
   action: AiSuggestion["action"],
   sectionTitle?: string,
+  template?: ProjectTemplate | null,
 ) {
   if (action === "delete") {
     return "";
@@ -419,7 +494,7 @@ export function previewSuggestionLatexLine(
     return replaceVisibleLatexLine(source, suggestedText);
   }
 
-  return createInsertedLatexLine(source, suggestedText, sectionTitle);
+  return createInsertedLatexLine(source, suggestedText, sectionTitle, undefined, template);
 }
 
 export function escapeLatexText(value: string) {
@@ -575,11 +650,12 @@ function createLine(input: Omit<ResumeLine, "id" | "page">): ResumeLine {
 }
 
 function parseSectionTitle(line: string) {
-  const match = line.match(/^\\section\*?\{(.+)\}/);
+  const match = line.match(/^\\section\*?\s*\{(.+)\}/);
   return match ? cleanLatexText(match[1]) : undefined;
 }
 
 function readVisibleCommandBlock(lines: string[], startIndex: number) {
+  const textAhead = lines.slice(startIndex, Math.min(lines.length, startIndex + 5)).join("\n");
   const firstLine = lines[startIndex].trim();
   const command = visibleCommandNames.find((name) =>
     firstLine.startsWith(`\\${name}`),
@@ -622,10 +698,16 @@ function parseCommand(line: string, command: string): ParsedCommand | undefined 
   }
 
   let cursor = commandStart + command.length + 1;
+  // skip the backslash and the command name
+  while (cursor < line.length && /\s/.test(line[cursor] ?? "")) {
+    cursor += 1;
+  }
+
   const args: string[] = [];
+  const argNodes: { value: string; startIndex: number; endIndex: number }[] = [];
 
   while (cursor < line.length) {
-    while (/\s/.test(line[cursor] ?? "")) {
+    while (cursor < line.length && /\s/.test(line[cursor] ?? "")) {
       cursor += 1;
     }
 
@@ -633,6 +715,7 @@ function parseCommand(line: string, command: string): ParsedCommand | undefined 
       break;
     }
 
+    const startIndex = cursor;
     const parsedArg = readBalancedArgument(line, cursor);
 
     if (!parsedArg) {
@@ -640,10 +723,15 @@ function parseCommand(line: string, command: string): ParsedCommand | undefined 
     }
 
     args.push(parsedArg.value);
+    argNodes.push({
+      value: parsedArg.value,
+      startIndex,
+      endIndex: parsedArg.nextIndex - 1,
+    });
     cursor = parsedArg.nextIndex;
   }
 
-  return args.length > 0 ? { args } : undefined;
+  return args.length > 0 ? { args, argNodes } : undefined;
 }
 
 function readBalancedArgument(line: string, startIndex: number) {
@@ -804,7 +892,8 @@ function createInsertedLatexLine(
   source: string,
   suggestedText: string,
   sectionTitle?: string,
-  options?: { useTechStackCommand?: boolean; useProjectHeadingCommand?: boolean; useNoBulletItems?: boolean; hasXcolor?: boolean },
+  options?: { useTechStackCommand?: boolean; useProjectHeadingCommand?: boolean; useNoBulletItems?: boolean; hasXcolor?: boolean; useTextbfForProjectHeading?: boolean; showTechStack?: boolean },
+  template?: ProjectTemplate | null,
 ) {
   const indent = source.match(/^\s*/)?.[0] ?? "";
   const trimmed = source.trim();
@@ -819,7 +908,7 @@ function createInsertedLatexLine(
       link: projectSuggestion.link,
       fromDate: projectSuggestion.dates,
       toDate: "",
-    }, options);
+    }, undefined, template);
   }
 
   if (options?.useTechStackCommand && /^tech stack\s*:/i.test(strippedText)) {
@@ -1046,7 +1135,7 @@ function formatProjectDateRange(project: ProjectDraft) {
 function findNextSectionIndex(lines: string[], startIndex: number) {
   const index = lines.findIndex(
     (line, currentIndex) =>
-      currentIndex >= startIndex && /^\\section\*?\{/.test(line.trim()),
+      currentIndex >= startIndex && /^\\section\*?\s*\{/.test(line.trim()),
   );
 
   return index === -1 ? lines.length : index;
@@ -1083,7 +1172,8 @@ function replaceProjectBlockInLatex(
   lines: string[],
   targetIndex: number,
   projectSuggestion: NonNullable<ReturnType<typeof parseProjectSuggestion>>,
-  options?: { useTechStackCommand?: boolean; useProjectHeadingCommand?: boolean; useNoBulletItems?: boolean; hasXcolor?: boolean },
+  options?: { useTechStackCommand?: boolean; useProjectHeadingCommand?: boolean; useNoBulletItems?: boolean; hasXcolor?: boolean; useTextbfForProjectHeading?: boolean; showTechStack?: boolean },
+  template?: ProjectTemplate | null,
 ) {
   const projectStartIndex = findProjectBlockStart(lines, targetIndex);
 
@@ -1101,6 +1191,7 @@ function replaceProjectBlockInLatex(
           toDate: "",
         },
         options,
+        template,
       ),
     );
     return lines;
@@ -1117,6 +1208,7 @@ function replaceProjectBlockInLatex(
       toDate: "",
     },
     options,
+    template,
   );
 
   lines.splice(
@@ -1132,7 +1224,7 @@ function findProjectBlockStart(lines: string[], targetIndex: number) {
   for (let index = targetIndex; index >= 0; index -= 1) {
     const trimmed = lines[index].trim();
 
-    if (/^\\section\*?\{/.test(trimmed)) {
+    if (/^\\section\*?\s*\{/.test(trimmed)) {
       return -1;
     }
 
@@ -1150,7 +1242,7 @@ function findProjectBlockEnd(lines: string[], projectStartIndex: number) {
 
     if (
       /^\\(?:resumeSubheading|resumeProjectHeading)\b/.test(trimmed) ||
-      /^\\section\*?\{/.test(trimmed) ||
+      /^\\section\*?\s*\{/.test(trimmed) ||
       trimmed === "\\resumeSubHeadingListEnd"
     ) {
       return index;
@@ -1166,4 +1258,194 @@ function slugify(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function usesTextbfInProjectHeading(latex: string) {
+  return /\\resumeProjectHeading\{\s*\\textbf\{/.test(latex);
+}
+
+function hasTechStackInProjects(latex: string) {
+  return /tech stack\s*:/i.test(latex) || /\\techstack\{/.test(latex) || /Tech Stack:/i.test(latex);
+}
+
+function safeReplace(source: string, search: string, replacement: string) {
+  if (!search) return source;
+  const index = source.lastIndexOf(search);
+  if (index !== -1) {
+    return source.substring(0, index) + replacement + source.substring(index + search.length);
+  }
+  return source;
+}
+
+export function extractProjectTemplate(latex: string, sections: import("@/types/resume").ResumeSection[]): ProjectTemplate | null {
+  const projectSection = sections.find(s => s.title.toLowerCase().includes("project"));
+  if (!projectSection || projectSection.lines.length === 0) return null;
+
+  const headingIndex = projectSection.lines.findIndex(l => l.kind === "subheading" || l.kind === "projectHeading");
+  if (headingIndex === -1) return null;
+
+  const headingLine = projectSection.lines[headingIndex];
+  
+  const bullets: import("@/types/resume").ResumeLine[] = [];
+  for (let i = headingIndex + 1; i < projectSection.lines.length; i++) {
+    const line = projectSection.lines[i];
+    if (line.kind === "subheading" || line.kind === "projectHeading") break;
+    if (line.kind === "bullet") bullets.push(line);
+  }
+
+  if (bullets.length === 0) return null;
+
+  const lines = latex.replace(/\r\n/g, "\n").split("\n");
+  
+  const firstBullet = bullets[0];
+  const lastBullet = bullets[bullets.length - 1];
+
+  let listStartLine = (firstBullet.sourceLine ?? headingLine.sourceEndLine ?? 0) - 1;
+  while (listStartLine > (headingLine.sourceEndLine ?? 0)) {
+    if (/Start|begin\{itemize\}/i.test(lines[listStartLine] ?? "")) {
+      break;
+    }
+    listStartLine--;
+  }
+  
+  if (listStartLine <= (headingLine.sourceEndLine ?? 0)) {
+    listStartLine = (firstBullet.sourceLine ?? headingLine.sourceEndLine ?? 0) - 1;
+  }
+
+  const listStart = lines[listStartLine]?.trim() || "\\resumeItemListStart";
+
+  let headerRaw = lines.slice(headingLine.sourceLine, listStartLine).join("\n");
+  
+  const parsedHeader = parseCommand(headerRaw, "resumeProjectHeading") || parseCommand(headerRaw, "resumeSubheading");
+  if (parsedHeader && parsedHeader.argNodes.length > 0) {
+    let modifiedHeader = headerRaw;
+    let offset = 0;
+    
+    if (headingLine.text && parsedHeader.argNodes[0]) {
+      const node = parsedHeader.argNodes[0];
+      
+      let titleText = headingLine.text;
+      let techText: string | null = null;
+      
+      const separators = [" $|$ ", " | ", " - ", " -- ", " |", "| ", " $|$", "$|$ "];
+      for (const sep of separators) {
+        if (titleText.includes(sep)) {
+          const parts = titleText.split(sep);
+          for (let i = 0; i < parts.length; i++) {
+            if (isTechStackBullet(parts[i], true)) {
+              techText = parts[i].trim();
+              parts.splice(i, 1);
+              titleText = parts.join(sep).trim();
+              break;
+            }
+          }
+          if (techText) break;
+        }
+      }
+
+      let templatedValue = node.value;
+      if (techText) {
+        templatedValue = safeReplace(templatedValue, techText, "__TECH_STACK__");
+      }
+      templatedValue = safeReplace(templatedValue, titleText, "__HEADING__");
+
+      modifiedHeader = modifiedHeader.substring(0, node.startIndex + 1 + offset) + templatedValue + modifiedHeader.substring(node.endIndex + offset);
+      offset += templatedValue.length - node.value.length;
+    }
+    if (headingLine.rightText && parsedHeader.argNodes[1]) {
+      const node = parsedHeader.argNodes[1];
+      const templatedValue = safeReplace(node.value, headingLine.rightText, "__DATES__");
+      modifiedHeader = modifiedHeader.substring(0, node.startIndex + 1 + offset) + templatedValue + modifiedHeader.substring(node.endIndex + offset);
+      offset += templatedValue.length - node.value.length;
+    }
+    if (headingLine.secondaryText && parsedHeader.argNodes[2]) {
+      const node = parsedHeader.argNodes[2];
+      const templatedValue = safeReplace(node.value, headingLine.secondaryText, "__TECH_STACK__");
+      modifiedHeader = modifiedHeader.substring(0, node.startIndex + 1 + offset) + templatedValue + modifiedHeader.substring(node.endIndex + offset);
+      offset += templatedValue.length - node.value.length;
+    }
+    headerRaw = modifiedHeader;
+  }
+  
+  if (!headerRaw.includes("__HEADING__")) {
+    return null;
+  }
+
+  const regularBullet = bullets.find(b => !isTechStackBullet(b.text)) || bullets[0];
+  let bulletTemplate = lines.slice(regularBullet.sourceLine, regularBullet.sourceEndLine! + 1).join("\n");
+  
+  const parsedBullet = parseCommand(bulletTemplate, "resumeItemNoBullet") || parseCommand(bulletTemplate, "resumeItem");
+  if (parsedBullet && parsedBullet.argNodes.length > 0) {
+    const node = parsedBullet.argNodes[0];
+    if (regularBullet.text) {
+      const templatedValue = safeReplace(node.value, regularBullet.text, "__BULLET__");
+      bulletTemplate = bulletTemplate.substring(0, node.startIndex + 1) + templatedValue + bulletTemplate.substring(node.endIndex);
+    }
+  } else if (/^\\item\b/.test(bulletTemplate.trim())) {
+    if (regularBullet.text) {
+      bulletTemplate = safeReplace(bulletTemplate, regularBullet.text, "__BULLET__");
+    }
+  }
+
+  let techStackTemplate: string | null = null;
+  const techBullet = bullets.find(b => isTechStackBullet(b.text));
+  if (techBullet) {
+    techStackTemplate = lines.slice(techBullet.sourceLine, techBullet.sourceEndLine! + 1).join("\n");
+    const parsedTech = parseCommand(techStackTemplate, "resumeItemNoBullet") || parseCommand(techStackTemplate, "resumeItem");
+    const pureTech = stripTechStackLabel(techBullet.text);
+    if (parsedTech && parsedTech.argNodes.length > 0) {
+      const node = parsedTech.argNodes[0];
+      if (pureTech) {
+        const templatedValue = safeReplace(node.value, pureTech, "__TECH_STACK__");
+        techStackTemplate = techStackTemplate.substring(0, node.startIndex + 1) + templatedValue + techStackTemplate.substring(node.endIndex);
+      }
+    } else if (/^\\item\b/.test(techStackTemplate.trim())) {
+      if (pureTech) {
+        techStackTemplate = safeReplace(techStackTemplate, pureTech, "__TECH_STACK__");
+      }
+    }
+  }
+
+  let listEndLine = lastBullet.sourceEndLine! + 1;
+  while (listEndLine < lines.length) {
+    if (/End|end\{itemize\}/i.test(lines[listEndLine] ?? "") || /^\\resume(?:Subheading|ProjectHeading)/.test(lines[listEndLine]?.trim() || "") || /^\\section/.test(lines[listEndLine]?.trim() || "")) {
+      break;
+    }
+    listEndLine++;
+  }
+  
+  let listEnd = "\\resumeItemListEnd";
+  if (listEndLine < lines.length && /End|end\{itemize\}/i.test(lines[listEndLine] ?? "")) {
+    listEnd = lines[listEndLine]?.trim() || "";
+  }
+
+  return {
+    headerTemplate: headerRaw,
+    bulletTemplate,
+    techStackTemplate,
+    listStart,
+    listEnd
+  };
+}
+
+function isTechStackBullet(text: string, relaxed = false) {
+  if (/(?:tech stack|technologies|tools|languages|frameworks)\b/i.test(text)) {
+    return true;
+  }
+  
+  const techKeywords = [
+    "javascript", "typescript", "python", "java", "c\\+\\+", "c#", "ruby", "go", "rust", "php",
+    "react", "angular", "vue", "next\\.js", "node\\.js", "express", "django", "flask", "spring",
+    "html", "css", "tailwind", "bootstrap", "sass",
+    "sql", "mysql", "postgresql", "mongodb", "redis",
+    "aws", "azure", "gcp", "docker", "kubernetes", "git", "linux"
+  ];
+  const regex = new RegExp(`\\b(${techKeywords.join('|')})\\b`, 'ig');
+  const matches = text.match(regex);
+  
+  if (matches && ((relaxed && matches.length >= 1) || matches.length >= 2) && text.includes(",")) {
+    return true;
+  }
+  
+  return false;
 }

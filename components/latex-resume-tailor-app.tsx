@@ -2825,7 +2825,7 @@ export function LatexResumeTailorApp() {
                         </Button>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button
+                        {/* <Button
                           type="button"
                           variant="ghost"
                           size="icon"
@@ -2835,7 +2835,7 @@ export function LatexResumeTailorApp() {
                           title={synctexMapping ? "Locate current line in PDF (forward sync)" : "SyncTeX unavailable"}
                         >
                           <Crosshair className="h-3.5 w-3.5" />
-                        </Button>
+                        </Button> */}
                         <span className="mx-1 h-6 w-px bg-slate-600" />
                         <Button
                           type="button"
