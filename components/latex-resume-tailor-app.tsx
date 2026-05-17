@@ -1269,14 +1269,18 @@ export function LatexResumeTailorApp() {
       const controller = new AbortController();
       polishAbortRef.current = controller;
 
-      setPolishState({ range, original: text, polished: null, loading: true, action });
+      const cleanText = text
+        .replace(/\\(?:textbf|textit|emph|underline|textsubscript|textsuperscript)\{([^}]*)\}/g, "$1")
+        .replace(/\\([&%$#_])/g, "$1");
+
+      setPolishState({ range, original: cleanText, polished: null, loading: true, action });
 
       try {
         const response = await fetch("/api/resume/polish", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text,
+            text: cleanText,
             action,
             provider: llmProvider,
             model: llmModel.trim(),

@@ -1,4 +1,5 @@
-import { RangeSetBuilder, StateField, type Extension, StateEffect } from "@codemirror/state";
+import { RangeSetBuilder, StateField, type Extension, StateEffect, EditorState } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
 import {
   Decoration,
   EditorView,
@@ -81,14 +82,14 @@ export function createPolishExtension({
     create(state) {
       if (polishState || hasSuggestions || state.field(mouseDraggingField)) return null;
       const { from, to, head } = state.selection.main;
-      return computeTooltip(from, to, head, onTriggerPolish);
+      return computeTooltip(from, to, head, onTriggerPolish, state);
     },
     update(value, tr) {
       if (polishState || hasSuggestions || tr.state.field(mouseDraggingField)) return null;
       if (!tr.selection && !tr.docChanged && !tr.effects.some((e) => e.is(setMouseDragging)))
         return value;
       const { from, to, head } = tr.state.selection.main;
-      return computeTooltip(from, to, head, onTriggerPolish);
+      return computeTooltip(from, to, head, onTriggerPolish, tr.state);
     },
     provide: (field) => showTooltip.from(field),
   });
@@ -112,8 +113,31 @@ function computeTooltip(
   to: number,
   head: number,
   onTriggerPolish: CreatePolishExtensionInput["onTriggerPolish"],
+  state: EditorState,
 ): Tooltip | null {
   if (from === to) return null;
+
+  const tree = syntaxTree(state);
+  let containsCommand = false;
+  
+  tree.iterate({
+    from,
+    to,
+    enter(node) {
+      if (node.name === "tagName" || node.name === "keyword" || node.name === "builtin") {
+        const cmdName = state.sliceDoc(node.from, node.to);
+        // Exclude inline formatting tags from blocking the tooltip
+        if (!/^\\(?:textbf|textit|emph|underline|textsubscript|textsuperscript|&|%|\$|#|_)$/.test(cmdName.trim())) {
+          containsCommand = true;
+          return false;
+        }
+      }
+    }
+  });
+
+  if (containsCommand) {
+    return null;
+  }
 
   return {
     pos: head,
