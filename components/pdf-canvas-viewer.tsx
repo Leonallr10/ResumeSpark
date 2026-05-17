@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 
 import type { SynctexMapping, SynctexRect } from "@/lib/synctex-parser";
 import { inverseSync } from "@/lib/synctex-parser";
@@ -44,12 +45,14 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
     const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
     const pageWrappersRef = useRef<Map<number, HTMLDivElement>>(new Map());
     const [pages, setPages] = useState<PageInfo[]>([]);
+    const [layoutZoom, setLayoutZoom] = useState(zoom);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfDocRef = useRef<any>(null);
     const renderTaskRef = useRef<number>(0);
     const renderedZoomRef = useRef<number>(100);
     const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const liveZoomRef = useRef<number>(zoom);
+    const isWheelCommitRef = useRef(false);
     const onZoomChangeRef = useRef(onZoomChange);
     onZoomChangeRef.current = onZoomChange;
 
@@ -147,7 +150,9 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
 
         if (taskId === renderTaskRef.current) {
           renderedZoomRef.current = targetZoom;
-          // After sharp render, remove CSS transform from wrapper
+          // Flush layout zoom synchronously so pages resize BEFORE we
+          // remove the CSS transform — avoids a flash at the old size.
+          flushSync(() => setLayoutZoom(targetZoom));
           applyLiveTransform(targetZoom);
         }
       }
@@ -156,7 +161,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
     }, [pages]);
 
     // Apply CSS transform for instant visual zoom (no re-render)
-    function applyLiveTransform(currentZoom: number) {
+    function applyLiveTransform(currentZoom: number, origin = "top center") {
       const wrapper = innerWrapperRef.current;
       if (!wrapper) return;
 
@@ -164,7 +169,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
       const factor = currentZoom / rendered;
 
       wrapper.style.transform = factor === 1 ? "" : `scale(${factor})`;
-      wrapper.style.transformOrigin = "top center";
+      wrapper.style.transformOrigin = origin;
       wrapper.style.width = "";
       wrapper.style.height = "";
     }
@@ -182,7 +187,15 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
     useEffect(() => {
       if (pages.length === 0) return;
 
-      // Immediately apply CSS transform for smooth visual
+      // Wheel zoom commit: the wheel handler already applied the correct
+      // transform + scroll, and renderSharp was called directly — skip here
+      // to avoid overriding the "0 0" origin with "top center" (causes jump).
+      if (isWheelCommitRef.current) {
+        isWheelCommitRef.current = false;
+        return;
+      }
+
+      // Toolbar buttons: apply CSS transform for smooth visual
       applyLiveTransform(zoom);
 
       if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
@@ -201,6 +214,8 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
       if (!container) return;
 
       function handleWheel(e: WheelEvent) {
+        const ct = scrollContainerRef.current;
+        if (!ct) return;
         // Trackpad pinch on all platforms sends ctrl+wheel
         // Regular Ctrl+wheel from mouse also works
         if (!e.ctrlKey && !e.metaKey) return;
@@ -217,14 +232,25 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
         const newZoom = Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, current + step)));
         if (newZoom === current) return;
 
+        // Cursor-point zoom: adjust scroll so content under cursor stays fixed
+        const containerRect = ct.getBoundingClientRect();
+        const mouseX = e.clientX - containerRect.left;
+        const mouseY = e.clientY - containerRect.top;
+        const ratio = newZoom / current;
+
         liveZoomRef.current = newZoom;
 
-        // Apply CSS transform immediately (no React render)
-        applyLiveTransform(newZoom);
+        // Apply CSS transform with origin at top-left for predictable scroll math
+        applyLiveTransform(newZoom, "0 0");
+
+        // Adjust scroll position to keep cursor point stationary
+        ct.scrollTop = Math.max(0, (ct.scrollTop + mouseY) * ratio - mouseY);
+        ct.scrollLeft = Math.max(0, (ct.scrollLeft + mouseX) * ratio - mouseX);
 
         // Debounce: commit to React state after user stops zooming
         if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
         commitTimerRef.current = setTimeout(() => {
+          isWheelCommitRef.current = true;
           onZoomChangeRef.current?.(liveZoomRef.current);
           renderSharp(liveZoomRef.current);
         }, RENDER_DEBOUNCE_MS);
@@ -284,7 +310,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
       );
     }
 
-    const scale = zoom / 100;
+    const scale = layoutZoom / 100;
 
     return (
       <div
@@ -295,7 +321,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
         <div
           ref={innerWrapperRef}
           className="flex flex-col items-center gap-4 py-4"
-          style={{ transformOrigin: "top center", willChange: "transform" }}
+          style={{ willChange: "transform" }}
         >
           {pages.map((page, idx) => {
             const pageNumber = idx + 1;

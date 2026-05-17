@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Syne', 'sans-serif'],
+                        body: ['DM Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        bg: '#0a1914',
+                        surface: '#142820',
+                        card: '#1a3428',
+                        border: '#1e3c32',
+                        accent: '#22c55e',
+                        'accent-dim': '#16a34a',
+                        fg: '#f5faf5',
+                        muted: '#7db89a',
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s ease-in-out infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'slide-up': 'slideUp 0.6s ease both',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%,100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        slideUp: {
+                            from: { opacity: '0', transform: 'translateY(24px)' },
+                            to: { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            scroll-behavior: smooth;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0a1914;
+            color: #f5faf5;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5 {
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a1914;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #22c55e;
+            border-radius: 2px;
+        }
+
+        /* Noise texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events: none;
+            opacity: 0.4;
+        }
+
+        section,
+        nav {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Nav active */
+        .nav-btn.active {
+            background: #22c55e;
+            color: #0a1914;
+        }
+
+        .nav-btn {
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover:not(.active) {
+            background: #1a3428;
+            color: #22c55e;
+        }
+
+        /* Card hover */
+        .card-hover {
+            transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+        }
+
+        .card-hover:hover {
+            border-color: #22c55e !important;
+            box-shadow: 0 0 24px rgba(34, 197, 94, 0.12);
+            transform: translateY(-2px);
+        }
+
+        /* Timeline */
+        .timeline-line {
+            position: relative;
+        }
+
+        .timeline-line::before {
+            content: '';
+            position: absolute;
+            left: 16px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #22c55e, #16a34a 60%, transparent);
+        }
+
+        @media (min-width: 768px) {
+            .timeline-line::before {
+                left: 50%;
+                transform: translateX(-50%);
+            }
+        }
+
+        /* Progress line animation */
+        #timeline-progress {
+            position: absolute;
+            left: 16px;
+            top: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #22c55e, #16a34a);
+            height: 0%;
+            transition: height 0.2s ease;
+            border-radius: 2px;
+        }
+
+        @media (min-width: 768px) {
+            #timeline-progress {
+                left: 50%;
+                transform: translateX(-50%);
+            }
+        }
+
+        /* Fade in on scroll */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Skill badge */
+        .skill-badge {
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .skill-badge:hover {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
+        }
+
+        /* Project card image gradient */
+        .proj-img {
+            background: linear-gradient(135deg, #22c55e 0%, #15803d 60%, #064e3b 100%);
+        }
+
+        /* Glow blob */
+        .glow-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.25) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip span {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0a1914;
+            color: #f5faf5;
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+            border: 1px solid #1e3c32;
+        }
+
+        .tooltip:hover span {
+            display: block;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+
+    <!-- ─── NAVIGATION ─────────────────────────────────────────────────────── -->
+    <nav id="navbar" class="fixed bottom-0 left-0 right-0 md:top-0 md:bottom-auto z-50">
+        <div
+            class="bg-surface border-t md:border-t-0 md:border-b border-border flex items-center justify-center md:justify-start px-4 md:px-10 h-16 md:h-16 gap-1 md:gap-2">
+
+            <!-- Logo (md+) -->
+            <a href="#intro"
+                class="hidden md:flex items-center gap-2 mr-auto font-body font-bold text-accent text-lg tracking-tight">
+                <span
+                    class="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-bg text-xs font-black">P</span>
+                Portfolio
+            </a>
+
+            <!-- Nav items -->
+            <button onclick="scrollTo('intro')"
+                class="nav-btn active rounded-lg px-3 py-2 text-xs md:text-sm font-semibold flex flex-col md:flex-row items-center gap-1 md:gap-2 text-bg"
+                data-section="intro">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span class="hidden md:inline">Home</span>
+            </button>
+            <button onclick="scrollTo('education')"
+                class="nav-btn rounded-lg px-3 py-2 text-xs md:text-sm font-semibold flex flex-col md:flex-row items-center gap-1 md:gap-2 text-muted"
+                data-section="education">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m-6-3.5l6 3.5 6-3.5" />
+                </svg>
+                <span class="hidden md:inline">Education</span>
+            </button>
+            <button onclick="scrollTo('experience')"
+                class="nav-btn rounded-lg px-3 py-2 text-xs md:text-sm font-semibold flex flex-col md:flex-row items-center gap-1 md:gap-2 text-muted"
+                data-section="experience">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span class="hidden md:inline">Experience</span>
+            </button>
+            <button onclick="scrollTo('projects')"
+                class="nav-btn rounded-lg px-3 py-2 text-xs md:text-sm font-semibold flex flex-col md:flex-row items-center gap-1 md:gap-2 text-muted"
+                data-section="projects">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                <span class="hidden md:inline">Projects</span>
+            </button>
+            <button onclick="scrollTo('achievements')"
+                class="nav-btn rounded-lg px-3 py-2 text-xs md:text-sm font-semibold flex flex-col md:flex-row items-center gap-1 md:gap-2 text-muted"
+                data-section="achievements">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="hidden md:inline">Achievements</span>
+            </button>
+            <a href="https://calendly.com" target="_blank"
+                class="nav-btn rounded-lg px-3 py-2 text-xs md:text-sm font-semibold flex flex-col md:flex-row items-center gap-1 md:gap-2 text-muted ml-0 md:ml-auto">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="hidden md:inline">Schedule Call</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- ─── INTRO ─────────────────────────────────────────────────────────── -->
+    <style>
+        /* GitHub graph cells */
+        .gh-cell {
+            width: 11px;
+            height: 11px;
+            border-radius: 2px;
+            display: inline-block;
+            flex-shrink: 0;
+            transition: transform 0.15s, opacity 0.15s;
+            cursor: default;
+        }
+
+        .gh-cell:hover {
+            transform: scale(1.4);
+            opacity: 0.9;
+        }
+
+        .gh-0 {
+            background: #0f2818;
+        }
+
+        .gh-1 {
+            background: #0e4429;
+        }
+
+        .gh-2 {
+            background: #006d32;
+        }
+
+        .gh-3 {
+            background: #26a641;
+        }
+
+        .gh-4 {
+            background: #39d353;
+        }
+
+        /* LeetCode ring */
+        .lc-ring-track {
+            stroke: #1e3c32;
+        }
+
+        .lc-ring-fill {
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* stat pill */
+        .stat-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(34, 197, 94, 0.06);
+            border: 1px solid rgba(34, 197, 94, 0.18);
+            border-radius: 999px;
+            padding: 4px 12px 4px 8px;
+            font-size: 12px;
+            color: #7db89a;
+        }
+
+        .stat-pill strong {
+            color: #f5faf5;
+            font-size: 13px;
+        }
+
+        /* Difficulty badges */
+        .badge-easy {
+            background: rgba(34, 197, 94, 0.12);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.25);
+        }
+
+        .badge-medium {
+            background: rgba(234, 179, 8, 0.12);
+            color: #facc15;
+            border: 1px solid rgba(234, 179, 8, 0.25);
+        }
+
+        .badge-hard {
+            background: rgba(239, 68, 68, 0.12);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+
+        /* mini progress bar */
+        .diff-bar-track {
+            background: #1a3428;
+            border-radius: 4px;
+            overflow: hidden;
+            height: 5px;
+            flex: 1;
+        }
+
+        .diff-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 0;
+        }
+    </style>
+
+    <section id="intro"
+        class="min-h-screen flex items-start justify-center px-4 sm:px-8 lg:px-16 pt-20 md:pt-24 pb-24 md:pb-10 relative overflow-hidden">
+        <div class="glow-blob w-96 h-96 top-10 -left-20 opacity-60"></div>
+        <div class="glow-blob w-64 h-64 bottom-20 right-10 opacity-40"></div>
+
+        <div class="max-w-7xl w-full">
+
+            <!-- TOP ROW: left text + right profile -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center mb-10 lg:mb-12">
+
+                <!-- Left: text & CTA -->
+                <div class="flex flex-col space-y-6 order-2 lg:order-1">
+                    <div
+                        class="flex items-center gap-2.5 w-fit bg-accent/10 border border-accent/20 rounded-full px-4 py-1.5">
+                        <span class="w-2 h-2 bg-accent rounded-full animate-pulse-slow"></span>
+                        <span class="text-xs font-semibold text-accent tracking-wide">Available for freelance</span>
+                    </div>
+
+                    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-body font-extrabold leading-[1.05] text-fg">
+                        Crafting digital
+                        <span class="block text-accent mt-1">futures.</span>
+                    </h1>
+
+                    <p class="text-muted text-base lg:text-lg leading-relaxed max-w-md">
+                        I'm a specialized UI/UX designer and Framer developer building next-generation interfaces with
+                        extreme precision and minimalist aesthetics.
+                    </p>
+
+                    <!-- Quick stats row -->
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <div class="stat-pill">
+                            <svg class="w-3.5 h-3.5 text-accent" fill="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                            </svg>
+                            <strong>847</strong> contributions
+                        </div>
+                        <div class="stat-pill">
+                            <svg class="w-3.5 h-3.5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
+                            </svg>
+                            <strong>42</strong> repos
+                        </div>
+                        <div class="stat-pill">
+                            <svg class="w-3.5 h-3.5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                            </svg>
+                            <strong>1.2k</strong> stars
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <a href="#projects" onclick="scrollTo('projects'); return false;"
+                            class="inline-flex items-center justify-center gap-2 px-8 py-3 bg-accent text-bg font-bold font-body rounded-full hover:bg-accent-dim transition-all duration-300 text-sm">
+                            View Projects
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                    d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                        </a>
+                        <a href="#education" onclick="scrollTo('education'); return false;"
+                            class="inline-flex items-center justify-center px-8 py-3 border-2 border-accent text-accent font-bold font-body rounded-full hover:bg-accent/10 transition-all duration-300 text-sm">
+                            About Me
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Right: profile card -->
+                <div class="flex flex-col items-center order-1 lg:order-2">
+                    <div class="relative w-full max-w-xs sm:max-w-sm">
+                        <div
+                            class="absolute inset-0 bg-gradient-to-br from-accent/30 to-accent/5 rounded-3xl blur-3xl opacity-50 animate-float">
+                        </div>
+                        <div
+                            class="relative rounded-2xl overflow-hidden border-2 border-accent/30 aspect-square shadow-2xl shadow-accent/10">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop"
+                                alt="Profile" class="w-full h-full object-cover" loading="eager" />
+                            <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-bg/60 to-transparent">
+                            </div>
+                        </div>
+                        <!-- Social links -->
+                        <div class="flex justify-center gap-3 mt-5 flex-wrap">
+                            <a href="https://github.com" target="_blank" rel="noopener"
+                                class="tooltip p-3 rounded-full border border-border hover:border-accent hover:bg-accent/10 hover:text-accent transition-all duration-300 text-muted">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                                </svg>
+                                <span>GitHub</span>
+                            </a>
+                            <a href="https://linkedin.com" target="_blank" rel="noopener"
+                                class="tooltip p-3 rounded-full border border-border hover:border-accent hover:bg-accent/10 hover:text-accent transition-all duration-300 text-muted">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                                </svg>
+                                <span>LinkedIn</span>
+                            </a>
+                            <a href="https://twitter.com" target="_blank" rel="noopener"
+                                class="tooltip p-3 rounded-full border border-border hover:border-accent hover:bg-accent/10 hover:text-accent transition-all duration-300 text-muted">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                                </svg>
+                                <span>Twitter</span>
+                            </a>
+                            <a href="mailto:hello@example.com"
+                                class="tooltip p-3 rounded-full border border-border hover:border-accent hover:bg-accent/10 hover:text-accent transition-all duration-300 text-muted">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                <span>Email</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTTOM ROW: GitHub + LeetCode side by side -->
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 pb-2">
+
+                <!-- GitHub Contribution Graph (spans 3 cols) -->
+                <div class="lg:col-span-3 bg-surface border border-border rounded-2xl p-5 sm:p-6">
+                    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <div class="p-2 bg-accent/10 rounded-lg border border-accent/15">
+                                <svg class="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-body font-bold text-fg">GitHub Activity</p>
+                                <p class="text-xs text-muted">847 contributions in the last year</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-xs text-muted">
+                            <span>Less</span>
+                            <span class="gh-cell gh-0 !w-9px !h-9px" style="width:9px;height:9px"></span>
+                            <span class="gh-cell gh-1" style="width:9px;height:9px"></span>
+                            <span class="gh-cell gh-2" style="width:9px;height:9px"></span>
+                            <span class="gh-cell gh-3" style="width:9px;height:9px"></span>
+                            <span class="gh-cell gh-4" style="width:9px;height:9px"></span>
+                            <span>More</span>
+                        </div>
+                    </div>
+
+                    <!-- Month labels -->
+                    <div class="flex gap-1 mb-1 pl-0 overflow-x-auto pb-1" id="gh-months"
+                        style="font-size:10px; color:#7db89a;">
+                    </div>
+
+                    <!-- Graph grid -->
+                    <div class="overflow-x-auto">
+                        <div id="gh-graph" class="flex gap-1" style="min-width: max-content;"></div>
+                    </div>
+                </div>
+
+                <!-- LeetCode Panel (spans 2 cols) -->
+                <div class="lg:col-span-2 bg-surface border border-border rounded-2xl p-5 sm:p-6 flex flex-col">
+                    <div class="flex items-center gap-2.5 mb-5">
+                        <div class="p-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                            <!-- LeetCode icon approximation -->
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                                <path d="M13.5 3L7 10.5H13L10.5 21L17 13.5H11L13.5 3Z" fill="#facc15" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-body font-bold text-fg">LeetCode</p>
+                            <p class="text-xs text-muted">Problem solving stats</p>
+                        </div>
+                        <a href="https://leetcode.com" target="_blank"
+                            class="ml-auto text-muted hover:text-accent transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </a>
+                    </div>
+
+                    <!-- Ring + total in center -->
+                    <div class="flex items-center gap-6 mb-5">
+                        <div class="relative flex-shrink-0" style="width:90px;height:90px;">
+                            <svg width="90" height="90" viewBox="0 0 90 90" style="transform:rotate(-90deg)">
+                                <circle cx="45" cy="45" r="38" fill="none" stroke-width="7" class="lc-ring-track" />
+                                <!-- Easy arc -->
+                                <circle cx="45" cy="45" r="38" fill="none" stroke-width="7" stroke="#4ade80"
+                                    style="stroke-dasharray: 238.76; stroke-dashoffset: 0; stroke-linecap: round;"
+                                    class="lc-ring-fill" id="lc-easy-arc" />
+                                <!-- Medium arc -->
+                                <circle cx="45" cy="45" r="38" fill="none" stroke-width="7" stroke="#facc15"
+                                    style="stroke-dasharray: 238.76; stroke-dashoffset: 0; stroke-linecap: round;"
+                                    class="lc-ring-fill" id="lc-medium-arc" />
+                                <!-- Hard arc -->
+                                <circle cx="45" cy="45" r="38" fill="none" stroke-width="7" stroke="#f87171"
+                                    style="stroke-dasharray: 238.76; stroke-dashoffset: 0; stroke-linecap: round;"
+                                    class="lc-ring-fill" id="lc-hard-arc" />
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-xl font-body font-extrabold text-fg">387</span>
+                                <span class="text-xs text-muted" style="margin-top:-2px">solved</span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-2 flex-1">
+                            <!-- Easy -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="badge-easy text-xs font-semibold px-2 py-0.5 rounded-full">Easy</span>
+                                    <span class="text-xs font-bold text-fg">215 <span class="text-muted font-normal">/
+                                            800</span></span>
+                                </div>
+                                <div class="diff-bar-track">
+                                    <div class="diff-bar-fill" style="background:#4ade80;" data-width="26.9"
+                                        id="bar-easy"></div>
+                                </div>
+                            </div>
+                            <!-- Medium -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span
+                                        class="badge-medium text-xs font-semibold px-2 py-0.5 rounded-full">Medium</span>
+                                    <span class="text-xs font-bold text-fg">136 <span class="text-muted font-normal">/
+                                            1600</span></span>
+                                </div>
+                                <div class="diff-bar-track">
+                                    <div class="diff-bar-fill" style="background:#facc15;" data-width="8.5"
+                                        id="bar-medium"></div>
+                                </div>
+                            </div>
+                            <!-- Hard -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="badge-hard text-xs font-semibold px-2 py-0.5 rounded-full">Hard</span>
+                                    <span class="text-xs font-bold text-fg">36 <span class="text-muted font-normal">/
+                                            680</span></span>
+                                </div>
+                                <div class="diff-bar-track">
+                                    <div class="diff-bar-fill" style="background:#f87171;" data-width="5.3"
+                                        id="bar-hard"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom stats strip -->
+                    <div class="grid grid-cols-3 gap-2 mt-auto">
+                        <div class="bg-card border border-border rounded-xl p-3 text-center">
+                            <p class="text-lg font-body font-extrabold text-fg">1,847</p>
+                            <p class="text-xs text-muted mt-0.5">Ranking</p>
+                        </div>
+                        <div class="bg-card border border-border rounded-xl p-3 text-center">
+                            <p class="text-lg font-body font-extrabold text-accent">42</p>
+                            <p class="text-xs text-muted mt-0.5">Streak</p>
+                        </div>
+                        <div class="bg-card border border-border rounded-xl p-3 text-center">
+                            <p class="text-lg font-body font-extrabold text-fg">Top 5%</p>
+                            <p class="text-xs text-muted mt-0.5">Global</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <script>
+            /* ── GitHub contribution graph generator ─────────────────── */
+            (function buildGithubGraph() {
+                const WEEKS = 52;
+                const DAYS = 7;
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+                /* seed-based pseudo-random so it looks consistent */
+                function seededRand(s) { s = Math.sin(s) * 10000; return s - Math.floor(s); }
+
+                const graphEl = document.getElementById('gh-graph');
+                const monthsEl = document.getElementById('gh-months');
+                if (!graphEl) return;
+
+                const today = new Date();
+                const startDate = new Date(today);
+                startDate.setDate(today.getDate() - WEEKS * 7 + 1);
+
+                /* month label tracking */
+                let lastMonth = -1;
+                const monthSpans = [];
+
+                for (let w = 0; w < WEEKS; w++) {
+                    const col = document.createElement('div');
+                    col.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
+
+                    let monthLabel = '';
+
+                    for (let d = 0; d < DAYS; d++) {
+                        const cellDate = new Date(startDate);
+                        cellDate.setDate(startDate.getDate() + w * 7 + d);
+                        const isFuture = cellDate > today;
+
+                        const cell = document.createElement('span');
+                        cell.className = 'gh-cell';
+
+                        if (isFuture) {
+                            cell.classList.add('gh-0');
+                        } else {
+                            /* weight toward 0-1 but allow occasional bursts */
+                            const r = seededRand(w * 7 + d + 42);
+                            const level = r < 0.45 ? 0 : r < 0.65 ? 1 : r < 0.80 ? 2 : r < 0.92 ? 3 : 4;
+                            cell.classList.add('gh-' + level);
+                        }
+
+                        const mo = cellDate.getMonth();
+                        if (d === 0 && mo !== lastMonth) { monthLabel = months[mo]; lastMonth = mo; }
+
+                        const label = `${cellDate.toDateString()}`;
+                        cell.title = label;
+                        col.appendChild(cell);
+                    }
+
+                    monthSpans.push(monthLabel);
+                    graphEl.appendChild(col);
+                }
+
+                /* render month labels aligned with week columns */
+                monthSpans.forEach(m => {
+                    const sp = document.createElement('span');
+                    sp.textContent = m;
+                    sp.style.cssText = 'min-width:11px;display:inline-block;text-align:left;';
+                    /* each week col is 11px + 4px gap = 15px; show label only when non-empty */
+                    if (!m) sp.style.opacity = '0';
+                    monthsEl.appendChild(sp);
+                });
+            })();
+
+        /* ── LeetCode ring animation ─────────────────────────────── */
+        (function animateLeetcode() {
+            const CIRCUMFERENCE = 2 * Math.PI * 38; /* ~238.76 */
+            const easy = { solved: 215, total: 800 };
+            const medium = { solved: 136, total: 1600 };
+            const hard = { solved: 36, total: 680 };
+            const grand = easy.solved + medium.solved + hard.solved; /* 387 */
+
+            const easyFrac = easy.solved / grand;
+            const mediumFrac = medium.solved / grand;
+            const hardFrac = hard.solved / grand;
+
+            /* Each arc starts after the previous one.
+               stroke-dashoffset pushes the arc's start point.
+               offset = C - (fraction * C) rotated by prior arcs. */
+            const easyOffset = CIRCUMFERENCE * (1 - easyFrac);
+            const mediumOffset = CIRCUMFERENCE * (1 - mediumFrac) - (easyFrac * CIRCUMFERENCE);
+            const hardOffset = CIRCUMFERENCE * (1 - hardFrac) - ((easyFrac + mediumFrac) * CIRCUMFERENCE);
+
+            /* We render 3 stacked circles; each is clipped by its own dash pattern.
+               For a segmented ring we offset each arc's start angle using stroke-dashoffset. */
+            const easyArc = document.getElementById('lc-easy-arc');
+            const mediumArc = document.getElementById('lc-medium-arc');
+            const hardArc = document.getElementById('lc-hard-arc');
+
+            /* Animate after a short delay */
+            setTimeout(() => {
+                if (easyArc) easyArc.style.strokeDashoffset = easyOffset;
+                if (mediumArc) { mediumArc.style.strokeDasharray = CIRCUMFERENCE; mediumArc.style.strokeDashoffset = CIRCUMFERENCE * (1 - mediumFrac) + (easyFrac * CIRCUMFERENCE); }
+                if (hardArc) { hardArc.style.strokeDasharray = CIRCUMFERENCE; hardArc.style.strokeDashoffset = CIRCUMFERENCE * (1 - hardFrac) + ((easyFrac + mediumFrac) * CIRCUMFERENCE); }
+            }, 400);
+
+            /* Animate progress bars */
+            setTimeout(() => {
+                ['easy', 'medium', 'hard'].forEach(d => {
+                    const bar = document.getElementById('bar-' + d);
+                    if (bar) bar.style.width = bar.dataset.width + '%';
+                });
+            }, 500);
+        })();
+    </script>
+
+    <!-- ─── EDUCATION ─────────────────────────────────────────────────────── -->
+    <section id="education" class="py-20 px-4 sm:px-8 lg:px-16">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-14 reveal">
+                <h2 class="text-4xl sm:text-5xl font-body font-extrabold text-fg mb-3">Education & Skills</h2>
+                <div class="w-16 h-1 bg-accent mx-auto rounded-full mb-4"></div>
+                <p class="text-muted text-sm sm:text-base max-w-xl mx-auto">My academic journey and professional
+                    expertise</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+
+                <!-- Education column -->
+                <div class="reveal space-y-5">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m-6-3.5l6 3.5 6-3.5" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-body font-bold text-fg">Education</h3>
+                    </div>
+
+                    <div class="space-y-0">
+                        <div class="pb-5 border-b border-border">
+                            <h4 class="font-semibold text-fg text-sm mb-1">B.S. Computer Science</h4>
+                            <p class="text-accent text-xs font-semibold mb-1">University of Technology</p>
+                            <p class="text-muted text-xs mb-2">2018 – 2022</p>
+                            <p class="text-muted text-xs leading-relaxed">Focused on software engineering and web
+                                development</p>
+                        </div>
+                        <div class="pt-5">
+                            <h4 class="font-semibold text-fg text-sm mb-1">High School Diploma</h4>
+                            <p class="text-accent text-xs font-semibold mb-1">State High School</p>
+                            <p class="text-muted text-xs mb-2">2014 – 2018</p>
+                            <p class="text-muted text-xs leading-relaxed">Science and Technology stream</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Skills column -->
+                <div class="reveal space-y-5" style="animation-delay:0.1s">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-body font-bold text-fg">Skills</h3>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold text-fg text-xs uppercase tracking-wider mb-2.5">Frontend</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">React</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Next.js</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">TypeScript</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Tailwind
+                                    CSS</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Framer
+                                    Motion</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-fg text-xs uppercase tracking-wider mb-2.5">Backend</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Node.js</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Express</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Python</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">PostgreSQL</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">MongoDB</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-fg text-xs uppercase tracking-wider mb-2.5">Tools & Design
+                            </h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Figma</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Git</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Docker</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">AWS</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Vercel</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-fg text-xs uppercase tracking-wider mb-2.5">Soft Skills</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Communication</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Leadership</span>
+                                <span
+                                    class="skill-badge px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">Teamwork</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Courses column -->
+                <div class="reveal space-y-4" style="animation-delay:0.2s">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-body font-bold text-fg">Certificates & Courses</h3>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div
+                            class="card-hover p-4 bg-card border border-border rounded-xl flex items-start justify-between gap-2">
+                            <div>
+                                <h4 class="font-semibold text-fg text-sm leading-tight">Advanced React Patterns</h4>
+                                <p class="text-muted text-xs mt-1">Udemy</p>
+                            </div>
+                            <span class="text-accent text-xs font-bold flex-shrink-0">2023</span>
+                        </div>
+                        <div
+                            class="card-hover p-4 bg-card border border-border rounded-xl flex items-start justify-between gap-2">
+                            <div>
+                                <h4 class="font-semibold text-fg text-sm leading-tight">Full Stack Web Development</h4>
+                                <p class="text-muted text-xs mt-1">Coursera</p>
+                            </div>
+                            <span class="text-accent text-xs font-bold flex-shrink-0">2022</span>
+                        </div>
+                        <div
+                            class="card-hover p-4 bg-card border border-border rounded-xl flex items-start justify-between gap-2">
+                            <div>
+                                <h4 class="font-semibold text-fg text-sm leading-tight">UI/UX Design Masterclass</h4>
+                                <p class="text-muted text-xs mt-1">LinkedIn Learning</p>
+                            </div>
+                            <span class="text-accent text-xs font-bold flex-shrink-0">2023</span>
+                        </div>
+                        <div
+                            class="card-hover p-4 bg-card border border-border rounded-xl flex items-start justify-between gap-2">
+                            <div>
+                                <h4 class="font-semibold text-fg text-sm leading-tight">Cloud Architecture on AWS</h4>
+                                <p class="text-muted text-xs mt-1">AWS Academy</p>
+                            </div>
+                            <span class="text-accent text-xs font-bold flex-shrink-0">2022</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── EXPERIENCE ─────────────────────────────────────────────────────── -->
+    <section id="experience" class="py-20 px-4 sm:px-8 lg:px-16">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center mb-14 reveal">
+                <h2 class="text-4xl sm:text-5xl font-body font-extrabold text-fg mb-3">Experience</h2>
+                <div class="w-16 h-1 bg-accent mx-auto rounded-full mb-4"></div>
+                <p class="text-muted text-sm sm:text-base">My professional journey and key achievements</p>
+            </div>
+
+            <!-- Timeline -->
+            <div class="relative timeline-line" id="timelineWrap">
+                <div id="timeline-progress"></div>
+
+                <div class="space-y-10 md:space-y-14">
+
+                    <!-- Exp 1 -->
+                    <div class="relative reveal">
+                        <div
+                            class="absolute left-0 md:left-1/2 top-7 -translate-x-[4px] md:-translate-x-1/2 w-9 h-9 bg-bg border-4 border-accent rounded-full flex items-center justify-center z-10">
+                            <div class="w-2.5 h-2.5 bg-accent rounded-full"></div>
+                        </div>
+                        <div class="ml-14 md:ml-0 md:w-[47%] md:mr-auto md:pr-10">
+                            <div class="card-hover bg-card border border-border rounded-2xl p-5 sm:p-6">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <span class="text-3xl">🚀</span>
+                                    <div>
+                                        <h3 class="text-base sm:text-lg font-body font-bold text-fg">Senior Frontend
+                                            Developer</h3>
+                                        <p class="text-accent text-xs font-semibold">Tech Startup Inc</p>
+                                    </div>
+                                </div>
+                                <p class="text-muted text-xs font-medium mb-3">Jan 2022 → Present</p>
+                                <p class="text-muted text-sm leading-relaxed mb-4">Lead frontend development for web
+                                    applications serving 100k+ users.</p>
+                                <div class="mb-4">
+                                    <p class="text-xs font-bold text-fg mb-2 uppercase tracking-wider">Tech Stack</p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">React</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">Next.js</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">TypeScript</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">Tailwind
+                                            CSS</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-fg mb-2 uppercase tracking-wider">Key Achievements
+                                    </p>
+                                    <ul class="space-y-1.5">
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Improved page load
+                                            time by 60%</li>
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Mentored 3 junior
+                                            developers</li>
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Led migration to
+                                            Next.js 13</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Exp 2 -->
+                    <div class="relative reveal">
+                        <div
+                            class="absolute left-0 md:left-1/2 top-7 -translate-x-[4px] md:-translate-x-1/2 w-9 h-9 bg-bg border-4 border-accent rounded-full flex items-center justify-center z-10">
+                            <div class="w-2.5 h-2.5 bg-accent rounded-full"></div>
+                        </div>
+                        <div class="ml-14 md:ml-auto md:w-[47%] md:pl-10">
+                            <div class="card-hover bg-card border border-border rounded-2xl p-5 sm:p-6">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <span class="text-3xl">🎨</span>
+                                    <div>
+                                        <h3 class="text-base sm:text-lg font-body font-bold text-fg">Full Stack
+                                            Developer</h3>
+                                        <p class="text-accent text-xs font-semibold">Digital Agency Pro</p>
+                                    </div>
+                                </div>
+                                <p class="text-muted text-xs font-medium mb-3">Jun 2020 → Dec 2021</p>
+                                <p class="text-muted text-sm leading-relaxed mb-4">Developed and maintained 15+ client
+                                    websites and applications.</p>
+                                <div class="mb-4">
+                                    <p class="text-xs font-bold text-fg mb-2 uppercase tracking-wider">Tech Stack</p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">React</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">Node.js</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">MongoDB</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">Express</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-fg mb-2 uppercase tracking-wider">Key Achievements
+                                    </p>
+                                    <ul class="space-y-1.5">
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Reduced deployment
+                                            time by 40%</li>
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Built custom analytics
+                                            dashboard</li>
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Increased client
+                                            satisfaction to 98%</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Exp 3 -->
+                    <div class="relative reveal">
+                        <div
+                            class="absolute left-0 md:left-1/2 top-7 -translate-x-[4px] md:-translate-x-1/2 w-9 h-9 bg-bg border-4 border-accent rounded-full flex items-center justify-center z-10">
+                            <div class="w-2.5 h-2.5 bg-accent rounded-full"></div>
+                        </div>
+                        <div class="ml-14 md:ml-0 md:w-[47%] md:mr-auto md:pr-10">
+                            <div class="card-hover bg-card border border-border rounded-2xl p-5 sm:p-6">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <span class="text-3xl">💻</span>
+                                    <div>
+                                        <h3 class="text-base sm:text-lg font-body font-bold text-fg">Junior Developer
+                                        </h3>
+                                        <p class="text-accent text-xs font-semibold">Web Solutions Ltd</p>
+                                    </div>
+                                </div>
+                                <p class="text-muted text-xs font-medium mb-3">Jan 2020 → May 2020</p>
+                                <p class="text-muted text-sm leading-relaxed mb-4">Built responsive web applications and
+                                    fixed critical production bugs.</p>
+                                <div class="mb-4">
+                                    <p class="text-xs font-bold text-fg mb-2 uppercase tracking-wider">Tech Stack</p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">React</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">JavaScript</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">CSS</span>
+                                        <span
+                                            class="skill-badge px-2.5 py-0.5 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">Git</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-fg mb-2 uppercase tracking-wider">Key Achievements
+                                    </p>
+                                    <ul class="space-y-1.5">
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Fixed 50+ critical
+                                            bugs</li>
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Improved code quality
+                                            score by 35%</li>
+                                        <li class="flex gap-2 text-muted text-xs"><span
+                                                class="text-accent mt-0.5 flex-shrink-0">✓</span> Contributed to 5 major
+                                            releases</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── PROJECTS ───────────────────────────────────────────────────────── -->
+    <section id="projects" class="py-20 px-4 sm:px-8 lg:px-16">
+        <div class="max-w-6xl mx-auto">
+            <div class="mb-10 reveal">
+                <h2 class="text-4xl sm:text-5xl font-body font-extrabold text-fg mb-3">Featured Projects</h2>
+                <div class="h-1 w-16 bg-accent rounded-full"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 reveal">
+
+                <!-- Project 1 -->
+                <div class="card-hover bg-card border border-border rounded-2xl overflow-hidden flex flex-col group">
+                    <div
+                        class="h-36 proj-img flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-500 relative overflow-hidden">
+                        🛍️
+                        <div
+                            class="absolute inset-0 bg-gradient-to-br from-accent/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                        </div>
+                    </div>
+                    <div class="p-6 flex flex-col flex-1">
+                        <h3 class="text-lg font-body font-bold text-fg mb-1.5">E-Commerce Platform</h3>
+                        <p class="text-muted text-sm leading-relaxed mb-3 line-clamp-3">A full-featured e-commerce
+                            platform with real-time inventory management, payment processing, and admin dashboard.</p>
+                        <div class="flex items-center gap-1.5 text-muted text-xs mb-4">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Jan 2023 - Jun 2023
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mb-6">
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">React</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Node.js</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">MongoDB</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Stripe</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">+1</span>
+                        </div>
+                        <div class="flex gap-2 mt-auto">
+                            <a href="https://example.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent hover:bg-accent-dim text-bg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Demo
+                            </a>
+                            <a href="https://github.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 border border-border hover:bg-surface text-fg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                                </svg>
+                                Code
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project 2 -->
+                <div class="card-hover bg-card border border-border rounded-2xl overflow-hidden flex flex-col group">
+                    <div class="h-36 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-500"
+                        style="background:linear-gradient(135deg,#16a34a,#064e3b)">✓</div>
+                    <div class="p-6 flex flex-col flex-1">
+                        <h3 class="text-lg font-body font-bold text-fg mb-1.5">Task Management App</h3>
+                        <p class="text-muted text-sm leading-relaxed mb-3 line-clamp-3">A collaborative task management
+                            application with real-time updates, team collaboration features, and advanced filtering.</p>
+                        <div class="flex items-center gap-1.5 text-muted text-xs mb-4">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Aug 2022 - Dec 2022
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mb-6">
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">React</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Firebase</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Tailwind
+                                CSS</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">TypeScript</span>
+                        </div>
+                        <div class="flex gap-2 mt-auto">
+                            <a href="https://example.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent hover:bg-accent-dim text-bg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Demo
+                            </a>
+                            <a href="https://github.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 border border-border hover:bg-surface text-fg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                                </svg>
+                                Code
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project 3 -->
+                <div class="card-hover bg-card border border-border rounded-2xl overflow-hidden flex flex-col group">
+                    <div class="h-36 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-500"
+                        style="background:linear-gradient(135deg,#1d4ed8,#0f172a)">💬</div>
+                    <div class="p-6 flex flex-col flex-1">
+                        <h3 class="text-lg font-body font-bold text-fg mb-1.5">AI Chat Application</h3>
+                        <p class="text-muted text-sm leading-relaxed mb-3 line-clamp-3">An intelligent chatbot powered
+                            by machine learning with natural language processing and multi-language support.</p>
+                        <div class="flex items-center gap-1.5 text-muted text-xs mb-4">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Mar 2023 - Aug 2023
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mb-6">
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">React</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Python</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">TensorFlow</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">FastAPI</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">+1</span>
+                        </div>
+                        <div class="flex gap-2 mt-auto">
+                            <a href="https://example.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent hover:bg-accent-dim text-bg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Demo
+                            </a>
+                            <a href="https://github.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 border border-border hover:bg-surface text-fg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                                </svg>
+                                Code
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project 4 -->
+                <div class="card-hover bg-card border border-border rounded-2xl overflow-hidden flex flex-col group">
+                    <div class="h-36 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-500"
+                        style="background:linear-gradient(135deg,#7c3aed,#0f172a)">📊</div>
+                    <div class="p-6 flex flex-col flex-1">
+                        <h3 class="text-lg font-body font-bold text-fg mb-1.5">Analytics Dashboard</h3>
+                        <p class="text-muted text-sm leading-relaxed mb-3 line-clamp-3">A comprehensive analytics
+                            dashboard for monitoring application metrics and user behavior with real-time visualization.
+                        </p>
+                        <div class="flex items-center gap-1.5 text-muted text-xs mb-4">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Oct 2022 - Mar 2023
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mb-6">
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">React</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">D3.js</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Node.js</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">PostgreSQL</span>
+                        </div>
+                        <div class="flex gap-2 mt-auto">
+                            <a href="https://example.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent hover:bg-accent-dim text-bg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Demo
+                            </a>
+                            <a href="https://github.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 border border-border hover:bg-surface text-fg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                                </svg>
+                                Code
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project 5 -->
+                <div class="card-hover bg-card border border-border rounded-2xl overflow-hidden flex flex-col group">
+                    <div class="h-36 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-500"
+                        style="background:linear-gradient(135deg,#db2777,#0f172a)">👥</div>
+                    <div class="p-6 flex flex-col flex-1">
+                        <h3 class="text-lg font-body font-bold text-fg mb-1.5">Social Media App</h3>
+                        <p class="text-muted text-sm leading-relaxed mb-3 line-clamp-3">A social networking platform
+                            with user profiles, feed algorithms, messaging, and notifications built for scalability.</p>
+                        <div class="flex items-center gap-1.5 text-muted text-xs mb-4">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            May 2022 - Oct 2022
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mb-6">
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Next.js</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Express</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">MongoDB</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Socket.io</span>
+                        </div>
+                        <div class="flex gap-2 mt-auto">
+                            <a href="https://example.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent hover:bg-accent-dim text-bg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Demo
+                            </a>
+                            <a href="https://github.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 border border-border hover:bg-surface text-fg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                                </svg>
+                                Code
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project 6 -->
+                <div class="card-hover bg-card border border-border rounded-2xl overflow-hidden flex flex-col group">
+                    <div class="h-36 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-500"
+                        style="background:linear-gradient(135deg,#b45309,#0f172a)">📝</div>
+                    <div class="p-6 flex flex-col flex-1">
+                        <h3 class="text-lg font-body font-bold text-fg mb-1.5">Content Management System</h3>
+                        <p class="text-muted text-sm leading-relaxed mb-3 line-clamp-3">A headless CMS for managing and
+                            publishing digital content with WYSIWYG editor, SEO tools, and version control.</p>
+                        <div class="flex items-center gap-1.5 text-muted text-xs mb-4">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Nov 2021 - Apr 2022
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mb-6">
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Vue.js</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">Laravel</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">MySQL</span>
+                            <span
+                                class="px-2 py-0.5 bg-surface text-muted text-xs rounded hover:bg-accent hover:text-bg transition-colors cursor-default">GraphQL</span>
+                        </div>
+                        <div class="flex gap-2 mt-auto">
+                            <a href="https://example.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent hover:bg-accent-dim text-bg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Demo
+                            </a>
+                            <a href="https://github.com" target="_blank"
+                                class="flex-1 flex items-center justify-center gap-1.5 py-2 border border-border hover:bg-surface text-fg text-sm font-bold rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                                </svg>
+                                Code
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── ACHIEVEMENTS ───────────────────────────────────────────────────── -->
+    <section id="achievements" class="py-20 px-4 sm:px-8 lg:px-16 pb-32 md:pb-20">
+        <div class="max-w-6xl mx-auto">
+            <div class="mb-10 reveal">
+                <h2 class="text-4xl sm:text-5xl font-body font-extrabold text-fg mb-3">Achievements & Recognition
+                </h2>
+                <div class="h-1 w-16 bg-accent rounded-full"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 reveal">
+
+                <div class="card-hover bg-card border border-border rounded-2xl p-5 group">
+                    <div class="flex items-start gap-4">
+                        <div class="text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">🏆</div>
+                        <div class="flex-1 min-w-0">
+                            <h3
+                                class="text-base font-body font-bold text-fg mb-1.5 group-hover:text-accent transition-colors">
+                                AWS Certified Solutions Architect</h3>
+                            <p class="text-muted text-sm leading-relaxed mb-3">Achieved professional-level certification
+                                in designing distributed systems and cloud infrastructure on AWS.</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-accent text-sm font-bold">2023</p>
+                                <a href="https://example.com/certificate" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">
+                                    View Proof <svg class="w-3 h-3" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover bg-card border border-border rounded-2xl p-5 group">
+                    <div class="flex items-start gap-4">
+                        <div class="text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">⭐</div>
+                        <div class="flex-1 min-w-0">
+                            <h3
+                                class="text-base font-body font-bold text-fg mb-1.5 group-hover:text-accent transition-colors">
+                                Open Source Contributor</h3>
+                            <p class="text-muted text-sm leading-relaxed mb-3">Contributed 50+ pull requests to popular
+                                open-source projects, improving code quality for thousands of developers.</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-accent text-sm font-bold">50+ PRs, 1000+ Stars</p>
+                                <a href="https://github.com" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">View
+                                    Proof <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover bg-card border border-border rounded-2xl p-5 group">
+                    <div class="flex items-start gap-4">
+                        <div class="text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">🎤</div>
+                        <div class="flex-1 min-w-0">
+                            <h3
+                                class="text-base font-body font-bold text-fg mb-1.5 group-hover:text-accent transition-colors">
+                                Tech Speaker at Major Conference</h3>
+                            <p class="text-muted text-sm leading-relaxed mb-3">Delivered keynote on 'Building Scalable
+                                Web Applications' at International Tech Summit reaching 2,000+ attendees.</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-accent text-sm font-bold">2,000+ Attendees</p>
+                                <a href="https://example.com/talk" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">View
+                                    Proof <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover bg-card border border-border rounded-2xl p-5 group">
+                    <div class="flex items-start gap-4">
+                        <div class="text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">⚡</div>
+                        <div class="flex-1 min-w-0">
+                            <h3
+                                class="text-base font-body font-bold text-fg mb-1.5 group-hover:text-accent transition-colors">
+                                Performance Optimization Award</h3>
+                            <p class="text-muted text-sm leading-relaxed mb-3">Optimized application performance by 60%,
+                                reducing load time from 5s to 2s and improving user engagement by 45%.</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-accent text-sm font-bold">60% Improvement</p>
+                                <a href="https://example.com/case-study" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">View
+                                    Proof <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover bg-card border border-border rounded-2xl p-5 group">
+                    <div class="flex items-start gap-4">
+                        <div class="text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">👨‍💼</div>
+                        <div class="flex-1 min-w-0">
+                            <h3
+                                class="text-base font-body font-bold text-fg mb-1.5 group-hover:text-accent transition-colors">
+                                Team Leadership Recognition</h3>
+                            <p class="text-muted text-sm leading-relaxed mb-3">Led a team of 5 developers, improving
+                                team productivity by 35% and code quality metrics by 40%.</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-accent text-sm font-bold">+35% Productivity</p>
+                                <a href="https://example.com/recognition" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">View
+                                    Proof <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover bg-card border border-border rounded-2xl p-5 group">
+                    <div class="flex items-start gap-4">
+                        <div class="text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">🎯</div>
+                        <div class="flex-1 min-w-0">
+                            <h3
+                                class="text-base font-body font-bold text-fg mb-1.5 group-hover:text-accent transition-colors">
+                                Innovation Hackathon Winner</h3>
+                            <p class="text-muted text-sm leading-relaxed mb-3">Won first place in company hackathon with
+                                an AI-powered task automation tool that reduced manual work by 4 hours/week.</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-accent text-sm font-bold">1st Place</p>
+                                <a href="https://example.com/hackathon" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">View
+                                    Proof <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover bg-card border border-border rounded-2xl p-5 group">
+                    <div class="flex items-start gap-4">
+                        <div class="text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">📚</div>
+                        <div class="flex-1 min-w-0">
+                            <h3
+                                class="text-base font-body font-bold text-fg mb-1.5 group-hover:text-accent transition-colors">
+                                Technical Blog with 100K+ Reads</h3>
+                            <p class="text-muted text-sm leading-relaxed mb-3">Published technical articles on React
+                                best practices and system design, attracting 100K+ monthly readers.</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-accent text-sm font-bold">100K+ Readers</p>
+                                <a href="https://blog.example.com" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">View
+                                    Proof <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover bg-card border border-border rounded-2xl p-5 group">
+                    <div class="flex items-start gap-4">
+                        <div class="text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">🌱</div>
+                        <div class="flex-1 min-w-0">
+                            <h3
+                                class="text-base font-body font-bold text-fg mb-1.5 group-hover:text-accent transition-colors">
+                                Mentored 10+ Junior Developers</h3>
+                            <p class="text-muted text-sm leading-relaxed mb-3">Guided 10+ junior developers through
+                                career growth, with 8 of them promoted to senior roles within 2 years.</p>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-accent text-sm font-bold">80% Promotion Rate</p>
+                                <a href="https://example.com/mentoring" target="_blank"
+                                    class="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">View
+                                    Proof <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Stats banner -->
+            <div class="mt-12 reveal rounded-2xl overflow-hidden"
+                style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #064e3b 100%)">
+                <div class="p-8 sm:p-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
+                    <div>
+                        <div class="text-4xl sm:text-5xl font-body font-extrabold text-white mb-1">50+</div>
+                        <p class="text-white/80 text-sm">Open Source Contributions</p>
+                    </div>
+                    <div>
+                        <div class="text-4xl sm:text-5xl font-body font-extrabold text-white mb-1">100K+</div>
+                        <p class="text-white/80 text-sm">Total Reach & Influence</p>
+                    </div>
+                    <div>
+                        <div class="text-4xl sm:text-5xl font-body font-extrabold text-white mb-1">10+</div>
+                        <p class="text-white/80 text-sm">Developers Mentored</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <script>
+        // ── Smooth scroll ──────────────────────────────────────────
+        function scrollTo(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.scrollIntoView({ behavior: 'smooth' });
+            setActive(id);
+        }
+
+        function setActive(id) {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const isActive = btn.dataset.section === id;
+                btn.classList.toggle('active', isActive);
+                btn.classList.toggle('text-bg', isActive);
+                btn.classList.toggle('text-muted', !isActive);
+            });
+        }
+
+        // ── Active section detection ───────────────────────────────
+        const sections = ['intro', 'education', 'experience', 'projects', 'achievements'];
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(e => { if (e.isIntersecting) setActive(e.target.id); });
+        }, { threshold: 0.3 });
+
+        sections.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) observer.observe(el);
+        });
+
+        // ── Timeline progress ──────────────────────────────────────
+        const timelineWrap = document.getElementById('timelineWrap');
+        const progressBar = document.getElementById('timeline-progress');
+
+        window.addEventListener('scroll', () => {
+            if (!timelineWrap || !progressBar) return;
+            const rect = timelineWrap.getBoundingClientRect();
+            const winH = window.innerHeight;
+            const start = rect.top - winH * 0.5;
+            const end = rect.bottom - winH * 0.5;
+            const total = end - start;
+            const scrolled = -start;
+            const pct = Math.max(0, Math.min(100, (scrolled / total) * 100));
+            progressBar.style.height = pct + '%';
+        });
+
+        // ── Reveal on scroll ──────────────────────────────────────
+        const revealObserver = new IntersectionObserver(entries => {
+            entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+        }, { threshold: 0.12 });
+
+        document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+    </script>
+</body>
+
+</html>

@@ -30,6 +30,7 @@ import {
   FileText,
   FilePlus,
   FolderOpen,
+  Globe,
   List,
   ListOrdered,
   Loader2,
@@ -97,6 +98,7 @@ import {
 } from "@/lib/latex-resume";
 import { getDownloadFilename, sanitizeFilename } from "@/lib/resume";
 import { createClient } from "@/lib/supabase";
+import { extractPortfolioFromResume, portfolioToStorage } from "@/lib/portfolio";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
 import type { User } from "@supabase/supabase-js";
@@ -291,7 +293,7 @@ export function LatexResumeTailorApp() {
     projectHeadingPt: getFormattingFontSize("resumeProjectHeading", committedLatex),
     bulletItemPt: getFormattingFontSize("resumeItem", committedLatex),
     normalTextPt: getFormattingFontSize("normal-text", committedLatex),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [committedLatex]);
   const previewPages = useMemo(
     () => paginateResumeSections(previewSections, previewLayout, previewFontSizes),
@@ -403,15 +405,12 @@ export function LatexResumeTailorApp() {
     const supabase = createClient();
     const { data } = await supabase
       .from("resume_settings")
-      .select("*")
+      .select("provider, model")
       .eq("user_id", user.id)
       .maybeSingle();
     if (data) {
       setLlmProvider(data.provider as LlmProvider);
       setLlmModel(data.model);
-      setGeminiApiKey(data.gemini_api_key);
-      setGroqApiKey(data.groq_api_key);
-      setClaudeApiKey(data.claude_api_key);
     }
   }
 
@@ -451,9 +450,6 @@ export function LatexResumeTailorApp() {
       user_id: user.id,
       provider: settings.provider,
       model: settings.model,
-      gemini_api_key: settings.geminiApiKey,
-      groq_api_key: settings.groqApiKey,
-      claude_api_key: settings.claudeApiKey,
     }, { onConflict: "user_id" });
   }
 
@@ -1544,6 +1540,12 @@ export function LatexResumeTailorApp() {
     );
   }
 
+  function openPortfolioGenerator() {
+    const portfolioData = extractPortfolioFromResume(resumeSections, activeProjectDrafts);
+    portfolioToStorage(portfolioData);
+    window.open("/portfolio-generate", "_blank");
+  }
+
   async function auditResume() {
     if (resumeSections.length === 0) return;
 
@@ -1865,7 +1867,7 @@ export function LatexResumeTailorApp() {
 
   const currentFontSize = useMemo(() => {
     return getFormattingFontSize(toolbarCommand, latexCode);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toolbarCommand, latexCode]);
 
   const [fontSizeInput, setFontSizeInput] = useState(String(currentFontSize));
@@ -2490,6 +2492,17 @@ export function LatexResumeTailorApp() {
                     ) : (
                       <SearchCheck className="h-3.5 w-3.5" />
                     )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2.5"
+                    disabled={!user || lastCompileSuccess !== true}
+                    onClick={openPortfolioGenerator}
+                    title="Generate Portfolio Website"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     type="button"
@@ -3340,26 +3353,52 @@ function isValidModel(model: unknown): model is string {
   return typeof model === "string" && MODEL_OPTIONS.some((opt) => opt.model === model);
 }
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
+function setCookie(name: string, value: string, days = 365) {
+  if (typeof document === "undefined") return;
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Strict`;
+}
+
 function readCachedLlmSettings(): LlmSettings | undefined {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
+  if (typeof window === "undefined") return undefined;
 
   try {
-    const cachedValue = window.localStorage.getItem(LLM_SETTINGS_CACHE_KEY);
+    const provider = getCookie("llm_provider");
+    const model = getCookie("llm_model");
+    const geminiKey = getCookie("gemini_api_key");
+    const groqKey = getCookie("groq_api_key");
+    const claudeKey = getCookie("claude_api_key");
 
+    if (provider || model || geminiKey || groqKey || claudeKey) {
+      return {
+        provider: (["gemini", "groq", "claude"].includes(provider ?? "") ? provider : "gemini") as LlmProvider,
+        model: isValidModel(model) ? model : "gemini-2.5-pro",
+        geminiApiKey: geminiKey ?? "",
+        groqApiKey: groqKey ?? "",
+        claudeApiKey: claudeKey ?? "",
+      };
+    }
+
+    const cachedValue = window.localStorage.getItem(LLM_SETTINGS_CACHE_KEY);
     if (cachedValue) {
       const parsed = JSON.parse(cachedValue) as Record<string, unknown>;
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return {
-          provider: (["gemini", "groq", "claude"].includes(parsed.provider as string)
-            ? parsed.provider
-            : "gemini") as LlmProvider,
+        const migrated: LlmSettings = {
+          provider: (["gemini", "groq", "claude"].includes(parsed.provider as string) ? parsed.provider : "gemini") as LlmProvider,
           model: isValidModel(parsed.model) ? parsed.model : "gemini-2.5-pro",
           geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
           groqApiKey: typeof parsed.groqApiKey === "string" ? parsed.groqApiKey : "",
           claudeApiKey: typeof parsed.claudeApiKey === "string" ? parsed.claudeApiKey : "",
         };
+        writeCachedLlmSettings(migrated);
+        window.localStorage.removeItem(LLM_SETTINGS_CACHE_KEY);
+        return migrated;
       }
     }
 
@@ -3367,13 +3406,16 @@ function readCachedLlmSettings(): LlmSettings | undefined {
     if (legacyValue) {
       const legacy = JSON.parse(legacyValue) as Record<string, unknown>;
       if (legacy && typeof legacy === "object") {
-        return {
+        const migrated: LlmSettings = {
           provider: "gemini",
           model: isValidModel(legacy.model) ? legacy.model : "gemini-2.5-pro",
           geminiApiKey: typeof legacy.apiKey === "string" ? legacy.apiKey : "",
           groqApiKey: "",
           claudeApiKey: "",
         };
+        writeCachedLlmSettings(migrated);
+        window.localStorage.removeItem(LEGACY_GEMINI_SETTINGS_KEY);
+        return migrated;
       }
     }
 
@@ -3384,11 +3426,11 @@ function readCachedLlmSettings(): LlmSettings | undefined {
 }
 
 function writeCachedLlmSettings(settings: LlmSettings) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(LLM_SETTINGS_CACHE_KEY, JSON.stringify(settings));
+  setCookie("llm_provider", settings.provider);
+  setCookie("llm_model", settings.model);
+  setCookie("gemini_api_key", settings.geminiApiKey);
+  setCookie("groq_api_key", settings.groqApiKey);
+  setCookie("claude_api_key", settings.claudeApiKey);
 }
 
 function writeCachedProjectDrafts(projects: ProjectDraft[]) {
