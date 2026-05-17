@@ -9,8 +9,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Resume Tailor",
+  title: "AURABIO",
   description: "Tailor a resume to a JD with editable AI suggestions.",
+  icons: {
+    icon: "/aurabio-refined-logo.png",
+  },
 };
 
 export default function RootLayout({

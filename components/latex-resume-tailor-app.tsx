@@ -977,7 +977,7 @@ export function LatexResumeTailorApp() {
         break;
       }
     }
-    
+
     if (diffPos !== -1 && editorViewRef.current) {
       // Wait for React to apply the state change
       requestAnimationFrame(() => {
@@ -2230,23 +2230,20 @@ export function LatexResumeTailorApp() {
               animate={{ width: 280, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="flex h-full flex-col overflow-hidden border-r bg-white"
+              className="flex h-full flex-col overflow-hidden border-r border-slate-700/60 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950"
               style={{ minWidth: 0 }}
             >
-              <div className="flex items-center justify-between border-b px-3 py-2">
+              <div className="flex items-center justify-between border-b border-slate-700/60 px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="text-sm font-semibold">Projects</h2>
+                  <FolderOpen className="h-4 w-4 text-slate-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">Projects</h2>
                 </div>
                 <div className="flex items-center gap-1">
                   {user ? (
-                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={createNewProject} title="New Project">
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-300 hover:text-white hover:bg-slate-800" onClick={createNewProject} title="New Project">
                       <FilePlus className="h-4 w-4" />
                     </Button>
                   ) : null}
-                  {/* <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSidebarOpen(false)}>
-                    <X className="h-4 w-4" />
-                  </Button> */}
                 </div>
               </div>
               {user ? (
@@ -2254,17 +2251,20 @@ export function LatexResumeTailorApp() {
                   <ScrollArea className="flex-1">
                     <div className="p-2">
                       {supabaseProjects.length === 0 ? (
-                        <p className="px-2 py-4 text-center text-sm text-muted-foreground">No projects yet. Create one to get started.</p>
+                        <p className="px-2 py-4 text-center text-sm text-slate-400">No projects yet. Create one to get started.</p>
                       ) : (
                         supabaseProjects.map((project) => (
                           <div
                             key={project.id}
-                            className={`group flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted ${activeProjectId === project.id ? "bg-muted font-medium" : ""}`}
+                            className={`group flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-sm transition-all duration-150 ${activeProjectId === project.id
+                              ? "bg-gradient-to-r from-emerald-500/12 via-emerald-500/5 to-transparent border-l-emerald-450 text-white font-medium"
+                              : "border-l-transparent hover:bg-slate-800/40 hover:text-white text-slate-350"
+                              }`}
                             onClick={() => { if (renamingProjectId !== project.id) loadProjectIntoEditor(project); }}
                           >
                             {renamingProjectId === project.id ? (
                               <input
-                                className="flex-1 rounded border bg-background px-1.5 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                                className="flex-1 rounded border border-slate-700 bg-slate-950/60 text-slate-200 px-1.5 py-0.5 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
                                 value={renameValue}
                                 onChange={(e) => setRenameValue(e.target.value)}
                                 onBlur={() => { if (renameValue.trim()) renameProject(project.id, renameValue.trim()); setRenamingProjectId(null); }}
@@ -2274,18 +2274,18 @@ export function LatexResumeTailorApp() {
                               />
                             ) : (
                               <>
-                                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                <FileText className={`h-4 w-4 shrink-0 transition-colors ${activeProjectId === project.id ? "text-emerald-400" : "text-slate-400 group-hover:text-slate-300"}`} />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate">{project.name}</p>
-                                  <p className="truncate text-xs text-muted-foreground">
+                                  <p className={`truncate text-sm transition-colors ${activeProjectId === project.id ? "text-white" : "text-slate-300 group-hover:text-slate-100"}`}>{project.name}</p>
+                                  <p className={`truncate text-xs transition-colors ${activeProjectId === project.id ? "text-emerald-400/80" : "text-slate-500"}`}>
                                     {new Date(project.updated_at).toLocaleDateString()}
                                   </p>
                                 </div>
                                 <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setRenamingProjectId(project.id); setRenameValue(project.name); }}>
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-slate-450 hover:text-white hover:bg-slate-700" onClick={(e) => { e.stopPropagation(); setRenamingProjectId(project.id); setRenameValue(project.name); }}>
                                     <Pencil className="h-3 w-3" />
                                   </Button>
-                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}>
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-rose-450 hover:text-rose-350 hover:bg-rose-950/30" onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}>
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
@@ -2296,8 +2296,8 @@ export function LatexResumeTailorApp() {
                       )}
                     </div>
                   </ScrollArea>
-                  <div className="border-t p-2">
-                    <Button type="button" variant="ghost" size="sm" className="w-full gap-2 text-muted-foreground" onClick={handleSignOut}>
+                  <div className="border-t border-slate-750 p-2">
+                    <Button type="button" variant="ghost" size="sm" className="w-full gap-2 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" onClick={handleSignOut}>
                       <LogOut className="h-3.5 w-3.5" />
                       Sign Out
                     </Button>
@@ -2305,8 +2305,8 @@ export function LatexResumeTailorApp() {
                 </>
               ) : (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4">
-                  <p className="text-center text-sm text-muted-foreground">Sign in to save and manage your resume projects in the cloud.</p>
-                  <Button type="button" className="gap-2" onClick={() => { setAuthModalOpen(true); setAuthMode("signin"); }}>
+                  <p className="text-center text-sm text-slate-400">Sign in to save and manage your resume projects in the cloud.</p>
+                  <Button type="button" className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 border-0 text-white font-semibold transition-all shadow-md shadow-emerald-950/20" onClick={() => { setAuthModalOpen(true); setAuthMode("signin"); }}>
                     <LogIn className="h-4 w-4" />
                     Sign In
                   </Button>
@@ -2318,29 +2318,29 @@ export function LatexResumeTailorApp() {
         <div className="flex flex-1 min-h-0 min-w-0 flex-col">
           <div className="mx-auto flex min-h-0 w-full flex-1 flex-col items-stretch gap-5 px-4 py-5 xl:flex-row xl:items-stretch">
             <section className="flex w-full min-w-0 flex-1 min-h-0 flex-col rounded-md border bg-white xl:min-h-0">
-              <div className="flex flex-wrap items-center gap-2 border-b bg-white px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-700/60 bg-slate-800 px-3 py-2">
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 shrink-0"
+                    className="h-8 w-8 shrink-0 text-slate-300 hover:text-white hover:bg-slate-700"
                     onClick={() => setSidebarOpen((prev) => !prev)}
                     aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
                   >
                     {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
                   </Button>
                   <Image
-                    src="/resume-tailor.png"
-                    alt="Resume Tailor"
+                    src="/aurabio-refined-logo.png?v=3"
+                    alt="AURABIO"
                     width={120}
-                    height={18}
-                    className="h-8 w-auto"
+                    height={36}
+                    className="h-9 w-auto"
                     priority
                   />
                 </div>
 
-                <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
+                <span className="mx-0.5 hidden h-5 w-px bg-slate-700/60 sm:block" />
 
                 {/* Editor Toolbar */}
                 <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -2348,17 +2348,17 @@ export function LatexResumeTailorApp() {
                     <select
                       value={toolbarCommand}
                       onChange={(e) => setToolbarCommand(e.target.value as FormattingType)}
-                      className="h-8 w-32 truncate rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="h-8 w-32 truncate rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
                     >
-                      <option value="header-name">Header Name</option>
-                      <option value="section">Section</option>
-                      <option value="resumeSubheading">Subheading</option>
-                      <option value="resumeProjectHeading">Project Head</option>
-                      <option value="resumeItem">Bullet Item</option>
-                      <option value="normal-text">Normal Text</option>
+                      <option value="header-name" className="bg-slate-800 text-slate-100">Header Name</option>
+                      <option value="section" className="bg-slate-800 text-slate-100">Section</option>
+                      <option value="resumeSubheading" className="bg-slate-800 text-slate-100">Subheading</option>
+                      <option value="resumeProjectHeading" className="bg-slate-800 text-slate-100">Project Head</option>
+                      <option value="resumeItem" className="bg-slate-800 text-slate-100">Bullet Item</option>
+                      <option value="normal-text" className="bg-slate-800 text-slate-100">Normal Text</option>
                     </select>
                     <div
-                      className="relative flex h-8 w-20 items-center rounded-md border border-input bg-background text-sm select-none"
+                      className="relative flex h-8 w-20 items-center rounded-md border border-slate-700 bg-slate-900/60 text-sm select-none text-slate-100"
                       style={{ cursor: "ew-resize" }}
                       onPointerDown={(e) => {
                         if (isFontSizeEditing) return;
@@ -2380,7 +2380,7 @@ export function LatexResumeTailorApp() {
                       }}
                     >
                       <input
-                        className="h-full w-full bg-transparent px-2 text-center text-sm outline-none"
+                        className="h-full w-full bg-transparent px-2 text-center text-sm outline-none text-slate-100"
                         style={{ cursor: isFontSizeEditing ? "text" : "ew-resize" }}
                         value={isFontSizeEditing ? fontSizeInput : `${currentFontSize}pt`}
                         onFocus={() => {
@@ -2405,14 +2405,13 @@ export function LatexResumeTailorApp() {
                     </div>
                   </div>
 
-                  <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+                  <span className="mx-1 hidden h-5 w-px bg-slate-700/60 sm:block" />
 
                   <div className="flex items-center gap-1">
                     <Button
                       type="button"
-                      variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0 font-bold"
+                      className="h-8 w-8 p-0 font-bold bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                       onClick={insertLatexBold}
                       title="Bold (\\textbf{})"
                     >
@@ -2420,9 +2419,8 @@ export function LatexResumeTailorApp() {
                     </Button>
                     <Button
                       type="button"
-                      variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0 italic"
+                      className="h-8 w-8 p-0 italic bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                       onClick={insertLatexItalic}
                       title="Italic (\\textit{})"
                     >
@@ -2432,9 +2430,8 @@ export function LatexResumeTailorApp() {
                     <div className="relative" data-formatting-menu>
                       <Button
                         type="button"
-                        variant="outline"
                         size="sm"
-                        className="h-8 gap-1 px-2"
+                        className="h-8 gap-1 px-2 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                         onClick={() => setFormattingMenuOpen((v) => !v)}
                         title="Formatting"
                       >
@@ -2442,7 +2439,7 @@ export function LatexResumeTailorApp() {
                         <ChevronDown className="h-3 w-3" />
                       </Button>
                       {formattingMenuOpen ? (
-                        <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border bg-white py-1 shadow-lg">
+                        <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border border-slate-700 bg-slate-900 py-1 shadow-lg text-slate-200">
                           {([
                             { type: "header-name" as FormattingType, label: "Header Name" },
                             { type: "section" as FormattingType, label: "Section" },
@@ -2454,7 +2451,7 @@ export function LatexResumeTailorApp() {
                             <button
                               key={item.type}
                               type="button"
-                              className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-muted ${toolbarCommand === item.type ? "bg-muted/60 font-medium" : ""}`}
+                              className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-slate-800 hover:text-white ${toolbarCommand === item.type ? "bg-slate-800/80 text-emerald-400 font-semibold" : ""}`}
                               onClick={() => {
                                 setToolbarCommand(item.type);
                                 setFormattingMenuOpen(false);
@@ -2472,9 +2469,8 @@ export function LatexResumeTailorApp() {
 
                     <Button
                       type="button"
-                      variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                       onClick={insertBulletList}
                       title="Bullet list (\\begin{itemize})"
                     >
@@ -2482,9 +2478,8 @@ export function LatexResumeTailorApp() {
                     </Button>
                     <Button
                       type="button"
-                      variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                       onClick={insertNumberedList}
                       title="Numbered list (\\begin{enumerate})"
                     >
@@ -2492,9 +2487,8 @@ export function LatexResumeTailorApp() {
                     </Button>
                     <Button
                       type="button"
-                      variant="outline"
                       size="sm"
-                      className="h-8 gap-1 px-2"
+                      className="h-8 gap-1 px-2 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                       onClick={handleFindReplace}
                       title="Find & Replace"
                     >
@@ -2505,11 +2499,11 @@ export function LatexResumeTailorApp() {
 
                 {user && activeProjectId ? (
                   <>
-                    <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
+                    <span className="mx-0.5 hidden h-5 w-px bg-slate-700/60 sm:block" />
                     <div className="flex items-center gap-1">
                       {editingProjectName ? (
                         <input
-                          className="h-7 w-40 rounded border border-input bg-background px-2 text-center text-xs outline-none focus:ring-1 focus:ring-ring"
+                          className="h-7 w-40 rounded border border-slate-700 bg-slate-900/60 text-slate-200 px-2 text-center text-xs outline-none focus:ring-1 focus:ring-emerald-500"
                           value={projectNameInput}
                           onChange={(e) => setProjectNameInput(e.target.value)}
                           onBlur={() => { if (projectNameInput.trim()) { renameProject(activeProjectId, projectNameInput.trim()); } setEditingProjectName(false); }}
@@ -2519,11 +2513,11 @@ export function LatexResumeTailorApp() {
                       ) : (
                         <button
                           type="button"
-                          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
                           onClick={() => { setEditingProjectName(true); setProjectNameInput(currentProjectName); }}
                         >
                           <span className="max-w-[160px] truncate">{currentProjectName}</span>
-                          <Pencil className="h-2.5 w-2.5" />
+                          <Pencil className="h-2.5 w-2.5 text-slate-400" />
                         </button>
                       )}
                       {savingProject ? <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" /> : null}
@@ -2535,9 +2529,8 @@ export function LatexResumeTailorApp() {
                   {!user && !authLoading ? (
                     <Button
                       type="button"
-                      variant="outline"
                       size="sm"
-                      className="h-8 gap-1.5 px-2.5"
+                      className="h-8 gap-1.5 px-2.5 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                       onClick={() => { setAuthModalOpen(true); setAuthMode("signin"); }}
                     >
                       <LogIn className="h-3.5 w-3.5" />
@@ -2546,15 +2539,14 @@ export function LatexResumeTailorApp() {
                   ) : null}
                   <Button
                     type="button"
-                    variant="outline"
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                     onClick={() => setGeminiSettingsOpen(true)}
                     title="AI Model Settings"
                   >
                     <KeyRound className="h-3.5 w-3.5" />
                   </Button>
-                  <label className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm shadow-sm hover:bg-muted" title="Upload .tex file">
+                  <label className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-slate-700 bg-slate-700/40 text-sm shadow-sm text-slate-200 hover:text-white hover:bg-slate-700 transition-all duration-150" title="Upload .tex file">
                     <input
                       type="file"
                       accept=".tex,application/x-tex,text/x-tex,text/plain"
@@ -2567,14 +2559,13 @@ export function LatexResumeTailorApp() {
                       <Upload className="h-3.5 w-3.5" />
                     )}
                   </label>
-                  <Button type="button" variant="outline" size="sm" className="h-8 w-8 p-0" onClick={downloadLatexSource} title="Download .tex source">
+                  <Button type="button" size="sm" className="h-8 w-8 p-0 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150" onClick={downloadLatexSource} title="Download .tex source">
                     <Code2 className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white disabled:bg-slate-800/40 disabled:border-slate-800/30 disabled:text-slate-500 transition-all shadow-sm duration-150"
                     onClick={auditResume}
                     disabled={auditing || resumeSections.length === 0}
                     title="ATS Audit"
@@ -2587,9 +2578,8 @@ export function LatexResumeTailorApp() {
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5 px-2.5"
+                    className="h-8 gap-1.5 px-2.5 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white disabled:bg-slate-800/40 disabled:border-slate-800/30 disabled:text-slate-500 transition-all shadow-sm duration-150"
                     disabled={!user || lastCompileSuccess !== true}
                     onClick={openPortfolioGenerator}
                     title="Generate Portfolio Website"
@@ -2599,7 +2589,7 @@ export function LatexResumeTailorApp() {
                   <Button
                     type="button"
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 border-0 text-white font-semibold transition-all shadow-md shadow-emerald-950/20 disabled:bg-slate-800/40 disabled:text-slate-500 disabled:border-0"
                     onClick={downloadResumePdf}
                     disabled={!canCompilePdf || downloading}
                     title={
@@ -2616,10 +2606,9 @@ export function LatexResumeTailorApp() {
                   </Button>
                   <Button
                     type="button"
-                    variant={isInputPanelOpen ? "default" : "outline"}
                     onClick={() => setIsInputPanelOpen((current) => !current)}
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className={`h-8 w-8 p-0 transition-all shadow-sm border duration-150 ${isInputPanelOpen ? "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-500" : "bg-slate-700/40 border-slate-700/60 text-slate-200 hover:bg-slate-700 hover:text-white"}`}
                     aria-label={isInputPanelOpen ? "Hide input panel" : "Show input panel"}
                     title={isInputPanelOpen ? "Hide input panel" : "Show input panel"}
                   >
