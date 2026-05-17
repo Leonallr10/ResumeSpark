@@ -2815,16 +2815,16 @@ export function LatexResumeTailorApp() {
                           )}
                         </Button>
                       </div>
-                      {/* <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-7 gap-1 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100"
-                    onClick={() => setPreviewZoom(100)}
-                    aria-label="Reset preview zoom"
-                  >
-                    {previewZoom}%
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </Button> */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100"
+                        onClick={() => setPreviewZoom(100)}
+                        aria-label="Reset preview zoom"
+                        title="Reset zoom to 100%"
+                      >
+                        {previewZoom}%
+                      </Button>
                     </div>
 
                     {/* Diagnostics Panel */}

@@ -1,6 +1,6 @@
 # Resume Tailor
 
-A production-grade Next.js web application for tailoring resumes to specific job descriptions using AI. Users edit resumes in LaTeX, receive intelligent JD-aligned suggestions from multiple LLM providers, polish text inline, compile to PDF, and download publication-ready resumes.
+A production-grade Next.js web application for tailoring resumes to specific job descriptions using AI and generating deployable portfolio websites. Users edit resumes in LaTeX, receive intelligent JD-aligned suggestions from multiple LLM providers, polish text inline, compile to PDF, download publication-ready resumes, and generate single-page HTML portfolios with one-click deployment to Netlify or Vercel.
 
 ---
 
@@ -44,6 +44,10 @@ A production-grade Next.js web application for tailoring resumes to specific job
 - **Download** — Export as compiled PDF or raw `.tex` source
 - **Formatting Toolbar** — Insert LaTeX commands for sections, subheadings, project headings, bullet items, and text formatting
 - **Diagnostics Panel** — Clickable compilation errors/warnings with line numbers for direct editor navigation
+- **Portfolio Generator** — Generate a single-page HTML portfolio from resume data with live preview, profile image upload, and editable sections (intro, GitHub stats, LeetCode stats, experience timeline, projects grid, education & skills, certificates)
+- **Portfolio Deployment** — One-click deploy to Netlify or Vercel using personal access tokens
+- **Portfolio View More/Less** — Projects grid shows first 6 entries with a "View More Projects" toggle for additional entries
+- **Portfolio Recompile** — Committed/uncommitted state pattern prevents preview refresh on every keystroke; updates only on explicit Recompile click
 - **Dark Mode** — Full dark theme support via Tailwind CSS class strategy
 - **Responsive Layout** — Adjustable split-pane editor/preview with resizable panels
 
@@ -102,9 +106,23 @@ A production-grade Next.js web application for tailoring resumes to specific job
 │  │          SyncTeX Engine (--synctex=1 flag)                    │   │
 │  └───────────────────────────────────────────────────────────────┘   │
 │                                                                      │
+│  ┌────────────┐  ┌──────────────────┐  ┌──────────────────────────┐  │
+│  │/portfolio/ │  │/portfolio/deploy/ │  │ /portfolio/github|       │  │
+│  │  github    │  │ netlify | vercel  │  │          leetcode        │  │
+│  └────────────┘  └──────────────────┘  └──────────────────────────┘  │
+│                                                                      │
 │  ┌───────────────────────────────────────────────────────────────┐   │
 │  │          Supabase (Auth, PostgreSQL, RLS)                     │   │
 │  │          - resume_projects, resume_settings, resume_drafts    │   │
+│  │          - resume_project_drafts, portfolio_data              │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │          External APIs                                        │   │
+│  │          - Netlify API (site deploy)                          │   │
+│  │          - Vercel API (deployment)                            │   │
+│  │          - GitHub (contribution graph, profile stats)          │   │
+│  │          - LeetCode GraphQL (submission stats)                │   │
 │  └───────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -119,16 +137,27 @@ resume-generator/
 │   ├── layout.tsx                # Root layout (Inter font, metadata)
 │   ├── page.tsx                  # Home page entry point
 │   ├── globals.css               # Global styles and Tailwind base
-│   └── api/resume/               # Backend API routes
-│       ├── suggestions/route.ts  # AI resume suggestion generation
-│       ├── polish/route.ts       # Streaming text polish
-│       ├── compile-latex/route.ts# LaTeX → PDF compilation (+ SyncTeX)
-│       ├── audit/route.ts        # ATS resume audit
-│       ├── preview/[id]/route.ts # Cached PDF preview retrieval
-│       ├── synctex/[id]/route.ts # SyncTeX mapping data endpoint
-│       └── test-key/route.ts     # API key validation
+│   ├── portfolio-generate/       # Portfolio generator page
+│   │   └── page.tsx              # Portfolio generator route
+│   └── api/
+│       ├── resume/               # Resume API routes
+│       │   ├── suggestions/route.ts  # AI resume suggestion generation
+│       │   ├── polish/route.ts       # Streaming text polish
+│       │   ├── compile-latex/route.ts# LaTeX → PDF compilation (+ SyncTeX)
+│       │   ├── audit/route.ts        # ATS resume audit
+│       │   ├── preview/[id]/route.ts # Cached PDF preview retrieval
+│       │   ├── synctex/[id]/route.ts # SyncTeX mapping data endpoint
+│       │   └── test-key/route.ts     # API key validation
+│       └── portfolio/            # Portfolio API routes
+│           ├── github/route.ts   # GitHub profile & contribution stats
+│           ├── leetcode/route.ts # LeetCode submission stats
+│           └── deploy/
+│               ├── netlify/route.ts  # Deploy HTML to Netlify
+│               └── vercel/route.ts   # Deploy HTML to Vercel
 ├── components/                   # React components
-│   ├── latex-resume-tailor-app.tsx    # Main application (orchestrator)
+│   ├── latex-resume-tailor-app.tsx    # Main resume application (orchestrator)
+│   ├── portfolio-generator.tsx        # Portfolio generator (editor + preview)
+│   ├── portfolio-generator-loader.tsx # Dynamic import loader for portfolio
 │   ├── pdf-canvas-viewer.tsx          # PDF.js canvas viewer with SyncTeX
 │   ├── latex-resume-preview.tsx       # A4 resume preview renderer
 │   ├── latex-project-fields.tsx       # Project draft form/JSON editor
@@ -151,6 +180,7 @@ resume-generator/
 ├── lib/                          # Core logic and utilities
 │   ├── latex-resume.ts           # LaTeX parsing, manipulation, templates
 │   ├── resume.ts                 # Resume data structures and operations
+│   ├── portfolio.ts              # Portfolio HTML generation and storage
 │   ├── pdf.ts                    # PDF text extraction and layout analysis
 │   ├── pdf-cache.ts              # In-memory PDF + SyncTeX cache
 │   ├── synctex-parser.ts         # SyncTeX format parser + forward/inverse sync
@@ -161,12 +191,14 @@ resume-generator/
 │   └── utils.ts                  # Tailwind class merge utility
 ├── types/                        # TypeScript type definitions
 │   ├── resume.ts                 # Core domain types
+│   ├── portfolio.ts              # Portfolio data types
 │   ├── latex-diagnostics.ts      # Compiler diagnostic types
 │   └── html2pdf.d.ts             # html2pdf.js type declarations
 ├── prompts/                      # Standalone AI prompt references
 │   └── standalone-gemini-resume-optimizer.md
 ├── public/
-│   └── resume-tailor.png         # App logo/screenshot
+│   ├── resume-tailor.png         # App logo/screenshot
+│   └── portfolio.html            # Portfolio HTML template (DM Sans headings)
 ├── .env.example                  # Environment template
 ├── package.json
 ├── tsconfig.json
@@ -227,7 +259,7 @@ pnpm dev
 | `NEXT_PUBLIC_SUPABASE_URL` | For auth/persistence | Supabase project URL (e.g., `https://<ref>.supabase.co`) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | For auth/persistence | Supabase publishable anon key |
 
-At minimum, one LLM provider key is needed. Users can also supply LLM keys via the in-app settings panel (stored per-user in Supabase, sent per-request).
+At minimum, one LLM provider key is needed. Users can also supply LLM keys via the in-app settings panel (stored in browser cookies with `SameSite=Strict`, sent per-request).
 
 Supabase variables are optional — without them, the app runs in local-only mode (localStorage persistence, no auth).
 
@@ -505,6 +537,119 @@ Validates an API key against a provider by making a minimal generation request.
 
 ---
 
+### GET `/api/portfolio/github`
+
+Fetches GitHub profile stats and contribution calendar for a username.
+
+**Query Parameters:** `username` — GitHub username
+
+**Response:**
+```json
+{
+  "contributions": 1234,
+  "repos": 42,
+  "stars": "156",
+  "contributionCalendar": [{ "date": "2025-01-01", "count": 3 }, ...]
+}
+```
+
+**Method:**
+1. Fetches the GitHub contributions page HTML
+2. Parses contribution calendar SVG cells (`data-date`, `data-level`/`data-count`)
+3. Scrapes profile stats (repos, stars, contribution count) from profile page
+4. Returns structured stats with 365-day contribution history
+
+**Error:** `400` (missing username), `500` (fetch failure)
+
+---
+
+### GET `/api/portfolio/leetcode`
+
+Fetches LeetCode submission statistics for a username via LeetCode GraphQL API.
+
+**Query Parameters:** `username` — LeetCode username
+
+**Response:**
+```json
+{
+  "totalSolved": 250,
+  "easy": { "solved": 100, "total": 800 },
+  "medium": { "solved": 120, "total": 1700 },
+  "hard": { "solved": 30, "total": 750 },
+  "ranking": 50000,
+  "streak": 15,
+  "globalPercentile": "5.2%"
+}
+```
+
+**Method:**
+1. Queries LeetCode GraphQL API (`leetcode.com/graphql`) with `getUserProfile` query
+2. Extracts submission stats by difficulty, ranking, and reputation
+3. Calculates global percentile from ranking
+
+**Error:** `400` (missing username), `404` (user not found), `500` (API failure)
+
+---
+
+### POST `/api/portfolio/deploy/netlify`
+
+Deploys portfolio HTML to Netlify as a static site.
+
+**Request Body:**
+```json
+{
+  "token": "string (Netlify personal access token)",
+  "html": "string (complete HTML document)",
+  "siteName": "string (optional, slug for site URL)",
+  "siteId": "string (optional, existing site ID for redeployment)"
+}
+```
+
+**Response:**
+```json
+{
+  "url": "https://my-portfolio-abc123.netlify.app",
+  "siteId": "site-id-for-redeployment"
+}
+```
+
+**Method:**
+1. If no `siteId`: creates a new Netlify site via `POST /api/v1/sites`
+2. Deploys HTML as `index.html` via Netlify's file digest deploy API
+3. Returns live URL and site ID (for subsequent redeployments)
+
+**Error:** `400` (missing token/html), `500` (Netlify API failure)
+
+---
+
+### POST `/api/portfolio/deploy/vercel`
+
+Deploys portfolio HTML to Vercel as a static deployment.
+
+**Request Body:**
+```json
+{
+  "token": "string (Vercel personal access token)",
+  "html": "string (complete HTML document)",
+  "projectName": "string (optional, deployment project name)"
+}
+```
+
+**Response:**
+```json
+{
+  "url": "https://my-portfolio-abc123.vercel.app"
+}
+```
+
+**Method:**
+1. Creates a Vercel deployment via `POST /v13/deployments` with `index.html` file
+2. Returns the live deployment URL
+
+**Error:** `400` (missing token/html), `500` (Vercel API failure)
+
+---
+
 ## Core Libraries
 
 ### `lib/latex-resume.ts`
@@ -662,8 +807,41 @@ Uses `createBrowserClient()` from `@supabase/ssr` with `NEXT_PUBLIC_SUPABASE_URL
 | Table | Purpose | RLS |
 |-------|---------|-----|
 | `resume_projects` | Per-user resume projects (LaTeX source, company/role, JD) | Yes — `user_id = auth.uid()` |
-| `resume_settings` | Per-user LLM provider/model/API key preferences | Yes — `user_id = auth.uid()` |
+| `resume_settings` | Per-user LLM provider and model preferences (no API keys) | Yes — `user_id = auth.uid()` |
 | `resume_drafts` | Per-user project draft data | Yes — `user_id = auth.uid()` |
+| `resume_project_drafts` | Per-user project drafts linked to resume projects | Yes — `user_id = auth.uid()` |
+| `portfolio_data` | Per-user portfolio customizations (jsonb) | Yes — `user_id = auth.uid()` |
+
+---
+
+### `lib/portfolio.ts`
+
+Portfolio HTML generation engine. Converts structured `PortfolioData` into a complete, self-contained HTML page.
+
+| Export | Description |
+|--------|-------------|
+| `generatePortfolioHtml(data: PortfolioData, templateHtml: string): string` | Main entry: builds complete HTML page from portfolio data and template |
+| `portfolioToStorage(data: PortfolioData): object` | Serializes portfolio data for Supabase storage |
+| `portfolioFromStorage(raw: unknown): PortfolioData` | Deserializes stored data back to `PortfolioData` |
+| `createDefaultPortfolioData(): PortfolioData` | Returns empty portfolio data with default section structure |
+| `extractPortfolioFromResume(sections: ResumeSection[], drafts: ProjectDraft[]): Partial<PortfolioData>` | Extracts portfolio-compatible data from parsed LaTeX resume sections and project drafts |
+
+**HTML Builder Functions (internal):**
+| Function | Generates |
+|----------|-----------|
+| `buildIntroHtml()` | Hero section with name, headline, description, social links, profile image, availability tag |
+| `buildGitHubHtml()` | GitHub contribution calendar heatmap + stats (contributions, repos, stars) |
+| `buildLeetCodeHtml()` | LeetCode stats with progress rings (easy/medium/hard) and ranking |
+| `buildExperienceHtml()` | Timeline with role, company, period, and description entries |
+| `buildProjectsHtml()` | Project cards grid (first 6 visible, rest behind "View More" toggle) |
+| `buildEducationHtml()` | Education entries + skills categories + certificates |
+| `buildFooterScripts()` | JavaScript for reveal animations (IntersectionObserver), timeline progress bar (`requestAnimationFrame`), and project toggle |
+
+**View More/Less Projects:**
+- First 6 project entries rendered in the main grid
+- Entries 7+ wrapped in `<div id="extra-projects" style="display:none">`
+- Toggle button with rotating chevron icon
+- `toggleProjects()` JS function toggles visibility and button text
 
 ---
 
@@ -822,6 +1000,36 @@ Canvas-based PDF viewer using `pdfjs-dist` with bidirectional SyncTeX navigation
 - Style: `bg-yellow-300/40` (semi-transparent yellow overlay)
 - Position computed from `highlightRect` coordinates × zoom scale
 - Auto-fades after 2 seconds via `useEffect` + `setTimeout`
+
+---
+
+### `PortfolioGenerator` — Portfolio Editor & Preview
+
+The portfolio generator component with a two-pane editor/preview layout.
+
+**Key Responsibilities:**
+- Form-based editing of all portfolio sections (intro, GitHub, LeetCode, experience, projects, education)
+- Live HTML preview via iframe with `srcdoc`
+- Committed/uncommitted state pattern (preview only updates on Recompile)
+- Fetches resume data from Supabase on mount (parses LaTeX, extracts portfolio entries)
+- Profile image upload (Base64)
+- GitHub and LeetCode stat fetching via API routes
+- Save/load portfolio data to/from Supabase `portfolio_data` table
+- Deploy dropdown (Netlify/Vercel with personal access token input)
+
+**State Pattern:**
+| State | Purpose |
+|-------|---------|
+| `data` | Live editing state (updates on every keystroke, auto-saved to localStorage) |
+| `committedData` | Preview state (only updates on Recompile click or initial load) |
+
+**Mount Behavior:**
+1. Gets authenticated user from Supabase auth
+2. Fetches saved portfolio data from `portfolio_data` table
+3. Fetches latest resume from `resume_projects` + `resume_project_drafts`
+4. Parses LaTeX via `parseLatexResume()`, extracts portfolio via `extractPortfolioFromResume()`
+5. Merges resume-extracted data with saved customizations (profile image, usernames)
+6. Sets both `data` and `committedData`
 
 ---
 
@@ -994,6 +1202,61 @@ type PolishState = {
 } | null;
 ```
 
+### Portfolio Types (`types/portfolio.ts`)
+
+```typescript
+type SocialLink = {
+  platform: "github" | "linkedin" | "twitter" | "email" | "website" | "leetcode";
+  url: string;
+};
+
+type IntroSection = {
+  name: string;
+  headline: string;
+  description: string;
+  availabilityTag: string;
+  profileImageBase64: string | null;
+  socialLinks: SocialLink[];
+  resumeLink: string;
+};
+
+type GitHubSection = {
+  username: string;
+  contributions: number;
+  repos: number;
+  stars: string;
+  contributionCalendar?: GitHubContributionDay[];
+};
+
+type LeetCodeSection = {
+  username: string;
+  totalSolved: number;
+  easy: { solved: number; total: number };
+  medium: { solved: number; total: number };
+  hard: { solved: number; total: number };
+  ranking: number;
+  streak: number;
+  globalPercentile: string;
+};
+
+type ExperienceEntry = { role: string; company: string; period: string; description: string };
+type ProjectEntry = { title: string; description: string; tech: string; link: string };
+type EducationEntry = { degree: string; institution: string; period: string; description: string };
+type SkillCategory = { name: string; skills: string[] };
+type CertificateEntry = { title: string; provider: string; year: string };
+
+type PortfolioData = {
+  intro: IntroSection;
+  github: GitHubSection;
+  leetcode: LeetCodeSection;
+  experience: { entries: ExperienceEntry[] };
+  projects: { entries: ProjectEntry[] };
+  education: { entries: EducationEntry[]; skills: SkillCategory[]; certificates: CertificateEntry[] };
+};
+```
+
+---
+
 ### LaTeX Diagnostics (`types/latex-diagnostics.ts`)
 
 ```typescript
@@ -1086,6 +1349,42 @@ LaTeX Input → parseLatexResume() splits by \section{}
 7. Diagnostics (if any) shown as inline editor annotations
 ```
 
+### Portfolio Generation Flow
+
+```
+1. User navigates to /portfolio-generate
+2. Component mounts:
+   a. Fetches portfolio_data from Supabase (saved customizations)
+   b. Fetches latest resume from resume_projects + resume_project_drafts
+   c. Parses LaTeX → parseLatexResume() → ResumeSection[]
+   d. Extracts portfolio entries → extractPortfolioFromResume()
+   e. Merges: resume data + saved customizations → PortfolioData
+   f. Sets both data (editing) and committedData (preview)
+3. User edits fields → data updates (localStorage auto-save) → preview stays frozen
+4. User clicks Recompile → committedData = data → iframe refreshes
+5. Save: upserts to portfolio_data table in Supabase
+6. Deploy:
+   a. User enters Netlify/Vercel personal access token
+   b. Client sends POST /api/portfolio/deploy/{netlify|vercel}
+   c. Returns live URL
+```
+
+### Portfolio HTML Structure
+
+```
+Generated HTML:
+- Tailwind CSS (CDN) + DM Sans + JetBrains Mono (Google Fonts)
+- Intro section: hero with profile image, social links, availability badge
+- GitHub section: contribution heatmap + stats cards
+- LeetCode section: progress rings + ranking stats
+- Experience section: animated timeline with progress bar
+- Projects section: card grid (6 visible + "View More" toggle)
+- Education section: degrees + skill categories + certificates
+- Footer scripts: IntersectionObserver reveals, rAF timeline, toggleProjects()
+```
+
+---
+
 ### SyncTeX Bidirectional Sync Flow
 
 ```
@@ -1119,8 +1418,15 @@ Project Save/Load:
 1. On auth: fetch user's resume_projects list from Supabase
 2. On project switch: load LaTeX source, company/role, JD from selected project
 3. On edit: debounced auto-save updates resume_projects row
-4. Settings (LLM provider, model, API keys): stored in resume_settings (per-user)
-5. Uses .maybeSingle() for settings queries (returns null for new users)
+4. Settings: LLM provider and model stored in resume_settings (per-user)
+5. API keys stored in browser cookies (SameSite=Strict, 365-day expiry) — never sent to Supabase
+6. Legacy localStorage settings auto-migrate to cookies on load
+7. Uses .maybeSingle() for settings queries (returns null for new users)
+
+Portfolio Save/Load:
+1. On mount: fetches portfolio_data from Supabase + latest resume from resume_projects
+2. Parses LaTeX and extracts portfolio entries, merges with saved customizations
+3. Save button upserts to portfolio_data table (jsonb data column)
 ```
 
 ---
@@ -1153,14 +1459,27 @@ Non-render-critical state uses refs to avoid unnecessary re-renders:
 | Table | Data |
 |-------|------|
 | `resume_projects` | LaTeX source, company/role, JD, project name per user |
-| `resume_settings` | LLM provider, model, API keys per user |
+| `resume_settings` | LLM provider and model per user (no API keys) |
 | `resume_drafts` | Project draft data per user |
+| `resume_project_drafts` | Project drafts linked to resume projects |
+| `portfolio_data` | Portfolio customizations as jsonb per user |
+
+**Cookies (API keys):**
+| Cookie | Data |
+|--------|------|
+| `llm_provider` | Selected LLM provider name |
+| `llm_model` | Selected model ID |
+| `gemini_api_key` | Gemini API key |
+| `groq_api_key` | Groq API key |
+| `claude_api_key` | Claude API key |
+
+All cookies use `SameSite=Strict`, `path=/`, and 365-day expiry. Legacy `localStorage` data auto-migrates to cookies on first load then gets removed.
 
 **localStorage (fallback / supplementary):**
 | Key | Data |
 |-----|------|
 | `resume-tailor-projects-v1` | Project drafts array (JSON) — used when not authenticated |
-| `resume-tailor-llm-settings-v1` | Provider, model, and API keys per provider — legacy fallback |
+| `portfolio-data` | Portfolio editor state — auto-saved on every edit |
 
 ### History/Undo System
 - Debounced tracking: LaTeX changes are recorded to the undo stack after 450ms of inactivity
@@ -1304,7 +1623,10 @@ Uses `pdfjs-dist` to extract text and positioning from uploaded PDF resumes:
 | SyncTeX Data | In-memory (server) | 30 minutes | Co-located with PDF cache entry, served via `/synctex/[id]` |
 | SyncTeX Mapping | In-memory (client) | Session | Parsed `SynctexMapping` struct for forward/inverse sync lookups |
 | Resume Projects | Supabase (PostgreSQL) | Permanent | Per-user project data with RLS |
-| LLM Settings | Supabase (PostgreSQL) | Permanent | Per-user provider, model, API key preferences |
+| LLM Settings | Supabase (PostgreSQL) | Permanent | Per-user provider and model preferences |
+| API Keys | Browser cookies | 365 days | Per-provider API keys (`SameSite=Strict`) |
+| Portfolio Data | Supabase (PostgreSQL) | Permanent | Per-user portfolio customizations with RLS |
+| Portfolio Editor | localStorage | Permanent | Auto-saved portfolio editing state |
 | Project Drafts | localStorage (fallback) | Permanent | Persist user's project inputs when not authenticated |
 | Editor History | In-memory (refs) | Session | Undo/redo stack for LaTeX editor |
 
@@ -1345,9 +1667,13 @@ Minimal configuration — empty `NextConfig` object (Next.js defaults).
 - **Server state:** PDF and SyncTeX data are cached in-memory (30-minute TTL) for preview access; no persistent server-side state
 - **Authentication:** Supabase Auth (email/password) with Row Level Security on all user tables; app works without auth in local-only mode
 - **User data:** Stored in Supabase PostgreSQL when authenticated, falls back to localStorage for unauthenticated use
-- API keys can be provided per-request or via environment variables; user-supplied keys stored in Supabase `resume_settings`
+- **API key storage:** User-supplied LLM API keys are stored in browser cookies (`SameSite=Strict`, 365-day expiry) — never sent to or stored in Supabase. Only provider and model preferences are synced to Supabase `resume_settings`
+- API keys can be provided per-request or via environment variables
 - PDF compilation creates temporary directories that are cleaned up after each request
 - SyncTeX `.synctex.gz` files are generated alongside PDFs and cached together; unavailable for cloud compiles
 - The app dynamically imports the main component with SSR disabled since it relies on browser APIs (Canvas, File, localStorage, DecompressionStream)
 - CodeMirror extensions are rebuilt on each relevant state change via `useMemo`
 - The PDF canvas viewer uses a React-bypass pattern for smooth zoom: refs hold live state, direct DOM manipulation during active gestures, debounced React state commits after gesture ends
+- **Portfolio generator:** Uses committed/uncommitted state pattern (same as resume editor) — preview iframe only refreshes on explicit Recompile click, not on every keystroke
+- **Portfolio HTML:** Self-contained single file with embedded CSS, inline SVG icons, IntersectionObserver animations, and `requestAnimationFrame` timeline progress bar
+- **Portfolio deployment:** Netlify deploy uses file digest API for atomic deploys; Vercel uses v13 deployment API. Both support redeployment to existing sites

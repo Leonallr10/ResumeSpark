@@ -117,6 +117,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
     }, [pdfData, onPageCount]);
 
     // Full-quality render at a specific zoom level
+    // Full-quality render at a specific zoom level
     const renderSharp = useCallback((targetZoom: number) => {
       if (!pdfDocRef.current || pages.length === 0) return;
       if (renderedZoomRef.current === targetZoom) return;
@@ -129,30 +130,50 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
         const doc = pdfDocRef.current;
         if (!doc) return;
 
+        // Render into offscreen canvases to prevent stutter/flicker while waiting for PDF.js
+        const offscreenCanvases: Record<number, HTMLCanvasElement> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const viewports: Record<number, any> = {};
+
         for (let i = 1; i <= doc.numPages; i++) {
           if (taskId !== renderTaskRef.current) return;
-          const canvas = canvasRefs.current.get(i);
-          if (!canvas) continue;
-
+          
           const page = await doc.getPage(i);
           const viewport = page.getViewport({ scale: scale * dpr });
+          viewports[i] = viewport;
 
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.style.width = `${viewport.width / dpr}px`;
-          canvas.style.height = `${viewport.height / dpr}px`;
+          const offscreen = document.createElement("canvas");
+          offscreen.width = viewport.width;
+          offscreen.height = viewport.height;
 
-          const ctx = canvas.getContext("2d");
+          const ctx = offscreen.getContext("2d");
           if (!ctx) continue;
 
           await page.render({ canvasContext: ctx, viewport }).promise;
+          offscreenCanvases[i] = offscreen;
         }
 
+        // Apply to DOM in a single synchronous block
         if (taskId === renderTaskRef.current) {
           renderedZoomRef.current = targetZoom;
           // Flush layout zoom synchronously so pages resize BEFORE we
           // remove the CSS transform — avoids a flash at the old size.
           flushSync(() => setLayoutZoom(targetZoom));
+          
+          for (let i = 1; i <= doc.numPages; i++) {
+             const canvas = canvasRefs.current.get(i);
+             const offscreen = offscreenCanvases[i];
+             const viewport = viewports[i];
+             if (canvas && offscreen && viewport) {
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                canvas.style.width = `${viewport.width / dpr}px`;
+                canvas.style.height = `${viewport.height / dpr}px`;
+                const ctx = canvas.getContext("2d");
+                ctx?.drawImage(offscreen, 0, 0);
+             }
+          }
+          
           applyLiveTransform(targetZoom);
         }
       }
@@ -240,12 +261,19 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
 
         liveZoomRef.current = newZoom;
 
-        // Apply CSS transform with origin at top-left for predictable scroll math
-        applyLiveTransform(newZoom, "0 0");
+        const wrapper = innerWrapperRef.current;
+        const cx = wrapper ? wrapper.offsetWidth / 2 : ct.scrollWidth / 2;
+
+        // Apply CSS transform with origin at top center to match React layout centering
+        applyLiveTransform(newZoom, "top center");
+        
+        // Force layout recalculation so the browser updates scrollHeight/scrollWidth 
+        // based on the new transform before we set scrollTop/Left. This prevents clamping!
+        if (wrapper) void wrapper.offsetHeight;
 
         // Adjust scroll position to keep cursor point stationary
         ct.scrollTop = Math.max(0, (ct.scrollTop + mouseY) * ratio - mouseY);
-        ct.scrollLeft = Math.max(0, (ct.scrollLeft + mouseX) * ratio - mouseX);
+        ct.scrollLeft = Math.max(0, cx + (ct.scrollLeft + mouseX - cx) * ratio - mouseX);
 
         // Debounce: commit to React state after user stops zooming
         if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
@@ -320,8 +348,13 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
       >
         <div
           ref={innerWrapperRef}
-          className="flex flex-col items-center gap-4 py-4"
-          style={{ willChange: "transform" }}
+          className="flex flex-col items-center"
+          style={{ 
+            willChange: "transform",
+            gap: `${16 * scale}px`,
+            paddingTop: `${16 * scale}px`,
+            paddingBottom: `${16 * scale}px`
+          }}
         >
           {pages.map((page, idx) => {
             const pageNumber = idx + 1;
