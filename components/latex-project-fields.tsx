@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Save, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Save, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -153,30 +153,30 @@ export function LatexProjectFields({
     activeProjects.length > 1 || hasProjectDraftContent(selectedProject);
 
   return (
-    <div className="w-full space-y-3 rounded-md border bg-white p-3 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className="w-full space-y-4 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4 shadow-xl backdrop-blur-md text-slate-100">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-800 pb-3">
         <div>
-          <Label className="text-sm font-semibold">Project Input</Label>
-          <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
-            Add a project once, then insert it into the LaTeX Projects section.
+          <Label className="text-xs font-bold uppercase tracking-wider text-emerald-400">Project Input</Label>
+          <p className="mt-1 text-[11px] text-slate-400 leading-relaxed font-medium">
+            Add a project draft, then insert it into the LaTeX Projects section.
           </p>
         </div>
-        <div className="space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+        <div className="space-y-1.5">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 text-right">
             Input method
           </p>
           <div
-            className="grid grid-cols-2 rounded-lg border bg-muted/50 p-0.5"
+            className="grid grid-cols-2 rounded-lg border border-slate-800 bg-slate-950/70 p-0.5"
             role="tablist"
             aria-label="Project input method"
           >
             <Button
               type="button"
               size="sm"
-              variant={inputMode === "form" ? "secondary" : "ghost"}
-              className={`h-6 px-3 text-[10px] font-bold transition-all ${inputMode === "form"
-                ? "bg-white text-emerald-700 shadow-sm hover:bg-white"
-                : "text-muted-foreground hover:text-foreground"
+              variant="ghost"
+              className={`h-6 px-3 text-[10px] font-bold transition-all rounded ${inputMode === "form"
+                ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                 }`}
               onClick={() => switchInputMode("form")}
               role="tab"
@@ -187,10 +187,10 @@ export function LatexProjectFields({
             <Button
               type="button"
               size="sm"
-              variant={inputMode === "json" ? "secondary" : "ghost"}
-              className={`h-6 px-3 text-[10px] font-bold transition-all ${inputMode === "json"
-                ? "bg-white text-emerald-700 shadow-sm hover:bg-white"
-                : "text-muted-foreground hover:text-foreground"
+              variant="ghost"
+              className={`h-6 px-3 text-[10px] font-bold transition-all rounded ${inputMode === "json"
+                ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                 }`}
               onClick={() => switchInputMode("json")}
               role="tab"
@@ -210,11 +210,11 @@ export function LatexProjectFields({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="space-y-3"
+            className="space-y-4"
           >
-            <div className="flex flex-wrap items-start gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/40 p-2 rounded-lg border border-slate-800">
               {activeProjects.length > 1 ? (
-                <div className="flex min-w-0 flex-1 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-1.5">
                   <Button
                     type="button"
                     size="icon"
@@ -222,23 +222,24 @@ export function LatexProjectFields({
                     onClick={goToPreviousProject}
                     disabled={selectedProjectIndex === 0}
                     aria-label="Go to previous project"
-                    className="h-8 w-8 shrink-0"
+                    className="h-7 w-7 shrink-0 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <div className="min-w-0 flex-1">
+                  <div className="relative min-w-0 flex-1">
                     <select
                       value={selectedProjectIndex}
                       onChange={(event) => setSelectedProjectIndex(Number(event.target.value))}
-                      className="h-8 min-w-0 w-full rounded-md border border-input bg-background px-3 text-xs font-medium"
+                      className="h-7 w-full appearance-none rounded-md border border-slate-700 bg-slate-950 pl-2.5 pr-8 text-xs font-semibold text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all duration-200 truncate"
                       aria-label="Select project"
                     >
                       {activeProjects.map((currentProject, index) => (
-                        <option key={`${currentProject.heading}-${index}`} value={index}>
+                        <option key={`${currentProject.heading}-${index}`} value={index} className="bg-slate-900 text-slate-200">
                           {currentProject.heading.trim() || `Project ${index + 1}`}
                         </option>
                       ))}
                     </select>
+                    <ChevronDown className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   </div>
                   <Button
                     type="button"
@@ -247,89 +248,89 @@ export function LatexProjectFields({
                     onClick={goToNextProject}
                     disabled={selectedProjectIndex >= activeProjects.length - 1}
                     aria-label="Go to next project"
-                    className="h-8 w-8 shrink-0"
+                    className="h-7 w-7 shrink-0 bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
-                  <p className="shrink-0 text-[10px] font-bold text-muted-foreground tabular-nums bg-muted px-1.5 py-0.5 rounded">
-                    {selectedProjectIndex + 1} / {activeProjects.length}
+                  <p className="shrink-0 text-[10px] font-bold text-emerald-400 tabular-nums bg-slate-950 px-1.5 py-0.5 rounded border border-slate-850">
+                    {selectedProjectIndex + 1}/{activeProjects.length}
                   </p>
                 </div>
               ) : (
-                <p className="min-w-0 flex-1 text-[11px] font-medium text-muted-foreground italic">
-                  Editing {selectedProject.heading.trim() || "Project 1"}
+                <p className="min-w-0 flex-1 text-[11px] font-semibold text-emerald-400/90 italic pl-1">
+                  Editing: {selectedProject.heading.trim() || "Project 1"}
                 </p>
               )}
               <Button
                 type="button"
                 size="sm"
-                className="h-9 gap-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold"
+                className="h-7 gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white border-0 shadow-sm transition-all duration-200 active:scale-95 text-[10px] font-bold rounded-md px-2.5"
                 onClick={addProjectDraft}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3 w-3" />
                 NEW
               </Button>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               <Input
                 value={selectedProject.heading}
                 onChange={(event) => updateField("heading", event.target.value)}
                 placeholder="Project heading"
-                className="h-9 text-xs"
+                className="h-10 bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs"
               />
               <Textarea
                 value={selectedProject.explanation}
                 onChange={(event) => updateField("explanation", event.target.value)}
-                placeholder="Project explanation"
-                className="min-h-32 text-xs leading-relaxed"
+                placeholder="Project explanation (achievements, details, impact...)"
+                className="min-h-[140px] bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs leading-relaxed"
               />
               <Input
                 value={selectedProject.techStack}
                 onChange={(event) => updateField("techStack", event.target.value)}
                 placeholder="Tech stack (e.g. React, Node.js, MongoDB)"
-                className="h-9 text-xs"
+                className="h-10 bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs"
               />
               <Input
                 value={selectedProject.link}
                 onChange={(event) => updateField("link", event.target.value)}
                 placeholder="Project link (optional)"
-                className="h-9 text-xs"
+                className="h-10 bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs"
               />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <Input
                   value={selectedProject.fromDate}
                   onChange={(event) => updateField("fromDate", event.target.value)}
                   placeholder="From date"
-                  className="h-9 text-xs"
+                  className="h-10 bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs"
                 />
                 <Input
                   value={selectedProject.toDate}
                   onChange={(event) => updateField("toDate", event.target.value)}
                   placeholder="To date"
-                  className="h-9 text-xs"
+                  className="h-10 bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-1 border-t mt-4">
-              <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80 mt-4">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-9 w-9 text-rose-500 hover:text-rose-600 hover:bg-rose-50 border-rose-100 transition-colors"
+                  className="h-9 w-9 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border-rose-900/50 bg-slate-950/60 rounded-lg transition-all duration-200 active:scale-95 flex items-center justify-center"
                   onClick={deleteSelectedProject}
                   disabled={!canDeleteProject}
                   title="Delete project"
                 >
-                  <Trash2 className="h-6 w-6" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
                 {insertProjectCount > 1 ? (
                   <Button
                     type="button"
                     size="sm"
-                    className="h-9 gap-1.5 bg-gradient-to-br from-emerald-500/90 to-emerald-600/90 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold"
+                    className="h-9 gap-1.5 bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white border-none shadow-md shadow-emerald-950/30 transition-all duration-200 active:scale-95 text-xs font-bold rounded-lg px-4"
                     onClick={() => onInsertSingleProject(selectedProjectIndex)}
                     disabled={!canInsertProject(selectedProject)}
                   >
@@ -340,7 +341,7 @@ export function LatexProjectFields({
                 <Button
                   type="button"
                   size="sm"
-                  className="h-9 gap-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold px-4"
+                  className="h-9 gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white border-none shadow-md shadow-emerald-950/30 transition-all duration-200 active:scale-95 text-xs font-bold px-4 rounded-lg"
                   onClick={onInsertProject}
                   disabled={insertProjectCount === 0}
                 >
@@ -357,40 +358,36 @@ export function LatexProjectFields({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="space-y-3"
+            className="space-y-4"
           >
-            <Textarea
-              value={jsonValue}
-              onChange={(event) => {
-                setJsonValue(event.target.value);
-                setJsonError(null);
-              }}
-              placeholder={`{
-  "projects": [
-    {
-      "heading": "AI Resume Analyzer",
-      "explanation": "Built a resume scoring workflow with LLM feedback and keyword matching.",
-      "techStack": "Next.js, TypeScript, FastAPI, PostgreSQL",
-      "link": "https://github.com/example/ai-resume-analyzer",
-      "fromDate": "Jan 2026",
-      "toDate": "Apr 2026"
-    }
-  ]
-}`}
-              className="min-h-40 font-mono text-[10px] leading-relaxed bg-slate-50/50 border-emerald-100"
-            />
-            <div className="flex items-center justify-between pt-1">
+            <div className="relative group rounded-lg overflow-hidden border border-slate-700 bg-slate-950 p-0.5">
+              <div className="absolute top-2 right-3 z-10 flex items-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+              </div>
+              <Textarea
+                value={jsonValue}
+                onChange={(event) => {
+                  setJsonValue(event.target.value);
+                  setJsonError(null);
+                }}
+                placeholder={`{\n  "projects": [\n    {\n      "heading": "AI Resume Analyzer",\n      "explanation": "Built a resume scoring workflow with LLM feedback.",\n      "techStack": "Next.js, TypeScript, FastAPI",\n      "link": "https://github.com/example/analyzer",\n      "fromDate": "Jan 2026",\n      "toDate": "Apr 2026"\n    }\n  ]\n}`}
+                className="min-h-[220px] font-mono text-[11px] leading-relaxed bg-slate-950 border-0 text-emerald-400 placeholder-slate-650 focus-visible:ring-0 focus-visible:border-0 rounded-md p-3 tracking-wide resize-y focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 mt-2">
               {jsonError ? (
-                <p className="text-[10px] text-destructive font-bold">{jsonError.toUpperCase()}</p>
+                <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">{jsonError.replace("JSON", "").trim()}</p>
               ) : (
-                <p className="text-[10px] text-muted-foreground font-medium">
-                  PASTE OBJECT OR ARRAY
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  Paste object or array draft
                 </p>
               )}
               <Button
                 type="button"
                 size="sm"
-                className="h-9 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-none shadow-sm transition-all duration-200 active:scale-95 text-[11px] font-bold px-6"
+                className="h-9 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white border-none shadow-md shadow-emerald-950/30 transition-all duration-200 active:scale-95 text-xs font-bold px-5 rounded-lg"
                 onClick={applyJsonProject}
               >
                 APPLY JSON

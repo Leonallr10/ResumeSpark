@@ -2345,18 +2345,21 @@ export function LatexResumeTailorApp() {
                 {/* Editor Toolbar */}
                 <div className="flex flex-1 flex-wrap items-center gap-2">
                   <div className="flex items-center gap-2">
-                    <select
-                      value={toolbarCommand}
-                      onChange={(e) => setToolbarCommand(e.target.value as FormattingType)}
-                      className="h-8 w-32 truncate rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
-                    >
-                      <option value="header-name" className="bg-slate-800 text-slate-100">Header Name</option>
-                      <option value="section" className="bg-slate-800 text-slate-100">Section</option>
-                      <option value="resumeSubheading" className="bg-slate-800 text-slate-100">Subheading</option>
-                      <option value="resumeProjectHeading" className="bg-slate-800 text-slate-100">Project Head</option>
-                      <option value="resumeItem" className="bg-slate-800 text-slate-100">Bullet Item</option>
-                      <option value="normal-text" className="bg-slate-800 text-slate-100">Normal Text</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={toolbarCommand}
+                        onChange={(e) => setToolbarCommand(e.target.value as FormattingType)}
+                        className="h-8 w-32 appearance-none rounded-md border border-slate-700 bg-slate-900/60 pl-2.5 pr-8 py-1 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 truncate"
+                      >
+                        <option value="header-name" className="bg-slate-800 text-slate-100">Header Name</option>
+                        <option value="section" className="bg-slate-800 text-slate-100">Section</option>
+                        <option value="resumeSubheading" className="bg-slate-800 text-slate-100">Subheading</option>
+                        <option value="resumeProjectHeading" className="bg-slate-800 text-slate-100">Project Head</option>
+                        <option value="resumeItem" className="bg-slate-800 text-slate-100">Bullet Item</option>
+                        <option value="normal-text" className="bg-slate-800 text-slate-100">Normal Text</option>
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
                     <div
                       className="relative flex h-8 w-20 items-center rounded-md border border-slate-700 bg-slate-900/60 text-sm select-none text-slate-100"
                       style={{ cursor: "ew-resize" }}
@@ -3003,40 +3006,40 @@ export function LatexResumeTailorApp() {
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   className="flex w-full min-h-0 flex-col xl:w-[450px] xl:max-w-[450px] xl:self-stretch overflow-hidden"
                 >
-                  <Card className="sticky top-5 min-h-0 flex-1 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
-                    <CardContent className="space-y-5 pt-5 xl:flex xl:flex-1 xl:flex-col xl:overflow-y-auto">
+                  <Card className="sticky top-5 min-h-0 flex-1 xl:flex xl:h-full xl:min-h-0 xl:flex-col bg-gradient-to-br from-slate-800 via-slate-900 to-emerald-950/85 border-slate-700/60 shadow-2xl rounded-2xl text-slate-100 backdrop-blur-lg">
+                    <CardContent className="space-y-5 pt-5 xl:flex xl:flex-1 xl:flex-col xl:overflow-y-auto bg-transparent border-0">
                       <div
-                        className="grid grid-cols-2 rounded-lg border bg-muted p-1"
+                        className="grid grid-cols-2 rounded-xl border border-slate-700/80 bg-slate-950/60 p-1 backdrop-blur-md"
                         role="tablist"
                         aria-label="Input panel tabs"
                       >
                         <Button
                           type="button"
                           size="sm"
-                          variant={inputSidebarTab === "project" ? "secondary" : "ghost"}
-                          className={`h-8 text-xs ${inputSidebarTab === "project"
-                            ? "bg-background text-foreground shadow-sm hover:bg-background"
-                            : "text-muted-foreground hover:text-foreground"
+                          variant="ghost"
+                          className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 ${inputSidebarTab === "project"
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 border border-emerald-400/20"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                             }`}
                           onClick={() => setInputSidebarTab("project")}
                           role="tab"
                           aria-selected={inputSidebarTab === "project"}
                         >
-                          Project
+                          Project Drafts
                         </Button>
                         <Button
                           type="button"
                           size="sm"
-                          variant={inputSidebarTab === "jd" ? "secondary" : "ghost"}
-                          className={`h-8 text-xs ${inputSidebarTab === "jd"
-                            ? "bg-background text-foreground shadow-sm hover:bg-background"
-                            : "text-muted-foreground hover:text-foreground"
+                          variant="ghost"
+                          className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 ${inputSidebarTab === "jd"
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 border border-emerald-400/20"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                             }`}
                           onClick={() => setInputSidebarTab("jd")}
                           role="tab"
                           aria-selected={inputSidebarTab === "jd"}
                         >
-                          JD
+                          Job Description
                         </Button>
                       </div>
 
@@ -3070,27 +3073,28 @@ export function LatexResumeTailorApp() {
                             transition={{ duration: 0.2, ease: "easeInOut" }}
                             className="w-full"
                           >
-                            <div className="w-full space-y-3 rounded-md border bg-white p-3 shadow-sm">
+                            <div className="w-full space-y-4 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4 shadow-xl backdrop-blur-md">
                               <div className="space-y-2">
-                                <Label htmlFor="companyRole">Company name with role</Label>
+                                <Label htmlFor="companyRole" className="text-xs font-bold uppercase tracking-wider text-emerald-400">Company name & role</Label>
                                 <Input
                                   id="companyRole"
                                   value={companyRole}
                                   onChange={(event) => setCompanyRole(event.target.value)}
-                                  placeholder="Acme - Frontend Developer"
+                                  placeholder="e.g. Google - Senior Frontend Engineer"
                                   maxLength={COMPANY_ROLE_LIMIT}
+                                  className="h-10 bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs"
                                 />
                                 <FieldCounter value={companyRole.length} max={COMPANY_ROLE_LIMIT} />
                               </div>
 
                               <div className="space-y-2">
-                                <Label htmlFor="jd">JD</Label>
+                                <Label htmlFor="jd" className="text-xs font-bold uppercase tracking-wider text-emerald-400">Job Description (JD)</Label>
                                 <Textarea
                                   id="jd"
                                   value={jd}
                                   onChange={(event) => setJd(event.target.value)}
-                                  placeholder="Paste the job description here."
-                                  className="min-h-32"
+                                  placeholder="Paste the job description here to tailor your resume perfectly..."
+                                  className="min-h-[160px] bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs leading-relaxed"
                                   maxLength={JD_LIMIT}
                                 />
                                 <FieldCounter value={jd.length} max={JD_LIMIT} />
@@ -3103,9 +3107,9 @@ export function LatexResumeTailorApp() {
                                 --line-weight: 1px;
                                 --line-distance: 0.8rem 1rem;
                                 --animation-speed: 2s;
-                                --dot-color: #059669;
-                                --line-color: #10b981;
-                                --grid-color: rgba(16, 185, 129, 0.1);
+                                --dot-color: #10b981;
+                                --line-color: #34d399;
+                                --grid-color: rgba(16, 185, 129, 0.05);
                               }
 
                               .btn-wrapper::after {
@@ -3130,9 +3134,9 @@ export function LatexResumeTailorApp() {
                                 justify-content: center;
                                 align-items: center;
                                 width: 100%;
-                                padding: 0.8rem 1.25rem;
+                                padding: 0.9rem 1.5rem;
                                 background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                                border: none;
+                                border: 1px solid rgba(52, 211, 153, 0.2);
                                 color: #fff;
                                 font-family: inherit;
                                 font-size: 0.875rem;
@@ -3141,13 +3145,16 @@ export function LatexResumeTailorApp() {
                                 cursor: pointer;
                                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                                 z-index: 10;
-                                box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39);
+                                box-shadow: 0 4px 20px 0 rgba(16, 185, 129, 0.3);
+                                text-transform: uppercase;
+                                letter-spacing: 0.05em;
                               }
 
                               .btn-wrapper .btn:hover:not(:disabled) {
                                 transform: translateY(-2px);
                                 background: linear-gradient(135deg, #059669 0%, #047857 100%);
-                                box-shadow: 0 6px 20px rgba(5, 150, 105, 0.23);
+                                box-shadow: 0 8px 25px rgba(5, 150, 105, 0.4);
+                                border-color: rgba(52, 211, 153, 0.4);
                               }
 
                               .btn-wrapper .btn:active:not(:disabled) {
@@ -3155,15 +3162,17 @@ export function LatexResumeTailorApp() {
                               }
 
                               .btn-wrapper .btn:disabled {
-                                background: #94a3b8;
+                                background: #334155;
+                                color: #64748b;
+                                border-color: #1e293b;
                                 box-shadow: none;
                                 cursor: not-allowed;
                               }
 
                               .btn-wrapper .btn-svg {
                                 margin-left: 0.5rem;
-                                height: 20px;
-                                width: 20px;
+                                height: 18px;
+                                width: 18px;
                                 stroke-width: 1.5;
                                 stroke: currentColor;
                                 fill: rgba(255, 255, 255, 0.2);
@@ -3280,11 +3289,6 @@ export function LatexResumeTailorApp() {
                                   </button>
                                 )}
                               </div>
-
-                              {/* <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
-                            Suggestions update the LaTeX source, so the editable .tex remains the
-                            source of truth.
-                          </div> */}
                             </div>
                           </motion.div>
                         )}
