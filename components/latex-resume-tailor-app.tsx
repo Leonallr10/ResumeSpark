@@ -255,7 +255,8 @@ export function LatexResumeTailorApp() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authMode, setAuthMode] = useState<"signin" | "signup" | "forgot">("signin");
+  const [forgotSent, setForgotSent] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
@@ -570,6 +571,23 @@ export function LatexResumeTailorApp() {
         toast.success("Signed in successfully!");
         setAuthModalOpen(false);
       }
+    } catch {
+      setAuthError("An unexpected error occurred.");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setAuthError(null);
+    setAuthSubmitting(true);
+    const supabase = createClient();
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(authEmail, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+      if (err) { setAuthError(err.message); return; }
+      setForgotSent(true);
     } catch {
       setAuthError("An unexpected error occurred.");
     } finally {
@@ -1901,57 +1919,84 @@ export function LatexResumeTailorApp() {
     <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-[#f4f8f8]">
       <Toaster position="top-right" richColors />
       {authModalOpen ? (
-        <DialogContent onClose={() => { setAuthModalOpen(false); setAuthError(null); }} className="max-w-sm">
+        <DialogContent onClose={() => { setAuthModalOpen(false); setAuthError(null); setForgotSent(false); }} className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{authMode === "signup" ? "Create Account" : "Welcome back"}</DialogTitle>
+            <DialogTitle>
+              {authMode === "forgot" ? "Reset Password" : authMode === "signup" ? "Create Account" : "Welcome back"}
+            </DialogTitle>
             <DialogDescription>
-              {authMode === "signup" ? "Sign up to save your projects in the cloud." : "Sign in to access your saved projects."}
+              {authMode === "forgot"
+                ? "Enter your email and we'll send you a link to reset your password."
+                : authMode === "signup"
+                  ? "Sign up to save your projects in the cloud."
+                  : "Sign in to access your saved projects."}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <div className="flex rounded-lg border bg-muted/40 p-1">
-              <button
-                type="button"
-                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${authMode === "signin" ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                onClick={() => { setAuthMode("signin"); setAuthError(null); }}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${authMode === "signup" ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                onClick={() => { setAuthMode("signup"); setAuthError(null); }}
-              >
-                Sign Up
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="authEmail">Email</Label>
-                <Input
-                  id="authEmail"
-                  type="email"
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  className="h-10"
-                />
+            {authMode !== "forgot" ? (
+              <div className="flex rounded-lg border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${authMode === "signin" ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => { setAuthMode("signin"); setAuthError(null); }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${authMode === "signup" ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => { setAuthMode("signup"); setAuthError(null); }}
+                >
+                  Sign Up
+                </button>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="authPassword">Password</Label>
-                <Input
-                  id="authPassword"
-                  type="password"
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete={authMode === "signup" ? "new-password" : "current-password"}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleAuthSubmit(); }}
-                  className="h-10"
-                />
+            ) : null}
+            {authMode === "forgot" && forgotSent ? (
+              <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700">
+                <CircleCheck className="h-4 w-4 shrink-0" />
+                Password reset link sent! Check your email inbox.
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="authEmail">Email</Label>
+                  <Input
+                    id="authEmail"
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    onKeyDown={(e) => { if (e.key === "Enter" && authMode === "forgot") handleForgotPassword(); }}
+                    className="h-10"
+                  />
+                </div>
+                {authMode !== "forgot" ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="authPassword">Password</Label>
+                    <Input
+                      id="authPassword"
+                      type="password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete={authMode === "signup" ? "new-password" : "current-password"}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleAuthSubmit(); }}
+                      className="h-10"
+                    />
+                    {authMode === "signin" ? (
+                      <button
+                        type="button"
+                        className="text-sm text-primary hover:underline"
+                        onClick={() => { setAuthMode("forgot"); setAuthError(null); setForgotSent(false); }}
+                      >
+                        Forgot password?
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
             {authError ? (
               <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -1960,11 +2005,27 @@ export function LatexResumeTailorApp() {
             ) : null}
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setAuthModalOpen(false); setAuthError(null); }}>Cancel</Button>
-            <Button type="button" onClick={handleAuthSubmit} disabled={authSubmitting} className="min-w-[100px]">
-              {authSubmitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-              {authMode === "signup" ? "Create Account" : "Sign In"}
-            </Button>
+            {authMode === "forgot" ? (
+              <>
+                <Button type="button" variant="outline" onClick={() => { setAuthMode("signin"); setAuthError(null); setForgotSent(false); }}>
+                  Back to Sign In
+                </Button>
+                {!forgotSent ? (
+                  <Button type="button" onClick={handleForgotPassword} disabled={authSubmitting || !authEmail} className="min-w-[100px]">
+                    {authSubmitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                    Send Reset Link
+                  </Button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Button type="button" variant="outline" onClick={() => { setAuthModalOpen(false); setAuthError(null); }}>Cancel</Button>
+                <Button type="button" onClick={handleAuthSubmit} disabled={authSubmitting} className="min-w-[100px]">
+                  {authSubmitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                  {authMode === "signup" ? "Create Account" : "Sign In"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       ) : null}
