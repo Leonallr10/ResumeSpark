@@ -968,6 +968,28 @@ export function LatexResumeTailorApp() {
     }
   }
 
+  function navigateToDiff(currentText: string, newText: string) {
+    const len = Math.min(currentText.length, newText.length);
+    let diffPos = currentText.length !== newText.length ? len : -1;
+    for (let i = 0; i < len; i++) {
+      if (currentText[i] !== newText[i]) {
+        diffPos = i;
+        break;
+      }
+    }
+    
+    if (diffPos !== -1 && editorViewRef.current) {
+      // Wait for React to apply the state change
+      requestAnimationFrame(() => {
+        editorViewRef.current?.dispatch({
+          selection: { anchor: diffPos },
+          effects: EditorView.scrollIntoView(diffPos, { y: "center" })
+        });
+        editorViewRef.current?.focus();
+      });
+    }
+  }
+
   function undoLatex() {
     if (pastLatexRef.current.length === 0) {
       return;
@@ -975,6 +997,7 @@ export function LatexResumeTailorApp() {
 
     cancelTypingHistoryDebounce({ flushPending: true });
     const previous = pastLatexRef.current.pop()!;
+    navigateToDiff(latestLatexRef.current, previous);
     futureLatexRef.current.push(latestLatexRef.current);
     isApplyingHistoryRef.current = true;
     setLatexCode(previous);
@@ -993,6 +1016,7 @@ export function LatexResumeTailorApp() {
 
     cancelTypingHistoryDebounce({ flushPending: true });
     const next = futureLatexRef.current.pop()!;
+    navigateToDiff(latestLatexRef.current, next);
     pastLatexRef.current.push(latestLatexRef.current);
     isApplyingHistoryRef.current = true;
     setLatexCode(next);
@@ -1012,6 +1036,7 @@ export function LatexResumeTailorApp() {
     if (options?.recordHistory && value !== latestLatexRef.current) {
       commitLatexHistoryBeforeEdit(latestLatexRef.current);
     }
+    navigateToDiff(latestLatexRef.current, value);
     isApplyingHistoryRef.current = true;
     setLatexCode(value);
     setSuggestions([]);
@@ -1163,6 +1188,7 @@ export function LatexResumeTailorApp() {
     cancelTypingHistoryDebounce({ flushPending: true });
     commitLatexHistoryBeforeEdit(currentLatex);
     const nextLatex = applySuggestionToLatex(currentLatex, currentSections, suggestion);
+    navigateToDiff(currentLatex, nextLatex);
     const lineDelta = countLatexLines(nextLatex) - countLatexLines(currentLatex);
 
     isApplyingHistoryRef.current = true;
@@ -1247,6 +1273,7 @@ export function LatexResumeTailorApp() {
       }
     }
 
+    navigateToDiff(latestLatexRef.current, result);
     isApplyingHistoryRef.current = true;
     setLatexCode(result);
     setSuggestions([]);
