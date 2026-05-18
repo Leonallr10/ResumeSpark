@@ -352,11 +352,8 @@ ${buildFooterScripts()}
 function buildNavHtml(): string {
   return `<nav id="navbar" class="fixed bottom-0 left-0 right-0 md:top-0 md:bottom-auto z-50">
 <div class="bg-surface border-t md:border-t-0 md:border-b border-border flex items-center justify-center md:justify-start px-4 md:px-10 h-16 md:h-16 gap-1 md:gap-2">
-<a href="#intro" class="hidden md:flex items-center gap-2 mr-auto font-body font-bold text-accent text-lg tracking-tight">
+<a href="#intro" onclick="scrollToSection('intro'); return false;" class="hidden md:flex items-center gap-2 mr-auto font-body font-bold text-accent text-lg tracking-tight">
 <span class="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-bg text-xs font-black">P</span>Portfolio</a>
-<button onclick="scrollToSection('intro')" class="nav-btn active rounded-lg px-3 py-2 text-xs md:text-sm font-semibold flex flex-col md:flex-row items-center gap-1 md:gap-2 text-bg" data-section="intro">
-<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-<span class="hidden md:inline">Home</span></button>
 <button onclick="scrollToSection('education')" class="nav-btn rounded-lg px-3 py-2 text-xs md:text-sm font-semibold flex flex-col md:flex-row items-center gap-1 md:gap-2 text-muted" data-section="education">
 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m-6-3.5l6 3.5 6-3.5"/></svg>
 <span class="hidden md:inline">Education</span></button>
@@ -435,7 +432,7 @@ ${esc(firstWords)} <span class="block text-accent mt-1">${esc(lastWord)}</span><
 </div>
 <div class="flex flex-col sm:flex-row gap-3">
 <a href="#projects" onclick="scrollToSection('projects'); return false;" class="inline-flex items-center justify-center gap-2 px-8 py-3 bg-accent text-bg font-bold font-body rounded-full hover:bg-accent-dim transition-all duration-300 text-sm">View Projects <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
-${intro.resumeLink ? `<a href="${esc(intro.resumeLink)}" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-8 py-3 border-2 border-accent text-accent font-bold font-body rounded-full hover:bg-accent/10 transition-all duration-300 text-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Resume</a>` : `<a href="#education" onclick="scrollToSection('education'); return false;" class="inline-flex items-center justify-center px-8 py-3 border-2 border-accent text-accent font-bold font-body rounded-full hover:bg-accent/10 transition-all duration-300 text-sm">About Me</a>`}
+${intro.resumeLink ? `<a href="${esc(intro.resumeLink)}" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-8 py-3 border-2 border-accent text-accent font-bold font-body rounded-full hover:bg-accent/10 transition-all duration-300 text-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>View Resume</a>` : ''}
 </div>
 </div>
 <div class="flex flex-col items-center order-1 lg:order-2">
