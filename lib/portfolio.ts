@@ -48,13 +48,57 @@ export function createDefaultPortfolioData(): PortfolioData {
   };
 }
 
+function normalizeSectionLines(section: ResumeSection): ResumeSection {
+  const hasAnyKind = section.lines.some((l) => l.kind);
+  if (hasAnyKind) return section;
+
+  const title = section.title.toLowerCase();
+  const isHeader = !section.title || title === "header";
+
+  const avgFontSize =
+    section.lines.reduce((sum, l) => sum + (l.layout?.fontSize ?? 12), 0) /
+    (section.lines.length || 1);
+
+  const lines = section.lines.map((line, index) => {
+    const layout = line.layout;
+    const text = line.text || "";
+
+    if (isHeader) {
+      if (index === 0 || layout?.variant === "headerName") {
+        return { ...line, kind: "header" as const };
+      }
+      return line;
+    }
+
+    if (layout?.variant === "sectionHeading") return line;
+
+    const isBold = layout?.fontWeight && layout.fontWeight >= 700;
+    const isLarger = layout?.fontSize && layout.fontSize > avgFontSize * 1.05;
+    const looksLikeBullet =
+      text.startsWith("•") || text.startsWith("-") || text.startsWith("–") || /^\s*[▪▸►·∗]/.test(text);
+
+    if (looksLikeBullet) {
+      return { ...line, kind: "bullet" as const, text: text.replace(/^[\s•\-–▪▸►·∗]+/, "").trim() };
+    }
+
+    if (isBold || isLarger) {
+      return { ...line, kind: "subheading" as const };
+    }
+
+    return line;
+  });
+
+  return { ...section, lines };
+}
+
 export function extractPortfolioFromResume(
   resumeSections: ResumeSection[],
   projectDrafts: ProjectDraft[],
 ): PortfolioData {
   const data = createDefaultPortfolioData();
 
-  for (const section of resumeSections) {
+  for (const rawSection of resumeSections) {
+    const section = normalizeSectionLines(rawSection);
     const title = section.title.toLowerCase();
 
     if (!section.title || title === "header" || section.id === "header") {
@@ -98,9 +142,11 @@ function extractHeader(section: ResumeSection, intro: IntroSection) {
   const headerLine = section.lines.find((l) => l.kind === "header");
   if (headerLine) {
     intro.name = headerLine.text || "";
+  } else if (section.lines.length > 0) {
+    intro.name = section.lines[0].text || "";
   }
   for (const line of section.lines) {
-    if (line.kind === "header") continue;
+    if (line.kind === "header" || line === section.lines[0]) continue;
     const text = line.text || "";
     if (text.includes("@") && text.includes(".")) {
       intro.socialLinks.push({ platform: "email", url: `mailto:${text.trim()}` });
@@ -115,19 +161,40 @@ function extractHeader(section: ResumeSection, intro: IntroSection) {
   }
 }
 
+function splitTextAndDate(text: string): { main: string; date: string } {
+  const datePattern = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*[\s,]*\d{4}\s*[-–—]\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*[\s,]*\d{4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*[\s,]*\d{4}\s*[-–—]\s*(?:Present|Current)\b|\b\d{4}\s*[-–—]\s*\d{4}\b|\b\d{4}\s*[-–—]\s*(?:Present|Current)\b/i;
+  const match = text.match(datePattern);
+  if (match) {
+    const main = text.replace(match[0], "").replace(/\s{2,}/g, " ").trim();
+    return { main, date: match[0].trim() };
+  }
+  const multiSpace = text.split(/\s{3,}/);
+  if (multiSpace.length >= 2) {
+    return { main: multiSpace[0].trim(), date: multiSpace[multiSpace.length - 1].trim() };
+  }
+  return { main: text, date: "" };
+}
+
 function extractEducation(section: ResumeSection, edu: EducationSection) {
   let current: Partial<EducationEntry> | null = null;
   for (const line of section.lines) {
     if (line.kind === "subheading") {
       if (current?.degree) edu.entries.push(current as EducationEntry);
+      const { main, date } = splitTextAndDate(line.text || "");
       current = {
-        degree: line.text || "",
+        degree: main,
         institution: line.secondaryText || "",
-        period: line.rightText || "",
+        period: line.rightText || date,
         description: "",
       };
     } else if (current && line.kind === "bullet") {
       current.description = (current.description || "") + (line.text || "") + " ";
+    } else if (current && !line.kind && line.text) {
+      if (!current.institution) {
+        current.institution = line.text;
+      } else {
+        current.description = (current.description || "") + (line.text || "") + " ";
+      }
     }
   }
   if (current?.degree) edu.entries.push(current as EducationEntry);
@@ -152,10 +219,11 @@ function extractExperience(section: ResumeSection, exp: ExperienceSection) {
   for (const line of section.lines) {
     if (line.kind === "subheading") {
       if (current?.role) exp.entries.push(current as ExperienceEntry);
+      const { main, date } = splitTextAndDate(line.text || "");
       current = {
-        role: line.text || "",
+        role: main,
         company: line.secondaryText || "",
-        period: line.rightText || "",
+        period: line.rightText || date,
         techStack: [],
         achievements: [],
         companyLogoBase64: null,
@@ -163,6 +231,14 @@ function extractExperience(section: ResumeSection, exp: ExperienceSection) {
     } else if (current && line.kind === "bullet") {
       current.achievements = current.achievements || [];
       current.achievements.push(line.text || "");
+    } else if (current && !line.kind && line.text) {
+      const text = line.text;
+      if (!current.company && text.length < 60) {
+        current.company = text;
+      } else {
+        current.achievements = current.achievements || [];
+        current.achievements.push(text);
+      }
     }
   }
   if (current?.role) exp.entries.push(current as ExperienceEntry);
@@ -173,10 +249,11 @@ function extractProjects(section: ResumeSection, proj: ProjectsSection) {
   for (const line of section.lines) {
     if (line.kind === "projectHeading" || line.kind === "subheading") {
       if (current?.name) proj.entries.push(current as ProjectEntry);
+      const { main, date } = splitTextAndDate(line.text || "");
       current = {
-        name: line.text || "",
+        name: main,
         description: "",
-        period: line.rightText || "",
+        period: line.rightText || date,
         techStack: [],
         emoji: "💻",
         demoUrl: "",
@@ -193,10 +270,11 @@ function extractProjects(section: ResumeSection, proj: ProjectsSection) {
         current.description = text + " ";
       }
     } else if (!current && line.text && line.text.trim().length > 0) {
+      const { main, date } = splitTextAndDate(line.text);
       current = {
-        name: line.text,
+        name: main,
         description: "",
-        period: line.rightText || "",
+        period: line.rightText || date,
         techStack: [],
         emoji: "💻",
         demoUrl: "",
@@ -210,10 +288,12 @@ function extractProjects(section: ResumeSection, proj: ProjectsSection) {
 
 function extractAchievements(section: ResumeSection, ach: AchievementsSection) {
   for (const line of section.lines) {
-    if (line.kind === "bullet" || line.kind === "subheading") {
+    if (line.layout?.variant === "sectionHeading") continue;
+    if (line.kind === "bullet" || line.kind === "subheading" || (line.text && line.text.trim().length > 0)) {
+      const { main, date } = splitTextAndDate(line.text || "");
       ach.entries.push({
-        title: line.text || "",
-        metric: line.rightText || "",
+        title: main,
+        metric: line.rightText || date,
         emoji: "🏆",
         imageBase64: null,
       });

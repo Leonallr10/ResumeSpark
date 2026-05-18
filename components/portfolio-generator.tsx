@@ -8,12 +8,21 @@ import {
   useRef,
   type ChangeEvent,
 } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   ChevronDown,
   Loader2,
@@ -27,6 +36,7 @@ import {
   ExternalLink,
   Check,
   Save,
+  FileText,
 } from "lucide-react";
 import type {
   PortfolioData,
@@ -335,6 +345,51 @@ export function PortfolioGenerator() {
 
   const recompile = useCallback(() => setCommittedData(data), [data]);
 
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  const handleResumeUpload = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setUploadLoading(true);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsText(file);
+      });
+      const sections = parseLatexResume(text);
+
+      const extracted = extractPortfolioFromResume(sections, []);
+
+      const merged: PortfolioData = {
+        ...extracted,
+        intro: {
+          ...extracted.intro,
+          profileImageBase64: data.intro.profileImageBase64 || null,
+        },
+        github: { ...extracted.github, username: data.github.username || extracted.github.username },
+        leetcode: { ...extracted.leetcode, username: data.leetcode.username || extracted.leetcode.username },
+      };
+
+      setData(merged);
+      setCommittedData(merged);
+      setUploadDialogOpen(false);
+    } catch {
+      setUploadError("Failed to parse the file. Please ensure it is a valid LaTeX (.tex) resume.");
+    } finally {
+      setUploadLoading(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
+    }
+  }, [data]);
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Left Panel - Preview */}
@@ -351,6 +406,16 @@ export function PortfolioGenerator() {
           </Button>
           <Separator orientation="vertical" className="h-5 bg-slate-700/60" />
           <h1 className="text-sm font-bold text-slate-200 tracking-wide">Portfolio Preview</h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 text-xs bg-slate-700/60 border border-slate-650 text-slate-200 hover:bg-slate-600 hover:text-white transition-colors"
+            onClick={() => setUploadDialogOpen(true)}
+            title="Upload a LaTeX resume (.tex) to populate portfolio"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Upload Resume
+          </Button>
           <div className="ml-auto flex items-center gap-2">
             {deployedUrl && (
               <a
@@ -531,6 +596,78 @@ export function PortfolioGenerator() {
           </div>
         </ScrollArea>
       </div>
+
+      {uploadDialogOpen && (
+        <DialogContent onClose={() => { setUploadDialogOpen(false); setUploadError(null); setUploadLoading(false); }}>
+          <DialogHeader>
+            <DialogTitle>Upload LaTeX Resume</DialogTitle>
+            <DialogDescription>
+              Upload a .tex resume file to automatically populate your portfolio sections.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <AnimatePresence mode="wait">
+              {uploadLoading ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="flex flex-col items-center justify-center py-10 gap-4"
+                >
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Loader2 className="h-10 w-10 text-emerald-500" />
+                  </motion.div>
+                  <p className="text-sm text-muted-foreground animate-pulse font-medium">
+                    Parsing your resume...
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="upload"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-4"
+                >
+                  <label className="flex flex-col items-center justify-center h-36 border-2 border-dashed border-muted-foreground/30 rounded-lg cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-50/5 transition-colors">
+                    <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Click to select a .tex file
+                    </span>
+                    <span className="text-xs text-muted-foreground/60 mt-1">
+                      Only LaTeX resume files (.tex)
+                    </span>
+                    <input
+                      ref={uploadInputRef}
+                      type="file"
+                      accept=".tex"
+                      className="sr-only"
+                      onChange={handleResumeUpload}
+                    />
+                  </label>
+                  {uploadError && (
+                    <p className="text-xs text-destructive text-center font-medium">{uploadError}</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setUploadDialogOpen(false); setUploadError(null); setUploadLoading(false); }}
+              disabled={uploadLoading}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      )}
     </div>
   );
 }
@@ -1272,6 +1409,10 @@ function ProjectsForm({ data, update }: FormProps) {
   const set = (patch: Partial<typeof proj>) =>
     update("projects", { ...proj, ...patch });
 
+  const [projectInputMode, setProjectInputMode] = useState<"form" | "json">("form");
+  const [projectsJson, setProjectsJson] = useState("");
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
   const addEntry = () =>
     set({
       entries: [
@@ -1297,96 +1438,194 @@ function ProjectsForm({ data, update }: FormProps) {
       ),
     });
 
+  function applyProjectsJson() {
+    const result = parsePortfolioProjectJson(projectsJson);
+    if (!result.ok) {
+      setJsonError(result.error);
+      return;
+    }
+    set({ entries: result.entries });
+    setProjectInputMode("form");
+    setJsonError(null);
+    setProjectsJson("");
+  }
+
   return (
     <>
-      <SectionHeader title="Projects" />
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 text-xs gap-1"
-        onClick={addEntry}
-      >
-        <Plus className="h-3 w-3" /> Add Project
-      </Button>
-      {proj.entries.map((entry, i) => (
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Projects" />
         <div
-          key={i}
-          className="space-y-2 rounded-lg border p-3 relative"
+          className="grid grid-cols-2 rounded-lg border border-input bg-muted/30 p-0.5"
+          role="tablist"
+          aria-label="Project input method"
         >
           <Button
-            variant="ghost"
+            type="button"
             size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0 text-destructive"
-            onClick={() => removeEntry(i)}
+            variant="ghost"
+            className={`h-6 px-3 text-[10px] font-bold transition-all rounded ${
+              projectInputMode === "form"
+                ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+            onClick={() => setProjectInputMode("form")}
           >
-            <Trash2 className="h-3 w-3" />
+            FORM
           </Button>
-          <ImageUpload
-            label="Project Image"
-            value={entry.imageBase64}
-            onChange={(v) => updateEntry(i, { imageBase64: v })}
-          />
-          <Input
-            value={entry.name}
-            onChange={(e) => updateEntry(i, { name: e.target.value })}
-            placeholder="Project name"
-            className="h-8 text-xs"
-          />
-          <Textarea
-            value={entry.description}
-            onChange={(e) =>
-              updateEntry(i, { description: e.target.value })
-            }
-            placeholder="Description"
-            className="text-xs min-h-[50px]"
-          />
-          <Input
-            value={entry.period}
-            onChange={(e) => updateEntry(i, { period: e.target.value })}
-            placeholder="Jan 2023 - Jun 2023"
-            className="h-8 text-xs"
-          />
-          <Input
-            value={entry.techStack.join(", ")}
-            onChange={(e) =>
-              updateEntry(i, {
-                techStack: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="Tech stack (comma separated)"
-            className="h-8 text-xs"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              value={entry.emoji}
-              onChange={(e) =>
-                updateEntry(i, { emoji: e.target.value })
-              }
-              placeholder="Emoji"
-              className="h-8 text-xs"
-            />
-            <Input
-              value={entry.demoUrl}
-              onChange={(e) =>
-                updateEntry(i, { demoUrl: e.target.value })
-              }
-              placeholder="Demo URL"
-              className="h-8 text-xs"
-            />
-          </div>
-          <Input
-            value={entry.codeUrl}
-            onChange={(e) =>
-              updateEntry(i, { codeUrl: e.target.value })
-            }
-            placeholder="Code URL (GitHub)"
-            className="h-8 text-xs"
-          />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className={`h-6 px-3 text-[10px] font-bold transition-all rounded ${
+              projectInputMode === "json"
+                ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+            onClick={() => setProjectInputMode("json")}
+          >
+            JSON
+          </Button>
         </div>
-      ))}
+      </div>
+
+      {projectInputMode === "form" ? (
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={addEntry}
+          >
+            <Plus className="h-3 w-3" /> Add Project
+          </Button>
+          {proj.entries.map((entry, i) => (
+            <div
+              key={i}
+              className="space-y-2 rounded-lg border p-3 relative"
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2 h-6 w-6 p-0 text-destructive"
+                onClick={() => removeEntry(i)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+              <ImageUpload
+                label="Project Image"
+                value={entry.imageBase64}
+                onChange={(v) => updateEntry(i, { imageBase64: v })}
+              />
+              <div className="space-y-1.5">
+                <Label className="text-xs">Project Name</Label>
+                <Input
+                  value={entry.name}
+                  onChange={(e) => updateEntry(i, { name: e.target.value })}
+                  placeholder="Project name"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Description</Label>
+                <Textarea
+                  value={entry.description}
+                  onChange={(e) =>
+                    updateEntry(i, { description: e.target.value })
+                  }
+                  placeholder="Description"
+                  className="text-xs min-h-[50px]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Period</Label>
+                <Input
+                  value={entry.period}
+                  onChange={(e) => updateEntry(i, { period: e.target.value })}
+                  placeholder="Jan 2023 - Jun 2023"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tech Stack</Label>
+                <Input
+                  value={entry.techStack.join(", ")}
+                  onChange={(e) =>
+                    updateEntry(i, {
+                      techStack: e.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                  placeholder="Tech stack (comma separated)"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Emoji</Label>
+                  <Input
+                    value={entry.emoji}
+                    onChange={(e) =>
+                      updateEntry(i, { emoji: e.target.value })
+                    }
+                    placeholder="Emoji"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Demo URL</Label>
+                  <Input
+                    value={entry.demoUrl}
+                    onChange={(e) =>
+                      updateEntry(i, { demoUrl: e.target.value })
+                    }
+                    placeholder="Demo URL"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Code URL</Label>
+                <Input
+                  value={entry.codeUrl}
+                  onChange={(e) =>
+                    updateEntry(i, { codeUrl: e.target.value })
+                  }
+                  placeholder="Code URL (GitHub)"
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+          ))}
+        </>
+      ) : (
+        <div className="space-y-3">
+          <Label className="text-xs font-medium text-muted-foreground">
+            Paste project data as JSON array or {"{"}&quot;projects&quot;: [...]{"}"} object
+          </Label>
+          <Textarea
+            value={projectsJson}
+            onChange={(e) => { setProjectsJson(e.target.value); setJsonError(null); }}
+            placeholder={`[\n  {\n    "name": "My Project",\n    "description": "Built with React and Node.js",\n    "tech_stack": ["React", "Node.js"],\n    "period": "Jan 2024 - Mar 2024",\n    "demo_url": "https://demo.example.com",\n    "code_url": "https://github.com/user/repo",\n    "emoji": "🚀"\n  }\n]`}
+            className="min-h-[200px] font-mono text-xs"
+          />
+          {jsonError && (
+            <p className="text-xs text-destructive font-medium">{jsonError}</p>
+          )}
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              className="h-8 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+              onClick={applyProjectsJson}
+              disabled={!projectsJson.trim()}
+            >
+              <Check className="h-3 w-3" />
+              Apply JSON
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1468,4 +1707,60 @@ function AchievementsForm({ data, update }: FormProps) {
       ))}
     </>
   );
+}
+
+/* ─── JSON Parser for Portfolio Projects ──────────────────────── */
+function parsePortfolioProjectJson(value: string):
+  | { ok: true; entries: ProjectEntry[] }
+  | { ok: false; error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { ok: false, error: "Invalid JSON syntax." };
+  }
+
+  const items: unknown[] = Array.isArray(parsed)
+    ? parsed
+    : (parsed && typeof parsed === "object" && "projects" in (parsed as Record<string, unknown>))
+      ? (parsed as Record<string, unknown>).projects as unknown[]
+      : [parsed];
+
+  if (!Array.isArray(items)) {
+    return { ok: false, error: "Expected an array of projects or { \"projects\": [...] }." };
+  }
+
+  const entries: ProjectEntry[] = [];
+  for (const item of items) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const r = item as Record<string, unknown>;
+
+    const name = str(r.name ?? r.title ?? r.heading);
+    const description = str(r.description ?? r.explanation ?? r.summary ?? r.role);
+    const techStackRaw = r.techStack ?? r.tech_stack ?? r.stack ?? r.technologies;
+    const techStack = Array.isArray(techStackRaw)
+      ? techStackRaw.filter((s): s is string => typeof s === "string")
+      : typeof techStackRaw === "string"
+        ? techStackRaw.split(",").map(s => s.trim()).filter(Boolean)
+        : [];
+    const period = str(r.period ?? r.date ?? r.dates);
+    const emoji = str(r.emoji) || "💻";
+    const demoUrl = str(r.demoUrl ?? r.demo_url ?? r.demo ?? r.link ?? r.url);
+    const codeUrl = str(r.codeUrl ?? r.code_url ?? r.github ?? r.repo ?? r.repository);
+    const imageBase64 = typeof r.imageBase64 === "string" ? r.imageBase64 : null;
+
+    if (name || description) {
+      entries.push({ name, description, period, techStack, emoji, demoUrl, codeUrl, imageBase64 });
+    }
+  }
+
+  if (entries.length === 0) {
+    return { ok: false, error: "No valid projects found. Each needs at least a name or description." };
+  }
+
+  return { ok: true, entries };
+}
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
 }
