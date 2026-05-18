@@ -2792,6 +2792,52 @@ export function LatexResumeTailorApp() {
                         <Button
                           type="button"
                           variant="ghost"
+                          className="h-7 gap-1.5 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                          onClick={renderPdfPreview}
+                          disabled={!previewId}
+                          title={previewId ? "Open PDF in new tab" : "Compile first to preview PDF"}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="mx-1 h-6 w-px bg-slate-600" />
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className={`relative h-7 gap-1.5 px-2 text-sm hover:bg-slate-700 hover:text-slate-100 ${lastCompileSuccess === false
+                            ? "text-red-400"
+                            : lastCompileSuccess === true
+                              ? "text-green-400"
+                              : "text-slate-100"
+                            }`}
+                          onClick={recompileLatex}
+                          disabled={isRecompiling || !canCompilePdf}
+                          title="Recompile LaTeX and show diagnostics"
+                        >
+                          {isRecompiling ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : lastCompileSuccess === true ? (
+                            <CircleCheck className="h-3.5 w-3.5" />
+                          ) : lastCompileSuccess === false ? (
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          {lastCompileSuccess === false && diagnostics.filter((d) => d.severity === "error").length > 0 && (
+                            <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 text-[10px] leading-none">
+                              {diagnostics.filter((d) => d.severity === "error").length}
+                            </Badge>
+                          )}
+                        </Button>
+
+
+
+
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100"
                           onClick={() => goToPreviewPage(previewPage - 1)}
@@ -2875,58 +2921,6 @@ export function LatexResumeTailorApp() {
                           aria-label="Zoom in preview"
                         >
                           <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {/* <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
-                          onClick={handleForwardSync}
-                          disabled={!synctexMapping || viewMode !== "pdf"}
-                          title={synctexMapping ? "Locate current line in PDF (forward sync)" : "SyncTeX unavailable"}
-                        >
-                          <Crosshair className="h-3.5 w-3.5" />
-                        </Button> */}
-                        <span className="mx-1 h-6 w-px bg-slate-600" />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-7 gap-1.5 px-2 text-sm text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
-                          onClick={renderPdfPreview}
-                          disabled={!previewId}
-                          title={previewId ? "Open PDF in new tab" : "Compile first to preview PDF"}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className={`relative h-7 gap-1.5 px-2 text-sm hover:bg-slate-700 hover:text-slate-100 ${lastCompileSuccess === false
-                            ? "text-red-400"
-                            : lastCompileSuccess === true
-                              ? "text-green-400"
-                              : "text-slate-100"
-                            }`}
-                          onClick={recompileLatex}
-                          disabled={isRecompiling || !canCompilePdf}
-                          title="Recompile LaTeX and show diagnostics"
-                        >
-                          {isRecompiling ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : lastCompileSuccess === true ? (
-                            <CircleCheck className="h-3.5 w-3.5" />
-                          ) : lastCompileSuccess === false ? (
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                          ) : (
-                            <RefreshCw className="h-3.5 w-3.5" />
-                          )}
-                          {lastCompileSuccess === false && diagnostics.filter((d) => d.severity === "error").length > 0 && (
-                            <Badge variant="destructive" className="ml-1 h-4 min-w-4 px-1 text-[10px] leading-none">
-                              {diagnostics.filter((d) => d.severity === "error").length}
-                            </Badge>
-                          )}
                         </Button>
                       </div>
                       <Button
