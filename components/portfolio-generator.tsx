@@ -553,11 +553,11 @@ export function PortfolioGenerator() {
       </div>
 
       {/* Right Panel - Editor */}
-      <div className="flex-[1] min-w-0 flex flex-col bg-white">
+      <div className="flex-[1] min-w-0 flex flex-col bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950">
         {/* Tab nav */}
-        <div className="border-b px-3 py-2.5 shrink-0 bg-slate-900">
+        <div className="border-b border-slate-700/40 px-3 py-2.5 shrink-0 bg-slate-900/80 backdrop-blur-sm">
           <div
-            className="grid grid-cols-5 rounded-lg border border-slate-700/60 bg-slate-800 p-1"
+            className="grid grid-cols-5 rounded-xl border border-slate-700/50 bg-slate-800/60 p-1 shadow-inner"
             role="tablist"
             aria-label="Portfolio editor tabs"
           >
@@ -565,9 +565,9 @@ export function PortfolioGenerator() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`h-8 text-xs font-semibold rounded-md transition-all duration-150 ${activeTab === tab.id
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md border-0 hover:from-emerald-450 hover:to-teal-450"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+                className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 ${activeTab === tab.id
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 border-0"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/40"
                   }`}
               >
                 {tab.label}
@@ -577,23 +577,32 @@ export function PortfolioGenerator() {
         </div>
 
         <ScrollArea className="flex-1">
-          <div className="p-4 space-y-4">
-            {activeTab === "intro" && (
-              <IntroForm data={data} update={update} />
-            )}
-            {activeTab === "education" && (
-              <EducationForm data={data} update={update} />
-            )}
-            {activeTab === "experience" && (
-              <ExperienceForm data={data} update={update} />
-            )}
-            {activeTab === "projects" && (
-              <ProjectsForm data={data} update={update} />
-            )}
-            {activeTab === "achievements" && (
-              <AchievementsForm data={data} update={update} />
-            )}
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              className="p-4 space-y-4"
+            >
+              {activeTab === "intro" && (
+                <IntroForm data={data} update={update} />
+              )}
+              {activeTab === "education" && (
+                <EducationForm data={data} update={update} />
+              )}
+              {activeTab === "experience" && (
+                <ExperienceForm data={data} update={update} />
+              )}
+              {activeTab === "projects" && (
+                <ProjectsForm data={data} update={update} />
+              )}
+              {activeTab === "achievements" && (
+                <AchievementsForm data={data} update={update} />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </ScrollArea>
       </div>
 
@@ -679,7 +688,7 @@ type FormProps = {
 
 function SectionHeader({ title }: { title: string }) {
   return (
-    <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+    <h2 className="text-sm font-bold bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">{title}</h2>
   );
 }
 
@@ -702,23 +711,23 @@ function ImageUpload({
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
+      <Label className="text-xs text-slate-400 font-medium">{label}</Label>
       <div className="flex items-center gap-2">
         {value ? (
           <img
             src={value}
             alt={label}
-            className="h-10 w-10 rounded-md object-cover border"
+            className="h-10 w-10 rounded-lg object-cover border border-slate-600/50 ring-1 ring-emerald-500/20"
           />
         ) : (
-          <div className="h-10 w-10 rounded-md border border-dashed flex items-center justify-center">
-            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+          <div className="h-10 w-10 rounded-lg border border-dashed border-slate-600/60 flex items-center justify-center bg-slate-800/40">
+            <ImageIcon className="h-4 w-4 text-slate-500" />
           </div>
         )}
         <Button
           variant="outline"
           size="sm"
-          className="h-8 text-xs gap-1"
+          className="h-8 text-xs gap-1 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
           onClick={() => inputRef.current?.click()}
         >
           <Upload className="h-3 w-3" />
@@ -728,7 +737,7 @@ function ImageUpload({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 text-destructive"
+            className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
             onClick={() => onChange(null)}
           >
             <Trash2 className="h-3 w-3" />
@@ -779,105 +788,116 @@ function IntroForm({ data, update }: FormProps) {
         onChange={(v) => set({ profileImageBase64: v })}
       />
       <div className="space-y-1.5">
-        <Label className="text-xs">Full Name</Label>
+        <Label className="text-xs text-slate-400 font-medium">Full Name</Label>
         <Input
           value={intro.name}
           onChange={(e) => set({ name: e.target.value })}
           placeholder="John Doe"
-          className="h-8 text-xs"
+          className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs">Headline</Label>
+        <Label className="text-xs text-slate-400 font-medium">Headline</Label>
         <Input
           value={intro.headline}
           onChange={(e) => set({ headline: e.target.value })}
           placeholder="Crafting digital futures."
-          className="h-8 text-xs"
+          className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs">Description</Label>
+        <Label className="text-xs text-slate-400 font-medium">Description</Label>
         <Textarea
           value={intro.description}
           onChange={(e) => set({ description: e.target.value })}
           placeholder="A brief description about yourself..."
-          className="text-xs min-h-[60px]"
+          className="text-xs min-h-[60px] bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs">Availability Tag</Label>
+        <Label className="text-xs text-slate-400 font-medium">Availability Tag</Label>
         <Input
           value={intro.availabilityTag}
           onChange={(e) => set({ availabilityTag: e.target.value })}
           placeholder="Available for freelance"
-          className="h-8 text-xs"
+          className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs">Resume Link (PDF URL)</Label>
+        <Label className="text-xs text-slate-400 font-medium">Resume Link (PDF URL)</Label>
         <Input
           value={intro.resumeLink}
           onChange={(e) => set({ resumeLink: e.target.value })}
           placeholder="https://example.com/resume.pdf"
-          className="h-8 text-xs"
+          className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
         />
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[10px] text-slate-500">
           Replaces &quot;About Me&quot; button with a Resume download link in the hero section.
         </p>
       </div>
 
-      <Separator />
+      <Separator className="bg-slate-700/40" />
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-semibold">Social Links</Label>
+        <Label className="text-xs font-semibold text-slate-300">Social Links</Label>
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-xs gap-1"
+          className="h-7 text-xs gap-1 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
           onClick={addSocialLink}
         >
           <Plus className="h-3 w-3" /> Add
         </Button>
       </div>
-      {intro.socialLinks.map((link, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <select
-            value={link.platform}
-            onChange={(e) =>
-              updateSocialLink(i, {
-                platform: e.target.value as SocialLink["platform"],
-              })
-            }
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+      <AnimatePresence initial={false}>
+        {intro.socialLinks.map((link, i) => (
+          <motion.div
+            key={`social-${i}-${link.platform}`}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="overflow-hidden"
           >
-            <option value="github">GitHub</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="twitter">Twitter</option>
-            <option value="leetcode">LeetCode</option>
-            <option value="email">Email</option>
-            <option value="website">Website</option>
-          </select>
-          <Input
-            value={link.url}
-            onChange={(e) => updateSocialLink(i, { url: e.target.value })}
-            placeholder="URL"
-            className="h-8 text-xs flex-1"
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-destructive"
-            onClick={() => removeSocialLink(i)}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      ))}
+            <div className="flex items-center gap-2">
+              <select
+                value={link.platform}
+                onChange={(e) =>
+                  updateSocialLink(i, {
+                    platform: e.target.value as SocialLink["platform"],
+                  })
+                }
+                className="h-8 rounded-lg border border-slate-700/60 bg-slate-800/50 px-2 text-xs text-slate-200 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 focus:outline-none"
+              >
+                <option value="github">GitHub</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="twitter">Twitter</option>
+                <option value="leetcode">LeetCode</option>
+                <option value="email">Email</option>
+                <option value="website">Website</option>
+              </select>
+              <Input
+                value={link.url}
+                onChange={(e) => updateSocialLink(i, { url: e.target.value })}
+                placeholder="URL"
+                className="h-8 text-xs flex-1 bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                onClick={() => removeSocialLink(i)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
-      <Separator />
+      <Separator className="bg-slate-700/40" />
       <GitHubInlineForm data={data} update={update} />
 
-      <Separator />
+      <Separator className="bg-slate-700/40" />
       <LeetCodeInlineForm data={data} update={update} />
     </>
   );
@@ -914,18 +934,18 @@ function GitHubInlineForm({ data, update }: FormProps) {
     <>
       <SectionHeader title="GitHub Stats" />
       <div className="space-y-1.5">
-        <Label className="text-xs">GitHub Username</Label>
+        <Label className="text-xs text-slate-400 font-medium">GitHub Username</Label>
         <div className="flex items-center gap-2">
           <Input
             value={gh.username}
             onChange={(e) => setGh({ username: e.target.value })}
             placeholder="octocat"
-            className="h-8 text-xs flex-1"
+            className="h-8 text-xs flex-1 bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
           />
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1 shrink-0"
+            className="h-8 text-xs gap-1 shrink-0 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
             onClick={fetchGhStats}
             disabled={fetching || !gh.username.trim()}
           >
@@ -933,20 +953,20 @@ function GitHubInlineForm({ data, update }: FormProps) {
             Fetch
           </Button>
         </div>
-        {fetchError && <p className="text-[10px] text-destructive">{fetchError}</p>}
+        {fetchError && <p className="text-[10px] text-rose-400">{fetchError}</p>}
       </div>
       <div className="grid grid-cols-3 gap-2">
         <div className="space-y-1.5">
-          <Label className="text-xs">Contributions</Label>
-          <Input type="number" value={gh.contributions} onChange={(e) => setGh({ contributions: +e.target.value })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Contributions</Label>
+          <Input type="number" value={gh.contributions} onChange={(e) => setGh({ contributions: +e.target.value })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Repos</Label>
-          <Input type="number" value={gh.repos} onChange={(e) => setGh({ repos: +e.target.value })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Repos</Label>
+          <Input type="number" value={gh.repos} onChange={(e) => setGh({ repos: +e.target.value })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Stars</Label>
-          <Input value={gh.stars} onChange={(e) => setGh({ stars: e.target.value })} placeholder="1.2k" className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Stars</Label>
+          <Input value={gh.stars} onChange={(e) => setGh({ stars: e.target.value })} placeholder="1.2k" className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
       </div>
     </>
@@ -984,18 +1004,18 @@ function LeetCodeInlineForm({ data, update }: FormProps) {
     <>
       <SectionHeader title="LeetCode Stats" />
       <div className="space-y-1.5">
-        <Label className="text-xs">LeetCode Username</Label>
+        <Label className="text-xs text-slate-400 font-medium">LeetCode Username</Label>
         <div className="flex items-center gap-2">
           <Input
             value={lc.username}
             onChange={(e) => setLc({ username: e.target.value })}
             placeholder="leetcoder123"
-            className="h-8 text-xs flex-1"
+            className="h-8 text-xs flex-1 bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
           />
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1 shrink-0"
+            className="h-8 text-xs gap-1 shrink-0 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
             onClick={fetchLcStats}
             disabled={fetching || !lc.username.trim()}
           >
@@ -1003,51 +1023,51 @@ function LeetCodeInlineForm({ data, update }: FormProps) {
             Fetch
           </Button>
         </div>
-        {fetchError && <p className="text-[10px] text-destructive">{fetchError}</p>}
+        {fetchError && <p className="text-[10px] text-rose-400">{fetchError}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs">Total Solved</Label>
-        <Input type="number" value={lc.totalSolved} onChange={(e) => setLc({ totalSolved: +e.target.value })} className="h-8 text-xs" />
+        <Label className="text-xs text-slate-400 font-medium">Total Solved</Label>
+        <Input type="number" value={lc.totalSolved} onChange={(e) => setLc({ totalSolved: +e.target.value })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1.5">
-          <Label className="text-xs">Easy Solved</Label>
-          <Input type="number" value={lc.easy.solved} onChange={(e) => setLc({ easy: { ...lc.easy, solved: +e.target.value } })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Easy Solved</Label>
+          <Input type="number" value={lc.easy.solved} onChange={(e) => setLc({ easy: { ...lc.easy, solved: +e.target.value } })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Easy Total</Label>
-          <Input type="number" value={lc.easy.total} onChange={(e) => setLc({ easy: { ...lc.easy, total: +e.target.value } })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Easy Total</Label>
+          <Input type="number" value={lc.easy.total} onChange={(e) => setLc({ easy: { ...lc.easy, total: +e.target.value } })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Medium Solved</Label>
-          <Input type="number" value={lc.medium.solved} onChange={(e) => setLc({ medium: { ...lc.medium, solved: +e.target.value } })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Medium Solved</Label>
+          <Input type="number" value={lc.medium.solved} onChange={(e) => setLc({ medium: { ...lc.medium, solved: +e.target.value } })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Medium Total</Label>
-          <Input type="number" value={lc.medium.total} onChange={(e) => setLc({ medium: { ...lc.medium, total: +e.target.value } })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Medium Total</Label>
+          <Input type="number" value={lc.medium.total} onChange={(e) => setLc({ medium: { ...lc.medium, total: +e.target.value } })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Hard Solved</Label>
-          <Input type="number" value={lc.hard.solved} onChange={(e) => setLc({ hard: { ...lc.hard, solved: +e.target.value } })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Hard Solved</Label>
+          <Input type="number" value={lc.hard.solved} onChange={(e) => setLc({ hard: { ...lc.hard, solved: +e.target.value } })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Hard Total</Label>
-          <Input type="number" value={lc.hard.total} onChange={(e) => setLc({ hard: { ...lc.hard, total: +e.target.value } })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Hard Total</Label>
+          <Input type="number" value={lc.hard.total} onChange={(e) => setLc({ hard: { ...lc.hard, total: +e.target.value } })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
       </div>
-      <Separator />
+      <Separator className="bg-slate-700/40" />
       <div className="grid grid-cols-3 gap-2">
         <div className="space-y-1.5">
-          <Label className="text-xs">Ranking</Label>
-          <Input type="number" value={lc.ranking} onChange={(e) => setLc({ ranking: +e.target.value })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Ranking</Label>
+          <Input type="number" value={lc.ranking} onChange={(e) => setLc({ ranking: +e.target.value })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Streak</Label>
-          <Input type="number" value={lc.streak} onChange={(e) => setLc({ streak: +e.target.value })} className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Streak</Label>
+          <Input type="number" value={lc.streak} onChange={(e) => setLc({ streak: +e.target.value })} className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Percentile</Label>
-          <Input value={lc.globalPercentile} onChange={(e) => setLc({ globalPercentile: e.target.value })} placeholder="Top 5%" className="h-8 text-xs" />
+          <Label className="text-xs text-slate-400 font-medium">Percentile</Label>
+          <Input value={lc.globalPercentile} onChange={(e) => setLc({ globalPercentile: e.target.value })} placeholder="Top 5%" className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20" />
         </div>
       </div>
     </>
@@ -1107,158 +1127,182 @@ function EducationForm({ data, update }: FormProps) {
     <>
       <SectionHeader title="Education" />
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-semibold">Degrees</Label>
+        <Label className="text-xs font-semibold text-slate-300">Degrees</Label>
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-xs gap-1"
+          className="h-7 text-xs gap-1 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
           onClick={addEntry}
         >
           <Plus className="h-3 w-3" /> Add
         </Button>
       </div>
-      {edu.entries.map((entry, i) => (
-        <div
-          key={i}
-          className="space-y-2 rounded-lg border p-3 relative"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0 text-destructive"
-            onClick={() => removeEntry(i)}
+      <AnimatePresence initial={false}>
+        {edu.entries.map((entry, i) => (
+          <motion.div
+            key={`edu-${i}-${entry.degree}`}
+            initial={{ opacity: 0, height: 0, scale: 0.95 }}
+            animate={{ opacity: 1, height: "auto", scale: 1 }}
+            exit={{ opacity: 0, height: 0, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden"
           >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-          <Input
-            value={entry.degree}
-            onChange={(e) => updateEntry(i, { degree: e.target.value })}
-            placeholder="Degree"
-            className="h-8 text-xs"
-          />
-          <Input
-            value={entry.institution}
-            onChange={(e) =>
-              updateEntry(i, { institution: e.target.value })
-            }
-            placeholder="Institution"
-            className="h-8 text-xs"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              value={entry.period}
-              onChange={(e) => updateEntry(i, { period: e.target.value })}
-              placeholder="2018 - 2022"
-              className="h-8 text-xs"
-            />
-          </div>
-          <Input
-            value={entry.description}
-            onChange={(e) =>
-              updateEntry(i, { description: e.target.value })
-            }
-            placeholder="Description"
-            className="h-8 text-xs"
-          />
-        </div>
-      ))}
+            <div className="space-y-2 rounded-xl border border-slate-700/50 bg-slate-800/30 p-3 relative shadow-sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2 h-6 w-6 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                onClick={() => removeEntry(i)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+              <Input
+                value={entry.degree}
+                onChange={(e) => updateEntry(i, { degree: e.target.value })}
+                placeholder="Degree"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <Input
+                value={entry.institution}
+                onChange={(e) =>
+                  updateEntry(i, { institution: e.target.value })
+                }
+                placeholder="Institution"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  value={entry.period}
+                  onChange={(e) => updateEntry(i, { period: e.target.value })}
+                  placeholder="2018 - 2022"
+                  className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                />
+              </div>
+              <Input
+                value={entry.description}
+                onChange={(e) =>
+                  updateEntry(i, { description: e.target.value })
+                }
+                placeholder="Description"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
-      <Separator />
+      <Separator className="bg-slate-700/40" />
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-semibold">Skill Categories</Label>
+        <Label className="text-xs font-semibold text-slate-300">Skill Categories</Label>
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-xs gap-1"
+          className="h-7 text-xs gap-1 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
           onClick={addSkillCat}
         >
           <Plus className="h-3 w-3" /> Add
         </Button>
       </div>
-      {edu.skills.map((cat, i) => (
-        <div
-          key={i}
-          className="space-y-2 rounded-lg border p-3 relative"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0 text-destructive"
-            onClick={() => removeSkillCat(i)}
+      <AnimatePresence initial={false}>
+        {edu.skills.map((cat, i) => (
+          <motion.div
+            key={`skill-${i}-${cat.name}`}
+            initial={{ opacity: 0, height: 0, scale: 0.95 }}
+            animate={{ opacity: 1, height: "auto", scale: 1 }}
+            exit={{ opacity: 0, height: 0, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden"
           >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-          <Input
-            value={cat.name}
-            onChange={(e) => updateSkillCat(i, { name: e.target.value })}
-            placeholder="Category name (e.g. Frontend)"
-            className="h-8 text-xs"
-          />
-          <Input
-            value={cat.skills.join(", ")}
-            onChange={(e) =>
-              updateSkillCat(i, {
-                skills: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="Skills (comma separated)"
-            className="h-8 text-xs"
-          />
-        </div>
-      ))}
+            <div className="space-y-2 rounded-xl border border-slate-700/50 bg-slate-800/30 p-3 relative shadow-sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2 h-6 w-6 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                onClick={() => removeSkillCat(i)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+              <Input
+                value={cat.name}
+                onChange={(e) => updateSkillCat(i, { name: e.target.value })}
+                placeholder="Category name (e.g. Frontend)"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <Input
+                value={cat.skills.join(", ")}
+                onChange={(e) =>
+                  updateSkillCat(i, {
+                    skills: e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  })
+                }
+                placeholder="Skills (comma separated)"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
-      <Separator />
+      <Separator className="bg-slate-700/40" />
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-semibold">Certificates</Label>
+        <Label className="text-xs font-semibold text-slate-300">Certificates</Label>
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-xs gap-1"
+          className="h-7 text-xs gap-1 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
           onClick={addCert}
         >
           <Plus className="h-3 w-3" /> Add
         </Button>
       </div>
-      {edu.certificates.map((cert, i) => (
-        <div
-          key={i}
-          className="space-y-2 rounded-lg border p-3 relative"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0 text-destructive"
-            onClick={() => removeCert(i)}
+      <AnimatePresence initial={false}>
+        {edu.certificates.map((cert, i) => (
+          <motion.div
+            key={`cert-${i}-${cert.title}`}
+            initial={{ opacity: 0, height: 0, scale: 0.95 }}
+            animate={{ opacity: 1, height: "auto", scale: 1 }}
+            exit={{ opacity: 0, height: 0, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden"
           >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-          <Input
-            value={cert.title}
-            onChange={(e) => updateCert(i, { title: e.target.value })}
-            placeholder="Certificate title"
-            className="h-8 text-xs"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              value={cert.provider}
-              onChange={(e) =>
-                updateCert(i, { provider: e.target.value })
-              }
-              placeholder="Provider"
-              className="h-8 text-xs"
-            />
-            <Input
-              value={cert.year}
-              onChange={(e) => updateCert(i, { year: e.target.value })}
-              placeholder="Year"
-              className="h-8 text-xs"
-            />
-          </div>
-        </div>
-      ))}
+            <div className="space-y-2 rounded-xl border border-slate-700/50 bg-slate-800/30 p-3 relative shadow-sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2 h-6 w-6 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                onClick={() => removeCert(i)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+              <Input
+                value={cert.title}
+                onChange={(e) => updateCert(i, { title: e.target.value })}
+                placeholder="Certificate title"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  value={cert.provider}
+                  onChange={(e) =>
+                    updateCert(i, { provider: e.target.value })
+                  }
+                  placeholder="Provider"
+                  className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                />
+                <Input
+                  value={cert.year}
+                  onChange={(e) => updateCert(i, { year: e.target.value })}
+                  placeholder="Year"
+                  className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                />
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </>
   );
 }
@@ -1298,107 +1342,126 @@ function ExperienceForm({ data, update }: FormProps) {
       <Button
         variant="outline"
         size="sm"
-        className="h-7 text-xs gap-1"
+        className="h-7 text-xs gap-1 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
         onClick={addEntry}
       >
         <Plus className="h-3 w-3" /> Add Experience
       </Button>
-      {exp.entries.map((entry, i) => (
-        <div
-          key={i}
-          className="space-y-2 rounded-lg border p-3 relative"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0 text-destructive"
-            onClick={() => removeEntry(i)}
+      <AnimatePresence initial={false}>
+        {exp.entries.map((entry, i) => (
+          <motion.div
+            key={`exp-${i}-${entry.company}`}
+            initial={{ opacity: 0, height: 0, scale: 0.95 }}
+            animate={{ opacity: 1, height: "auto", scale: 1 }}
+            exit={{ opacity: 0, height: 0, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden"
           >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-          <ImageUpload
-            label="Company Logo"
-            value={entry.companyLogoBase64}
-            onChange={(v) => updateEntry(i, { companyLogoBase64: v })}
-          />
-          <Input
-            value={entry.role}
-            onChange={(e) => updateEntry(i, { role: e.target.value })}
-            placeholder="Role / Title"
-            className="h-8 text-xs"
-          />
-          <Input
-            value={entry.company}
-            onChange={(e) => updateEntry(i, { company: e.target.value })}
-            placeholder="Company"
-            className="h-8 text-xs"
-          />
-          <Input
-            value={entry.period}
-            onChange={(e) => updateEntry(i, { period: e.target.value })}
-            placeholder="Jan 2022 - Present"
-            className="h-8 text-xs"
-          />
-          <Input
-            value={entry.techStack.join(", ")}
-            onChange={(e) =>
-              updateEntry(i, {
-                techStack: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="Tech stack (comma separated)"
-            className="h-8 text-xs"
-          />
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Achievements</Label>
+            <div className="space-y-2 rounded-xl border border-slate-700/50 bg-slate-800/30 p-3 relative shadow-sm">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-xs gap-1"
-                onClick={() =>
+                className="absolute top-2 right-2 h-6 w-6 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                onClick={() => removeEntry(i)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+              <ImageUpload
+                label="Company Logo"
+                value={entry.companyLogoBase64}
+                onChange={(v) => updateEntry(i, { companyLogoBase64: v })}
+              />
+              <Input
+                value={entry.role}
+                onChange={(e) => updateEntry(i, { role: e.target.value })}
+                placeholder="Role / Title"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <Input
+                value={entry.company}
+                onChange={(e) => updateEntry(i, { company: e.target.value })}
+                placeholder="Company"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <Input
+                value={entry.period}
+                onChange={(e) => updateEntry(i, { period: e.target.value })}
+                placeholder="Jan 2022 - Present"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <Input
+                value={entry.techStack.join(", ")}
+                onChange={(e) =>
                   updateEntry(i, {
-                    achievements: [...entry.achievements, ""],
+                    techStack: e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean),
                   })
                 }
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
-            {entry.achievements.map((ach, j) => (
-              <div key={j} className="flex items-center gap-1">
-                <Input
-                  value={ach}
-                  onChange={(e) => {
-                    const updated = [...entry.achievements];
-                    updated[j] = e.target.value;
-                    updateEntry(i, { achievements: updated });
-                  }}
-                  placeholder="Achievement"
-                  className="h-7 text-xs"
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-destructive shrink-0"
-                  onClick={() =>
-                    updateEntry(i, {
-                      achievements: entry.achievements.filter(
-                        (_, idx) => idx !== j,
-                      ),
-                    })
-                  }
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+                placeholder="Tech stack (comma separated)"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-slate-400 font-medium">Achievements</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs gap-1 text-slate-400 hover:text-emerald-400"
+                    onClick={() =>
+                      updateEntry(i, {
+                        achievements: [...entry.achievements, ""],
+                      })
+                    }
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+                <AnimatePresence initial={false}>
+                  {entry.achievements.map((ach, j) => (
+                    <motion.div
+                      key={`ach-${i}-${j}`}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="flex items-center gap-1">
+                        <Input
+                          value={ach}
+                          onChange={(e) => {
+                            const updated = [...entry.achievements];
+                            updated[j] = e.target.value;
+                            updateEntry(i, { achievements: updated });
+                          }}
+                          placeholder="Achievement"
+                          className="h-7 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 shrink-0"
+                          onClick={() =>
+                            updateEntry(i, {
+                              achievements: entry.achievements.filter(
+                                (_, idx) => idx !== j,
+                              ),
+                            })
+                          }
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
-            ))}
-          </div>
-        </div>
-      ))}
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </>
   );
 }
@@ -1455,7 +1518,7 @@ function ProjectsForm({ data, update }: FormProps) {
       <div className="flex items-center justify-between">
         <SectionHeader title="Projects" />
         <div
-          className="grid grid-cols-2 rounded-lg border border-input bg-muted/30 p-0.5"
+          className="grid grid-cols-2 rounded-lg border border-slate-700/50 bg-slate-800/50 p-0.5"
           role="tablist"
           aria-label="Project input method"
         >
@@ -1465,8 +1528,8 @@ function ProjectsForm({ data, update }: FormProps) {
             variant="ghost"
             className={`h-6 px-3 text-[10px] font-bold transition-all rounded ${
               projectInputMode === "form"
-                ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/40"
             }`}
             onClick={() => setProjectInputMode("form")}
           >
@@ -1478,8 +1541,8 @@ function ProjectsForm({ data, update }: FormProps) {
             variant="ghost"
             className={`h-6 px-3 text-[10px] font-bold transition-all rounded ${
               projectInputMode === "json"
-                ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/40"
             }`}
             onClick={() => setProjectInputMode("json")}
           >
@@ -1493,130 +1556,138 @@ function ProjectsForm({ data, update }: FormProps) {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs gap-1"
+            className="h-7 text-xs gap-1 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
             onClick={addEntry}
           >
             <Plus className="h-3 w-3" /> Add Project
           </Button>
-          {proj.entries.map((entry, i) => (
-            <div
-              key={i}
-              className="space-y-2 rounded-lg border p-3 relative"
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute top-2 right-2 h-6 w-6 p-0 text-destructive"
-                onClick={() => removeEntry(i)}
+          <AnimatePresence initial={false}>
+            {proj.entries.map((entry, i) => (
+              <motion.div
+                key={`proj-${i}-${entry.name}`}
+                initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                animate={{ opacity: 1, height: "auto", scale: 1 }}
+                exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="overflow-hidden"
               >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-              <ImageUpload
-                label="Project Image"
-                value={entry.imageBase64}
-                onChange={(v) => updateEntry(i, { imageBase64: v })}
-              />
-              <div className="space-y-1.5">
-                <Label className="text-xs">Project Name</Label>
-                <Input
-                  value={entry.name}
-                  onChange={(e) => updateEntry(i, { name: e.target.value })}
-                  placeholder="Project name"
-                  className="h-8 text-xs"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Description</Label>
-                <Textarea
-                  value={entry.description}
-                  onChange={(e) =>
-                    updateEntry(i, { description: e.target.value })
-                  }
-                  placeholder="Description"
-                  className="text-xs min-h-[50px]"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Period</Label>
-                <Input
-                  value={entry.period}
-                  onChange={(e) => updateEntry(i, { period: e.target.value })}
-                  placeholder="Jan 2023 - Jun 2023"
-                  className="h-8 text-xs"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Tech Stack</Label>
-                <Input
-                  value={entry.techStack.join(", ")}
-                  onChange={(e) =>
-                    updateEntry(i, {
-                      techStack: e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                  placeholder="Tech stack (comma separated)"
-                  className="h-8 text-xs"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Emoji</Label>
-                  <Input
-                    value={entry.emoji}
-                    onChange={(e) =>
-                      updateEntry(i, { emoji: e.target.value })
-                    }
-                    placeholder="Emoji"
-                    className="h-8 text-xs"
+                <div className="space-y-2 rounded-xl border border-slate-700/50 bg-slate-800/30 p-3 relative shadow-sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-2 right-2 h-6 w-6 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                    onClick={() => removeEntry(i)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                  <ImageUpload
+                    label="Project Image"
+                    value={entry.imageBase64}
+                    onChange={(v) => updateEntry(i, { imageBase64: v })}
                   />
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400 font-medium">Project Name</Label>
+                    <Input
+                      value={entry.name}
+                      onChange={(e) => updateEntry(i, { name: e.target.value })}
+                      placeholder="Project name"
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400 font-medium">Description</Label>
+                    <Textarea
+                      value={entry.description}
+                      onChange={(e) =>
+                        updateEntry(i, { description: e.target.value })
+                      }
+                      placeholder="Description"
+                      className="text-xs min-h-[50px] bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400 font-medium">Period</Label>
+                    <Input
+                      value={entry.period}
+                      onChange={(e) => updateEntry(i, { period: e.target.value })}
+                      placeholder="Jan 2023 - Jun 2023"
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400 font-medium">Tech Stack</Label>
+                    <Input
+                      value={entry.techStack.join(", ")}
+                      onChange={(e) =>
+                        updateEntry(i, {
+                          techStack: e.target.value
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      placeholder="Tech stack (comma separated)"
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-slate-400 font-medium">Emoji</Label>
+                      <Input
+                        value={entry.emoji}
+                        onChange={(e) =>
+                          updateEntry(i, { emoji: e.target.value })
+                        }
+                        placeholder="Emoji"
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-slate-400 font-medium">Demo URL</Label>
+                      <Input
+                        value={entry.demoUrl}
+                        onChange={(e) =>
+                          updateEntry(i, { demoUrl: e.target.value })
+                        }
+                        placeholder="Demo URL"
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400 font-medium">Code URL</Label>
+                    <Input
+                      value={entry.codeUrl}
+                      onChange={(e) =>
+                        updateEntry(i, { codeUrl: e.target.value })
+                      }
+                      placeholder="Code URL (GitHub)"
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Demo URL</Label>
-                  <Input
-                    value={entry.demoUrl}
-                    onChange={(e) =>
-                      updateEntry(i, { demoUrl: e.target.value })
-                    }
-                    placeholder="Demo URL"
-                    className="h-8 text-xs"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Code URL</Label>
-                <Input
-                  value={entry.codeUrl}
-                  onChange={(e) =>
-                    updateEntry(i, { codeUrl: e.target.value })
-                  }
-                  placeholder="Code URL (GitHub)"
-                  className="h-8 text-xs"
-                />
-              </div>
-            </div>
-          ))}
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </>
       ) : (
         <div className="space-y-3">
-          <Label className="text-xs font-medium text-muted-foreground">
+          <Label className="text-xs font-medium text-slate-400">
             Paste project data as JSON array or {"{"}&quot;projects&quot;: [...]{"}"} object
           </Label>
           <Textarea
             value={projectsJson}
             onChange={(e) => { setProjectsJson(e.target.value); setJsonError(null); }}
             placeholder={`[\n  {\n    "name": "My Project",\n    "description": "Built with React and Node.js",\n    "tech_stack": ["React", "Node.js"],\n    "period": "Jan 2024 - Mar 2024",\n    "demo_url": "https://demo.example.com",\n    "code_url": "https://github.com/user/repo",\n    "emoji": "🚀"\n  }\n]`}
-            className="min-h-[200px] font-mono text-xs"
+            className="min-h-[200px] font-mono text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
           />
           {jsonError && (
-            <p className="text-xs text-destructive font-medium">{jsonError}</p>
+            <p className="text-xs text-rose-400 font-medium">{jsonError}</p>
           )}
           <div className="flex justify-end">
             <Button
               size="sm"
-              className="h-8 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="h-8 text-xs gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white border-0 shadow-md shadow-emerald-500/20"
               onClick={applyProjectsJson}
               disabled={!projectsJson.trim()}
             >
@@ -1658,53 +1729,61 @@ function AchievementsForm({ data, update }: FormProps) {
       <Button
         variant="outline"
         size="sm"
-        className="h-7 text-xs gap-1"
+        className="h-7 text-xs gap-1 border-slate-600/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 hover:border-emerald-500/40"
         onClick={addEntry}
       >
         <Plus className="h-3 w-3" /> Add Achievement
       </Button>
-      {ach.entries.map((entry, i) => (
-        <div
-          key={i}
-          className="space-y-2 rounded-lg border p-3 relative"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0 text-destructive"
-            onClick={() => removeEntry(i)}
+      <AnimatePresence initial={false}>
+        {ach.entries.map((entry, i) => (
+          <motion.div
+            key={`ach-${i}-${entry.title}`}
+            initial={{ opacity: 0, height: 0, scale: 0.95 }}
+            animate={{ opacity: 1, height: "auto", scale: 1 }}
+            exit={{ opacity: 0, height: 0, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden"
           >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-          <ImageUpload
-            label="Achievement Image"
-            value={entry.imageBase64}
-            onChange={(v) => updateEntry(i, { imageBase64: v })}
-          />
-          <Input
-            value={entry.title}
-            onChange={(e) => updateEntry(i, { title: e.target.value })}
-            placeholder="Achievement title"
-            className="h-8 text-xs"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              value={entry.metric}
-              onChange={(e) =>
-                updateEntry(i, { metric: e.target.value })
-              }
-              placeholder="Metric (e.g. 2023)"
-              className="h-8 text-xs"
-            />
-            <Input
-              value={entry.emoji}
-              onChange={(e) => updateEntry(i, { emoji: e.target.value })}
-              placeholder="Emoji"
-              className="h-8 text-xs"
-            />
-          </div>
-        </div>
-      ))}
+            <div className="space-y-2 rounded-xl border border-slate-700/50 bg-slate-800/30 p-3 relative shadow-sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2 h-6 w-6 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                onClick={() => removeEntry(i)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+              <ImageUpload
+                label="Achievement Image"
+                value={entry.imageBase64}
+                onChange={(v) => updateEntry(i, { imageBase64: v })}
+              />
+              <Input
+                value={entry.title}
+                onChange={(e) => updateEntry(i, { title: e.target.value })}
+                placeholder="Achievement title"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  value={entry.metric}
+                  onChange={(e) =>
+                    updateEntry(i, { metric: e.target.value })
+                  }
+                  placeholder="Metric (e.g. 2023)"
+                  className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                />
+                <Input
+                  value={entry.emoji}
+                  onChange={(e) => updateEntry(i, { emoji: e.target.value })}
+                  placeholder="Emoji"
+                  className="h-8 text-xs bg-slate-800/50 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50 focus:ring-emerald-500/20"
+                />
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </>
   );
 }
