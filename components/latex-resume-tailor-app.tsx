@@ -1582,7 +1582,7 @@ export function LatexResumeTailorApp() {
     try {
       const blob = pdfBlobRef.current ?? await createPdfBlob();
       pdfBlobRef.current = blob;
-      downloadBlob(blob, getDownloadFilename(companyRole));
+      downloadBlob(blob, getDownloadFilename(currentProjectName || companyRole || "resume"));
     } catch (compileError) {
       const message =
         compileError instanceof Error ? compileError.message : "LaTeX compilation failed.";
@@ -1596,7 +1596,7 @@ export function LatexResumeTailorApp() {
   function downloadLatexSource() {
     downloadBlob(
       new Blob([latexCode], { type: "application/x-tex;charset=utf-8" }),
-      `${sanitizeFilename(companyRole || "resume")}.tex`,
+      `${sanitizeFilename(currentProjectName || companyRole || "resume")}.tex`,
     );
   }
 
