@@ -339,36 +339,36 @@ export function PortfolioGenerator() {
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Left Panel - Preview */}
       <div className="flex-[3] min-w-0 border-r flex flex-col">
-        <div className="flex items-center gap-2 border-b px-4 py-2 bg-white shrink-0">
+        <div className="flex items-center gap-2 border-b border-slate-700/60 px-4 py-2.5 bg-slate-800 text-slate-100 shrink-0">
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 text-slate-300 hover:text-white hover:bg-slate-700/50"
             onClick={() => window.close()}
             title="Back to Resume Editor"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <Separator orientation="vertical" className="h-5" />
-          <h1 className="text-sm font-semibold">Portfolio Preview</h1>
+          <Separator orientation="vertical" className="h-5 bg-slate-700/60" />
+          <h1 className="text-sm font-bold text-slate-200 tracking-wide">Portfolio Preview</h1>
           <div className="ml-auto flex items-center gap-2">
             {deployedUrl && (
               <a
                 href={deployedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold text-emerald-400 bg-emerald-950/30 border border-emerald-800/80 rounded-md hover:bg-emerald-950/60 transition-colors shadow-sm"
               >
-                <Check className="h-3 w-3" />
+                <Check className="h-3 w-3 text-emerald-400" />
                 Live
                 <ExternalLink className="h-3 w-3" />
               </a>
             )}
             {deployedUrl && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-8 gap-1.5 text-xs"
+                className="h-8 gap-1.5 text-xs bg-slate-700/60 border border-slate-650 text-slate-200 hover:bg-slate-600 hover:text-white transition-colors"
                 onClick={redeployExisting}
                 disabled={deploying}
               >
@@ -377,9 +377,9 @@ export function PortfolioGenerator() {
               </Button>
             )}
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="h-8 gap-1.5 text-xs"
+              className="h-8 gap-1.5 text-xs bg-slate-700/60 border border-slate-650 text-slate-200 hover:bg-slate-600 hover:text-white transition-colors"
               onClick={recompile}
               title="Update preview with current edits"
             >
@@ -388,16 +388,16 @@ export function PortfolioGenerator() {
             </Button>
             {userId && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-8 gap-1.5 text-xs"
+                className="h-8 gap-1.5 text-xs bg-slate-700/60 border border-slate-650 text-slate-200 hover:bg-slate-600 hover:text-white transition-colors disabled:opacity-40"
                 onClick={saveToSupabase}
                 disabled={saving}
               >
                 {saving ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : saveSuccess ? (
-                  <Check className="h-3.5 w-3.5 text-green-600" />
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
                 ) : (
                   <Save className="h-3.5 w-3.5" />
                 )}
@@ -406,9 +406,9 @@ export function PortfolioGenerator() {
             )}
             <div className="relative" ref={deployDropdownRef}>
               <Button
-                variant="default"
+                variant="ghost"
                 size="sm"
-                className="h-8 gap-1.5 text-xs"
+                className="h-8 gap-1.5 text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 border-0 text-white font-semibold transition-all shadow-md shadow-emerald-950/20 active:scale-95"
                 onClick={() => setDeployOpen(!deployOpen)}
                 disabled={deploying}
               >
@@ -417,38 +417,38 @@ export function PortfolioGenerator() {
                 <ChevronDown className="h-3 w-3" />
               </Button>
               {deployOpen && (
-                <div className="absolute right-0 top-full mt-1 w-72 bg-white border rounded-lg shadow-lg z-50 p-3 space-y-3">
-                  <p className="text-xs font-semibold text-foreground">Deploy Portfolio</p>
+                <div className="absolute right-0 top-full mt-1.5 w-72 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 p-4 space-y-3.5 text-slate-100">
+                  <p className="text-xs font-semibold text-slate-200">Deploy Portfolio</p>
                   <div className="flex gap-1.5">
                     <button
-                      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium border rounded-md transition-colors ${deployPlatform === "netlify" ? "border-[#00C7B7] bg-[#00C7B7]/10 text-[#00897B]" : "border-border hover:bg-muted"}`}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium border rounded-md transition-colors ${deployPlatform === "netlify" ? "border-[#00C7B7] bg-[#00C7B7]/10 text-[#00E5D5]" : "border-slate-750 hover:bg-slate-800 text-slate-300 hover:text-slate-100"}`}
                       onClick={() => setDeployPlatform("netlify")}
                     >
                       <svg className="h-3.5 w-3.5" viewBox="0 0 40 40" fill="none"><path d="M20.593 3.007L3.478 20.122l17.115 17.115 17.115-17.115L20.593 3.007z" fill="#00C7B7" /></svg>
                       Netlify
                     </button>
                     <button
-                      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium border rounded-md transition-colors ${deployPlatform === "vercel" ? "border-black bg-black/5 text-black" : "border-border hover:bg-muted"}`}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium border rounded-md transition-colors ${deployPlatform === "vercel" ? "border-white bg-white/5 text-white" : "border-slate-750 hover:bg-slate-800 text-slate-300 hover:text-slate-100"}`}
                       onClick={() => setDeployPlatform("vercel")}
                     >
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 76 65" fill="none"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" fill="black" /></svg>
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 76 65" fill="none"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" fill="white" /></svg>
                       Vercel
                     </button>
                   </div>
                   {deployPlatform && (
                     <>
                       <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground font-medium">
+                        <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                           {deployPlatform === "netlify" ? "Netlify" : "Vercel"} Personal Access Token
                         </label>
-                        <Input
+                        <input
                           type="password"
                           value={deployToken}
                           onChange={(e) => setDeployToken(e.target.value)}
                           placeholder="Paste your token here..."
-                          className="h-7 text-xs"
+                          className="h-8 w-full rounded-md border border-slate-700 bg-slate-950 px-3 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 placeholder-slate-500 transition-all"
                         />
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-[9px] leading-relaxed text-slate-500">
                           {deployPlatform === "netlify"
                             ? "Get it from app.netlify.com → User settings → Applications → Personal access tokens"
                             : "Get it from vercel.com → Settings → Tokens → Create"}
@@ -456,7 +456,7 @@ export function PortfolioGenerator() {
                       </div>
                       <Button
                         size="sm"
-                        className="w-full h-7 text-xs gap-1.5"
+                        className="w-full h-8 text-xs gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-semibold transition-all border-0 shadow-sm active:scale-95"
                         onClick={handleDeploy}
                         disabled={deploying || !deployToken.trim()}
                       >
@@ -466,7 +466,7 @@ export function PortfolioGenerator() {
                     </>
                   )}
                   {deployError && (
-                    <p className="text-[10px] text-destructive">{deployError}</p>
+                    <p className="text-[10px] text-rose-400 animate-pulse font-medium">{deployError}</p>
                   )}
                 </div>
               )}
@@ -490,15 +490,19 @@ export function PortfolioGenerator() {
       {/* Right Panel - Editor */}
       <div className="flex-[1] min-w-0 flex flex-col bg-white">
         {/* Tab nav */}
-        <div className="border-b px-2 py-2 shrink-0">
-          <div className="flex flex-wrap gap-1">
+        <div className="border-b px-3 py-2.5 shrink-0 bg-slate-900">
+          <div
+            className="grid grid-cols-5 rounded-lg border border-slate-700/60 bg-slate-800 p-1"
+            role="tablist"
+            aria-label="Portfolio editor tabs"
+          >
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${activeTab === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted"
+                className={`h-8 text-xs font-semibold rounded-md transition-all duration-150 ${activeTab === tab.id
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md border-0 hover:from-emerald-450 hover:to-teal-450"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
                   }`}
               >
                 {tab.label}
