@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
-import projectsData from "@/projects.json";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
