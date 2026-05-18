@@ -3047,9 +3047,9 @@ export function LatexResumeTailorApp() {
                           type="button"
                           size="sm"
                           variant="ghost"
-                          className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 ${inputSidebarTab === "project"
-                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 border border-emerald-400/20"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                          className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 border ${inputSidebarTab === "project"
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 border-emerald-400/20"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent"
                             }`}
                           onClick={() => setInputSidebarTab("project")}
                           role="tab"
@@ -3061,9 +3061,9 @@ export function LatexResumeTailorApp() {
                           type="button"
                           size="sm"
                           variant="ghost"
-                          className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 ${inputSidebarTab === "jd"
-                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 border border-emerald-400/20"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                          className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 border ${inputSidebarTab === "jd"
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 border-emerald-400/20"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent"
                             }`}
                           onClick={() => setInputSidebarTab("jd")}
                           role="tab"
