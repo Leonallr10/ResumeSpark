@@ -32,5 +32,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/?auth_error=Could+not+verify+reset+link`);
+  return NextResponse.redirect(`${origin}/login?error=Could+not+verify+reset+link`);
 }

@@ -272,6 +272,7 @@ export function LatexResumeTailorApp() {
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [signOutModalOpen, setSignOutModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [supabaseProjects, setSupabaseProjects] = useState<ResumeProject[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -613,7 +614,9 @@ export function LatexResumeTailorApp() {
     setSupabaseProjects([]);
     setActiveProjectId(null);
     setSidebarOpen(false);
+    setSignOutModalOpen(false);
     toast.success("Signed out.");
+    window.location.href = "/";
   }
 
   const currentProjectName = useMemo(() => {
@@ -1603,7 +1606,7 @@ export function LatexResumeTailorApp() {
   function openPortfolioGenerator() {
     const portfolioData = extractPortfolioFromResume(resumeSections, activeProjectDrafts);
     portfolioToStorage(portfolioData);
-    window.open("/portfolio-generate", "_blank");
+    window.open("/portfolio-generator", "_blank");
   }
 
   async function auditResume() {
@@ -2068,6 +2071,23 @@ export function LatexResumeTailorApp() {
           </DialogFooter>
         </DialogContent>
       ) : null}
+      {signOutModalOpen ? (
+        <DialogContent onClose={() => setSignOutModalOpen(false)} className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sign Out</DialogTitle>
+            <DialogDescription>Are you sure you want to sign out? Any unsaved changes will be lost.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setSignOutModalOpen(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSignOut} className="flex-1 bg-red-600 text-white hover:bg-red-700">
+              <LogOut className="mr-1.5 h-3.5 w-3.5" />
+              Sign Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      ) : null}
       {geminiSettingsOpen ? (
         <DialogContent onClose={() => { setGeminiSettingsOpen(false); setTestKeyResult(null); }}>
           <DialogHeader>
@@ -2305,7 +2325,7 @@ export function LatexResumeTailorApp() {
                     </div>
                   </ScrollArea>
                   <div className="border-t border-slate-750 p-2">
-                    <Button type="button" variant="ghost" size="sm" className="w-full gap-2 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" onClick={handleSignOut}>
+                    <Button type="button" variant="ghost" size="sm" className="w-full gap-2 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" onClick={() => setSignOutModalOpen(true)}>
                       <LogOut className="h-3.5 w-3.5" />
                       Sign Out
                     </Button>

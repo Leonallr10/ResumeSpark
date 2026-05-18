@@ -1,5 +1,5 @@
-import { HomeResumeLoader } from "@/components/home-resume-loader";
+import { LandingPageLoader } from "@/components/landing-page-loader";
 
 export default function Home() {
-  return <HomeResumeLoader />;
+  return <LandingPageLoader />;
 }

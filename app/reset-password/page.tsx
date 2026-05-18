@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
     }
 
     setSuccess(true);
-    setTimeout(() => router.push("/"), 2000);
+    setTimeout(() => router.push("/resume-generator"), 2000);
   }
 
   return (
