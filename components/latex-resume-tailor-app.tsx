@@ -161,8 +161,18 @@ function providerForModel(model: string): LlmProvider {
   return MODEL_OPTIONS.find((opt) => opt.model === model)?.provider ?? "gemini";
 }
 
-type FormattingType = "section" | "resumeSubheading" | "resumeProjectHeading" | "resumeItem" | "normal-text" | "header-name";
+type FormattingType = string;
 
+function getDynamicCommands(latex: string) {
+  const customCommands: { name: string; args: number }[] = [];
+  const matches = latex.matchAll(/\\newcommand\{\\([a-zA-Z]+)\}(?:\[(\d+)\])?/g);
+  for (const match of matches) {
+    if (!customCommands.find(c => c.name === match[1])) {
+      customCommands.push({ name: match[1], args: match[2] ? parseInt(match[2], 10) : 0 });
+    }
+  }
+  return customCommands;
+}
 const LATEX_SIZE_COMMANDS = [
   { cmd: "\\tiny", pt: 6 },
   { cmd: "\\scriptsize", pt: 8 },
@@ -210,6 +220,7 @@ export function LatexResumeTailorApp() {
   const [inputSidebarTab, setInputSidebarTab] = useState<InputSidebarTab>("project");
   const [compilerStatus, setCompilerStatus] = useState<CompilerStatus | null>(null);
   const [checkingCompiler, setCheckingCompiler] = useState(true);
+  const [compilerEngine, setCompilerEngine] = useState<"pdflatex" | "xelatex" | "tectonic">("pdflatex");
   const [error, setError] = useState<string | null>(null);
   const [geminiSettingsOpen, setGeminiSettingsOpen] = useState(false);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("gemini");
@@ -1467,7 +1478,7 @@ export function LatexResumeTailorApp() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ latex: latexCode }),
+      body: JSON.stringify({ latex: latexCode, engine: compilerEngine }),
     });
 
     if (!response.ok) {
@@ -1497,7 +1508,7 @@ export function LatexResumeTailorApp() {
       const response = await fetch("/api/resume/compile-latex", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latex: latexCode }),
+        body: JSON.stringify({ latex: latexCode, engine: compilerEngine }),
       });
 
       if (!response.ok) {
@@ -1696,6 +1707,30 @@ export function LatexResumeTailorApp() {
     wrapSelectionWith("\\textit{", "}");
   }
 
+  function applyFormattingCommand(type: string) {
+    if (type === "normal-text") return;
+
+    let prefix = "";
+    let suffix = "";
+
+    if (type === "header-name") {
+      prefix = "\\textbf{\\Huge ";
+      suffix = "}";
+    } else if (type === "section") {
+      prefix = "\\section{";
+      suffix = "}";
+    } else {
+      const customCmds = getDynamicCommands(latexCode);
+      const cmdDef = customCmds.find((c) => c.name === type);
+      const argCount = cmdDef ? Math.max(1, cmdDef.args) : 1;
+
+      prefix = `\\${type}{`;
+      suffix = "}" + "{}".repeat(argCount - 1);
+    }
+
+    wrapSelectionWith(prefix, suffix);
+  }
+
 
   function getDocumentBasePt(latex: string): number {
     const m = latex.match(/\\documentclass\[[^\]]*?(\d+(?:\.\d+)?)pt[^\]]*\]/);
@@ -1764,23 +1799,11 @@ export function LatexResumeTailorApp() {
           ?? latex.match(/\{(\\Huge|\\huge|\\LARGE|\\Large|\\large)\s/);
         return headerMatch ? extractSizeFromArgs(headerMatch[1], basePt) : 25;
       }
-      case "resumeSubheading": {
-        const cmd = findCommandBody(latex, "resumeSubheading");
+      default: {
+        const cmd = findCommandBody(latex, type);
         if (!cmd) return basePt;
         return extractSizeFromArgs(cmd.body, basePt);
       }
-      case "resumeProjectHeading": {
-        const cmd = findCommandBody(latex, "resumeProjectHeading");
-        if (!cmd) return basePt;
-        return extractSizeFromArgs(cmd.body, basePt);
-      }
-      case "resumeItem": {
-        const cmd = findCommandBody(latex, "resumeItem")
-          ?? findCommandBody(latex, "resumeItemNoBullet");
-        return cmd ? extractSizeFromArgs(cmd.body, basePt) : Math.round(basePt * 0.9);
-      }
-      default:
-        return basePt;
     }
   }
 
@@ -1839,26 +1862,11 @@ export function LatexResumeTailorApp() {
         }
         break;
       }
-      case "resumeSubheading": {
-        const result = replaceSizeInCommandBody(updated, "resumeSubheading", newCmd);
+      default: {
+        const result = replaceSizeInCommandBody(updated, type, newCmd);
         if (result !== updated) {
           updated = result;
         }
-        break;
-      }
-      case "resumeProjectHeading": {
-        const result = replaceSizeInCommandBody(updated, "resumeProjectHeading", newCmd);
-        if (result !== updated) {
-          updated = result;
-        }
-        break;
-      }
-      case "resumeItem": {
-        let result = replaceSizeInCommandBody(updated, "resumeItem", newCmd);
-        if (result === updated) {
-          result = replaceSizeInCommandBody(updated, "resumeItemNoBullet", newCmd);
-        }
-        updated = result;
         break;
       }
     }
@@ -2347,16 +2355,39 @@ export function LatexResumeTailorApp() {
                   <div className="flex items-center gap-2">
                     <div className="relative">
                       <select
-                        value={toolbarCommand}
-                        onChange={(e) => setToolbarCommand(e.target.value as FormattingType)}
-                        className="h-8 w-32 appearance-none rounded-md border border-slate-700 bg-slate-900/60 pl-2.5 pr-8 py-1 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 truncate"
+                        value={compilerEngine}
+                        onChange={(e) => setCompilerEngine(e.target.value as "pdflatex" | "xelatex" | "tectonic")}
+                        className="h-8 w-28 appearance-none rounded-md border border-slate-700 bg-slate-900/60 pl-2.5 pr-8 py-1 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 truncate"
+                        title="Compiler Engine"
                       >
-                        <option value="header-name" className="bg-slate-800 text-slate-100">Header Name</option>
-                        <option value="section" className="bg-slate-800 text-slate-100">Section</option>
-                        <option value="resumeSubheading" className="bg-slate-800 text-slate-100">Subheading</option>
-                        <option value="resumeProjectHeading" className="bg-slate-800 text-slate-100">Project Head</option>
-                        <option value="resumeItem" className="bg-slate-800 text-slate-100">Bullet Item</option>
-                        <option value="normal-text" className="bg-slate-800 text-slate-100">Normal Text</option>
+                        <option value="pdflatex" className="bg-slate-800 text-slate-100">pdflatex</option>
+                        <option value="xelatex" className="bg-slate-800 text-slate-100">xelatex</option>
+                        <option value="tectonic" className="bg-slate-800 text-slate-100">tectonic</option>
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                    <div className="relative">
+                      <select
+                        value={toolbarCommand}
+                        onChange={(e) => {
+                          setToolbarCommand(e.target.value);
+                          applyFormattingCommand(e.target.value);
+                        }}
+                        className="h-8 w-36 appearance-none rounded-md border border-slate-700 bg-slate-900/60 pl-2.5 pr-8 py-1 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 truncate"
+                        title="Formatting Command"
+                      >
+                        <optgroup label="Built-in Commands" className="bg-slate-800 text-slate-300 font-semibold">
+                          <option value="header-name" className="text-slate-100 font-normal">Header Name</option>
+                          <option value="section" className="text-slate-100 font-normal">Section</option>
+                          <option value="normal-text" className="text-slate-100 font-normal">Normal Text</option>
+                        </optgroup>
+                        <optgroup label="Custom Commands" className="bg-slate-800 text-slate-300 font-semibold">
+                          {getDynamicCommands(latexCode).map((cmd) => (
+                            <option key={cmd.name} value={cmd.name} className="text-slate-100 font-normal">
+                              \{cmd.name}
+                            </option>
+                          ))}
+                        </optgroup>
                       </select>
                       <ChevronDown className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
@@ -2446,10 +2477,8 @@ export function LatexResumeTailorApp() {
                           {([
                             { type: "header-name" as FormattingType, label: "Header Name" },
                             { type: "section" as FormattingType, label: "Section" },
-                            { type: "resumeSubheading" as FormattingType, label: "Subheading" },
-                            { type: "resumeProjectHeading" as FormattingType, label: "Project Heading" },
-                            { type: "resumeItem" as FormattingType, label: "Bullet Item" },
                             { type: "normal-text" as FormattingType, label: "Normal Text" },
+                            ...getDynamicCommands(latexCode).map(cmd => ({ type: cmd.name, label: `\\${cmd.name}` }))
                           ]).map((item) => (
                             <button
                               key={item.type}
@@ -2458,6 +2487,7 @@ export function LatexResumeTailorApp() {
                               onClick={() => {
                                 setToolbarCommand(item.type);
                                 setFormattingMenuOpen(false);
+                                applyFormattingCommand(item.type);
                               }}
                             >
                               <span>{item.label}</span>
