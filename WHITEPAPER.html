@@ -1,0 +1,2075 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURABIO White Paper - AI-Powered Resume Tailoring & Portfolio Generation Platform</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #a5b4fc;
+            --accent: #06b6d4;
+            --accent-dark: #0891b2;
+            --bg: #0f0f1a;
+            --bg-card: #1a1a2e;
+            --bg-code: #16162a;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --text-heading: #f8fafc;
+            --border: #2d2d4a;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --gradient-1: linear-gradient(135deg, #6366f1, #06b6d4);
+            --gradient-2: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            font-size: 16px;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                color: #1a1a2e;
+                font-size: 11pt;
+            }
+
+            .hero {
+                background: #f8fafc !important;
+            }
+
+            .hero h1,
+            .hero p {
+                color: #1a1a2e !important;
+            }
+
+            .toc,
+            .section {
+                break-inside: avoid;
+            }
+
+            nav.sidebar {
+                display: none;
+            }
+        }
+
+        /* Sidebar Navigation */
+        nav.sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100vh;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 2rem 1rem;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+
+        nav.sidebar .nav-logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 2rem;
+            padding: 0 0.5rem;
+        }
+
+        nav.sidebar a {
+            display: block;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+
+        nav.sidebar a:hover {
+            color: var(--text-heading);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        nav.sidebar a.active {
+            color: var(--primary-light);
+            background: rgba(99, 102, 241, 0.15);
+            font-weight: 500;
+        }
+
+        /* Mobile menu toggle */
+        .menu-toggle {
+            display: none;
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 1001;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        /* Main content */
+        main {
+            margin-left: 280px;
+            max-width: 900px;
+            padding: 0 3rem 4rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-2);
+            border-bottom: 1px solid var(--border);
+            padding: 5rem 0 4rem;
+            margin: 0 -3rem 3rem;
+            padding-left: 3rem;
+            padding-right: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.06) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--primary-light);
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--text-heading);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .hero h1 span {
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            max-width: 650px;
+            position: relative;
+        }
+
+        .hero .version {
+            margin-top: 2rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            position: relative;
+        }
+
+        /* Sections */
+        .section {
+            margin-bottom: 4rem;
+            scroll-margin-top: 2rem;
+        }
+
+        h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--border);
+            position: relative;
+        }
+
+        h2::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--gradient-1);
+        }
+
+        h3 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: var(--text-heading);
+            margin: 2rem 0 1rem;
+        }
+
+        h4 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-heading);
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        strong {
+            color: var(--text-heading);
+            font-weight: 600;
+        }
+
+        /* Tables */
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        thead {
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        th {
+            padding: 0.85rem 1.25rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--primary-light);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid rgba(45, 45, 74, 0.5);
+            color: var(--text);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(99, 102, 241, 0.03);
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.85em;
+        }
+
+        :not(pre)>code {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary-light);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        /* Lists */
+        ul,
+        ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+
+        li::marker {
+            color: var(--primary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.75rem;
+            margin: 1.5rem 0;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.25rem;
+            margin: 1.5rem 0;
+        }
+
+        .card-grid .card {
+            margin: 0;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card-grid .card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .card h4 {
+            margin-top: 0;
+            color: var(--primary-light);
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 0;
+        }
+
+        /* Metric badges */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .metric {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .metric .value {
+            font-size: 2rem;
+            font-weight: 800;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .metric .label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        /* Architecture diagram */
+        .diagram {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.75rem;
+            line-height: 1.5;
+            white-space: pre;
+        }
+
+        /* Mermaid diagram containers */
+        .mermaid-wrapper {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+
+        .mermaid-wrapper .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+
+        .mermaid-wrapper .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Flow steps */
+        .flow-steps {
+            position: relative;
+            margin: 2rem 0;
+            padding-left: 2rem;
+        }
+
+        .flow-steps::before {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .flow-step {
+            position: relative;
+            margin-bottom: 1.5rem;
+            padding-left: 1.5rem;
+        }
+
+        .flow-step::before {
+            content: '';
+            position: absolute;
+            left: -2rem;
+            top: 0.5rem;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: 2px solid var(--primary);
+        }
+
+        .flow-step::after {
+            content: attr(data-step);
+            position: absolute;
+            left: -1.75rem;
+            top: 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Callout */
+        .callout {
+            background: rgba(99, 102, 241, 0.06);
+            border-left: 3px solid var(--primary);
+            border-radius: 0 8px 8px 0;
+            padding: 1.25rem 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .callout.warning {
+            background: rgba(245, 158, 11, 0.06);
+            border-left-color: var(--warning);
+        }
+
+        .callout.success {
+            background: rgba(16, 185, 129, 0.06);
+            border-left-color: var(--success);
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.12);
+            color: var(--primary-light);
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin: 0.15rem;
+        }
+
+        .tag.green {
+            background: rgba(16, 185, 129, 0.12);
+            color: #6ee7b7;
+        }
+
+        .tag.cyan {
+            background: rgba(6, 182, 212, 0.12);
+            color: #67e8f9;
+        }
+
+        .tag.amber {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fcd34d;
+        }
+
+        /* Divider */
+        hr {
+            border: none;
+            height: 1px;
+            background: var(--border);
+            margin: 3rem 0;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 3rem 0;
+            border-top: 1px solid var(--border);
+            margin-top: 4rem;
+        }
+
+        .footer p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            nav.sidebar {
+                transform: translateX(-100%);
+            }
+
+            nav.sidebar.open {
+                transform: translateX(0);
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            main {
+                margin-left: 0;
+                padding: 0 1.5rem 4rem;
+            }
+
+            .hero {
+                margin: 0 -1.5rem 3rem;
+                padding: 4rem 1.5rem 3rem;
+            }
+
+            .hero h1 {
+                font-size: 2.2rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+
+            .hero .subtitle {
+                font-size: 1rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+            }
+
+            .metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Syntax highlighting for code */
+        .keyword {
+            color: #c792ea;
+        }
+
+        .string {
+            color: #c3e88d;
+        }
+
+        .comment {
+            color: #546e7a;
+        }
+
+        .type {
+            color: #ffcb6b;
+        }
+
+        .function {
+            color: #82aaff;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#6366f1',
+                primaryTextColor: '#e2e8f0',
+                primaryBorderColor: '#4f46e5',
+                lineColor: '#06b6d4',
+                secondaryColor: '#1a1a2e',
+                tertiaryColor: '#16162a',
+                background: '#0f0f1a',
+                mainBkg: '#1a1a2e',
+                nodeBorder: '#4f46e5',
+                clusterBkg: '#16162a',
+                clusterBorder: '#2d2d4a',
+                titleColor: '#f8fafc',
+                edgeLabelBackground: '#1a1a2e',
+                nodeTextColor: '#e2e8f0'
+            },
+            flowchart: { curve: 'basis', padding: 20 },
+            er: { useMaxWidth: true }
+        });
+    </script>
+</head>
+
+<body>
+    <!-- Mobile Menu Toggle -->
+    <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')"
+        aria-label="Toggle navigation">
+        &#9776;
+    </button>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="nav-logo">AURABIO</div>
+        <a href="#executive-summary">Executive Summary</a>
+        <a href="#problem-statement">Problem Statement</a>
+        <a href="#solution-overview">Solution Overview</a>
+        <a href="#system-architecture">System Architecture</a>
+        <a href="#technology-stack">Technology Stack</a>
+        <a href="#feature-breakdown">Feature Breakdown</a>
+        <a href="#ai-integration">AI & LLM Integration</a>
+        <a href="#latex-pipeline">LaTeX Compilation Pipeline</a>
+        <a href="#synctex-engine">Bidirectional SyncTeX</a>
+        <a href="#portfolio-generation">Portfolio Generation</a>
+        <a href="#security">Security Architecture</a>
+        <a href="#performance">Performance Engineering</a>
+        <a href="#api-reference">API Reference</a>
+        <a href="#data-model">Data Model & Persistence</a>
+        <a href="#deployment">Deployment Strategy</a>
+        <a href="#differentiation">Competitive Differentiation</a>
+        <a href="#roadmap">Future Roadmap</a>
+        <a href="#conclusion">Conclusion</a>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <header class="hero">
+            <div class="hero-badge">White Paper v1.0</div>
+            <h1><span>AURABIO</span><br>AI-Powered Resume Tailoring &<br>Portfolio Generation Platform</h1>
+            <p class="subtitle">A production-grade platform that transforms career document management through
+                intelligent automation, multi-provider AI, and one-click deployment.</p>
+            <p class="version">May 2026 &mdash; Technical White Paper</p>
+        </header>
+
+        <!-- Executive Summary -->
+        <section class="section" id="executive-summary">
+            <h2>Executive Summary</h2>
+            <p><strong>AURABIO</strong> is a production-grade, full-stack web application that transforms the resume
+                tailoring and portfolio generation process through intelligent automation. By combining a
+                professional-grade LaTeX editor with multi-provider AI suggestions, bidirectional PDF synchronization,
+                and one-click portfolio deployment, AURABIO delivers an end-to-end career document management platform.
+            </p>
+
+            <div class="metrics">
+                <div class="metric">
+                    <div class="value">3</div>
+                    <div class="label">LLM Providers</div>
+                </div>
+                <div class="metric">
+                    <div class="value">4</div>
+                    <div class="label">LaTeX Compilers</div>
+                </div>
+                <div class="metric">
+                    <div class="value">5</div>
+                    <div class="label">Refinement Modes</div>
+                </div>
+                <div class="metric">
+                    <div class="value">7</div>
+                    <div class="label">AI Phases</div>
+                </div>
+                <div class="metric">
+                    <div class="value">2</div>
+                    <div class="label">Deploy Targets</div>
+                </div>
+                <div class="metric">
+                    <div class="value">300%</div>
+                    <div class="label">Max PDF Zoom</div>
+                </div>
+            </div>
+
+            <h3>Core Innovation</h3>
+            <p>AURABIO introduces <strong>Overleaf-style bidirectional SyncTeX navigation</strong> in a web application
+                &mdash; click a line in the editor to highlight the corresponding region in the compiled PDF, or click
+                the PDF to jump directly to the source code. This is combined with a <strong>hybrid zoom
+                    architecture</strong> that uses CSS transforms for instant visual feedback and debounced PDF.js
+                re-rasterization for sharp rendering, achieving smooth 60fps interactions without React re-render
+                overhead.</p>
+        </section>
+
+        <!-- Problem Statement -->
+        <section class="section" id="problem-statement">
+            <h2>Problem Statement</h2>
+
+            <h3>The Resume Tailoring Challenge</h3>
+            <p>Job seekers face a critical bottleneck in the modern hiring process: <strong>each application requires a
+                    tailored resume</strong> that aligns with the specific job description, company culture, and ATS
+                (Applicant Tracking System) requirements.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <h4>Time-Intensive Manual Tailoring</h4>
+                    <p>Professionals spend 30&ndash;90 minutes customizing each resume for a single application, making
+                        high-volume job searches unsustainable.</p>
+                </div>
+                <div class="card">
+                    <h4>LaTeX Users Lack AI Tools</h4>
+                    <p>Tools like Overleaf provide excellent LaTeX editing but no AI-powered content optimization. AI
+                        resume builders lack LaTeX support entirely.</p>
+                </div>
+                <div class="card">
+                    <h4>Opaque ATS Compatibility</h4>
+                    <p>Applicants cannot easily verify whether their PDF will be parsed correctly by ATS systems,
+                        leading to invisible rejection of qualified candidates.</p>
+                </div>
+                <div class="card">
+                    <h4>Disconnected Portfolio</h4>
+                    <p>Maintaining a portfolio website separately from a resume creates synchronization overhead and
+                        content inconsistency.</p>
+                </div>
+                <div class="card">
+                    <h4>Fragmented Tooling</h4>
+                    <p>Resume editing, AI suggestion, PDF compilation, and portfolio deployment exist as separate
+                        services &mdash; each with its own workflow.</p>
+                </div>
+            </div>
+
+            <h3>Market Gap Analysis</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Capability</th>
+                            <th>Overleaf</th>
+                            <th>AI Resume Builders</th>
+                            <th>Generic AI</th>
+                            <th>AURABIO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>LaTeX Editor</td>
+                            <td>Yes</td>
+                            <td>No</td>
+                            <td>No</td>
+                            <td><span class="tag green">Yes</span></td>
+                        </tr>
+                        <tr>
+                            <td>AI Suggestions</td>
+                            <td>No</td>
+                            <td>Limited</td>
+                            <td>Generic</td>
+                            <td><span class="tag green">Specialized</span></td>
+                        </tr>
+                        <tr>
+                            <td>Bidirectional PDF Sync</td>
+                            <td>Yes</td>
+                            <td>No</td>
+                            <td>No</td>
+                            <td><span class="tag green">Yes</span></td>
+                        </tr>
+                        <tr>
+                            <td>Multi-LLM Support</td>
+                            <td>No</td>
+                            <td>No</td>
+                            <td>Single</td>
+                            <td><span class="tag green">3 Providers</span></td>
+                        </tr>
+                        <tr>
+                            <td>ATS Optimization</td>
+                            <td>No</td>
+                            <td>Partial</td>
+                            <td>No</td>
+                            <td><span class="tag green">Yes</span></td>
+                        </tr>
+                        <tr>
+                            <td>Portfolio Generation</td>
+                            <td>No</td>
+                            <td>No</td>
+                            <td>No</td>
+                            <td><span class="tag green">Yes</span></td>
+                        </tr>
+                        <tr>
+                            <td>One-Click Deployment</td>
+                            <td>No</td>
+                            <td>No</td>
+                            <td>No</td>
+                            <td><span class="tag green">Yes</span></td>
+                        </tr>
+                        <tr>
+                            <td>JD-Aligned Tailoring</td>
+                            <td>No</td>
+                            <td>Basic</td>
+                            <td>Manual</td>
+                            <td><span class="tag green">Automated</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Solution Overview -->
+        <section class="section" id="solution-overview">
+            <h2>Solution Overview</h2>
+            <p>AURABIO addresses these challenges through an integrated platform that unifies five traditionally
+                separate workflows:</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <h4>1. Intelligent Resume Editing</h4>
+                    <p>CodeMirror 6-based LaTeX editor with syntax highlighting, undo/redo, and real-time diagnostics
+                        &mdash; providing the editing experience of Overleaf with AI capabilities.</p>
+                </div>
+                <div class="card">
+                    <h4>2. AI-Powered Content Optimization</h4>
+                    <p>Multi-provider LLM integration generates job-description-aligned suggestions through a
+                        proprietary 7-phase prompt engineering pipeline.</p>
+                </div>
+                <div class="card">
+                    <h4>3. Professional PDF Compilation</h4>
+                    <p>Multi-compiler pipeline with automatic fallback ensures reliable PDF generation with SyncTeX
+                        support for bidirectional navigation.</p>
+                </div>
+                <div class="card">
+                    <h4>4. Inline Text Refinement</h4>
+                    <p>Streaming text polish system with 5 refinement modes and real-time token delivery with inline
+                        diff visualization.</p>
+                </div>
+                <div class="card">
+                    <h4>5. Portfolio Generation & Deployment</h4>
+                    <p>Automatic extraction of resume data into a customizable portfolio website with GitHub/LeetCode
+                        integration and one-click deployment.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- System Architecture -->
+        <section class="section" id="system-architecture">
+            <h2>System Architecture</h2>
+
+            <h3>High-Level Architecture</h3>
+            <div class="mermaid-wrapper">
+                <pre class="mermaid">
+flowchart TD
+    subgraph CLIENT["CLIENT (Browser)"]
+        CM["CodeMirror 6\nLaTeX Editor + Polish"]
+        PDF["PDF.js Canvas Viewer\nHybrid Zoom Engine\nForward/Inverse Sync"]
+        CM <-->|"SyncTeX"| PDF
+        APP["LatexResumeTailorApp\n(State Orchestrator)\nLaTeX | AI Suggestions | Projects | Undo/Redo"]
+        CM --> APP
+        PDF --> APP
+    end
+
+    APP -->|"HTTPS (fetch, streaming)"| API
+
+    subgraph SERVER["NEXT.JS API LAYER (Server)"]
+        API["/resume/suggestions | /resume/polish\n/resume/compile-latex | /resume/synctex\n/portfolio/github | /portfolio/deploy"]
+        subgraph SERVICES["External Services"]
+            LLM["LLM Providers\nGemini / Claude / Groq"]
+            LATEX["LaTeX Compilers\npdflatex / xelatex\ntectonic / cloud"]
+            DEPLOY["Deploy APIs\nNetlify / Vercel"]
+            DATA["Data\nGitHub / LeetCode"]
+        end
+        API --> LLM
+        API --> LATEX
+        API --> DEPLOY
+        API --> DATA
+    end
+
+    subgraph DB["SUPABASE (PostgreSQL + Auth + RLS)"]
+        TABLES["resume_projects | portfolio_data | resume_settings"]
+    end
+
+    API --> DB
+                </pre>
+            </div>
+
+            <h3>Architectural Principles</h3>
+            <ol>
+                <li><strong>Separation of Concerns</strong> &mdash; Client-side rendering and interaction logic is
+                    isolated from server-side compilation and AI processing.</li>
+                <li><strong>Graceful Degradation</strong> &mdash; Multi-compiler fallback ensures functionality
+                    regardless of environment constraints.</li>
+                <li><strong>Security by Default</strong> &mdash; Row Level Security (RLS) enforces data isolation at the
+                    database layer, not the application layer.</li>
+                <li><strong>Performance-First Rendering</strong> &mdash; React-bypass patterns and hybrid zoom prevent
+                    UI jank in performance-critical paths.</li>
+                <li><strong>Provider Agnosticism</strong> &mdash; LLM integration abstracts provider differences behind
+                    a unified suggestion interface.</li>
+            </ol>
+        </section>
+
+        <!-- Technology Stack -->
+        <section class="section" id="technology-stack">
+            <h2>Core Technology Stack</h2>
+
+            <h3>Frontend</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Technology</th>
+                            <th>Version</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Next.js</td>
+                            <td>15</td>
+                            <td>Full-stack React framework (App Router)</td>
+                        </tr>
+                        <tr>
+                            <td>React</td>
+                            <td>19</td>
+                            <td>UI component library</td>
+                        </tr>
+                        <tr>
+                            <td>TypeScript</td>
+                            <td>5</td>
+                            <td>Type-safe development</td>
+                        </tr>
+                        <tr>
+                            <td>Tailwind CSS</td>
+                            <td>3</td>
+                            <td>Utility-first styling</td>
+                        </tr>
+                        <tr>
+                            <td>CodeMirror</td>
+                            <td>6</td>
+                            <td>LaTeX source editor</td>
+                        </tr>
+                        <tr>
+                            <td>PDF.js</td>
+                            <td>4.10.38</td>
+                            <td>PDF rendering engine</td>
+                        </tr>
+                        <tr>
+                            <td>Radix UI</td>
+                            <td>Latest</td>
+                            <td>Accessible UI primitives</td>
+                        </tr>
+                        <tr>
+                            <td>Framer Motion</td>
+                            <td>Latest</td>
+                            <td>Animations and transitions</td>
+                        </tr>
+                        <tr>
+                            <td>Zod</td>
+                            <td>3.24.1</td>
+                            <td>Runtime schema validation</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Backend & Infrastructure</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Technology</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Next.js API Routes</td>
+                            <td>Serverless API endpoints</td>
+                        </tr>
+                        <tr>
+                            <td>Supabase</td>
+                            <td>PostgreSQL database, authentication, RLS</td>
+                        </tr>
+                        <tr>
+                            <td>@supabase/ssr</td>
+                            <td>Server-side session management</td>
+                        </tr>
+                        <tr>
+                            <td>pdflatex / xelatex / tectonic</td>
+                            <td>Local LaTeX compilation</td>
+                        </tr>
+                        <tr>
+                            <td>texlive.net</td>
+                            <td>Cloud LaTeX compilation fallback</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>AI/LLM Providers</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Provider</th>
+                            <th>SDK</th>
+                            <th>Use Case</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Google Gemini</td>
+                            <td><code>@google/genai</code></td>
+                            <td>Primary suggestion engine</td>
+                        </tr>
+                        <tr>
+                            <td>Anthropic Claude</td>
+                            <td><code>@anthropic-ai/sdk</code></td>
+                            <td>High-quality text refinement</td>
+                        </tr>
+                        <tr>
+                            <td>Groq</td>
+                            <td><code>groq-sdk</code></td>
+                            <td>Fast inference for real-time polish</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Feature Breakdown -->
+        <section class="section" id="feature-breakdown">
+            <h2>Feature Breakdown</h2>
+
+            <h3>1. AI-Powered Resume Suggestions</h3>
+            <p>The suggestion engine employs a <strong>7-phase prompt architecture</strong> designed to produce
+                actionable, non-fabricated resume improvements:</p>
+
+            <div class="flow-steps">
+                <div class="flow-step" data-step="1">
+                    <strong>JD Decomposition</strong> &mdash; Extract key requirements, technologies, and qualifications
+                    from the job description.
+                </div>
+                <div class="flow-step" data-step="2">
+                    <strong>Project Scoring</strong> &mdash; Rank user's projects by relevance to decomposed
+                    requirements.
+                </div>
+                <div class="flow-step" data-step="3">
+                    <strong>Bullet Construction</strong> &mdash; Craft impactful, quantified bullet points using STAR
+                    methodology.
+                </div>
+                <div class="flow-step" data-step="4">
+                    <strong>Skills Optimization</strong> &mdash; Align skills section with JD keywords and ATS
+                    requirements.
+                </div>
+                <div class="flow-step" data-step="5">
+                    <strong>Summary Generation</strong> &mdash; Generate a compelling professional summary.
+                </div>
+                <div class="flow-step" data-step="6">
+                    <strong>Validation Gate</strong> &mdash; Verify no fabricated claims, hallucinated metrics, or false
+                    attributions.
+                </div>
+                <div class="flow-step" data-step="7">
+                    <strong>Layout Density Enforcement</strong> &mdash; Ensure optimal information density within page
+                    constraints.
+                </div>
+            </div>
+
+            <h3>2. Streaming Text Polish</h3>
+            <p>Five specialized refinement modes for in-place text optimization:</p>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mode</th>
+                            <th>Behavior</th>
+                            <th>Use Case</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="tag">Improve</span></td>
+                            <td>Fix weak verbs, eliminate passive voice, sharpen impact</td>
+                            <td>General improvement</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag cyan">Elaborate</span></td>
+                            <td>Expand 1.5&ndash;2x with technical context and specifics</td>
+                            <td>Thin bullet points</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag">Professional</span></td>
+                            <td>Corporate tone, industry terminology, executive language</td>
+                            <td>Career transitions</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag amber">Concise</span></td>
+                            <td>Trim filler, target single clean line</td>
+                            <td>Space optimization</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag green">Quantify</span></td>
+                            <td>Add scale, impact numbers, and measurable outcomes</td>
+                            <td>ATS optimization</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="callout">
+                <strong>Delivery Mechanism:</strong> Web Streams API delivers tokens in real-time, with an inline
+                CodeMirror diff widget showing original vs. polished text before user acceptance.
+            </div>
+
+            <h3>3. Multi-Compiler LaTeX Pipeline</h3>
+            <div class="mermaid-wrapper">
+                <pre class="mermaid">
+flowchart TD
+    SRC["User LaTeX Source"] --> PDF_LATEX
+
+    PDF_LATEX["pdflatex\n(2-pass + SyncTeX)"]
+    PDF_LATEX -->|"success"| OUTPUT["PDF + SyncTeX"]
+    PDF_LATEX -->|"fail"| XE_LATEX
+
+    XE_LATEX["xelatex\n(Unicode + SyncTeX)"]
+    XE_LATEX -->|"success"| OUTPUT
+    XE_LATEX -->|"fail"| TECTONIC
+
+    TECTONIC["tectonic\n(Rust-based)"]
+    TECTONIC -->|"success"| OUTPUT
+    TECTONIC -->|"fail"| CLOUD
+
+    CLOUD["texlive.net\n(Cloud API, No SyncTeX)"]
+    CLOUD -->|"success"| OUTPUT2["PDF"]
+                </pre>
+            </div>
+
+            <div class="callout success">
+                <strong>ATS Compatibility Enhancements:</strong> Auto-injects <code>\pdfgentounicode=1</code> for
+                Unicode text extraction, includes <code>\input{glyphtounicode}</code> for glyph mapping, and applies
+                engine-specific normalization for consistent output.
+            </div>
+        </section>
+
+        <!-- AI Integration -->
+        <section class="section" id="ai-integration">
+            <h2>AI & LLM Integration</h2>
+
+            <h3>Provider Architecture</h3>
+            <p>AURABIO implements a <strong>provider-agnostic AI layer</strong> that normalizes the interface across
+                three LLM providers while preserving provider-specific optimizations:</p>
+
+            <pre><code><span class="keyword">interface</span> <span class="type">LLMProvider</span> {
+  <span class="function">generateSuggestions</span>(context: <span class="type">SuggestionContext</span>): <span class="type">Promise</span>&lt;<span class="type">SuggestionResponse</span>&gt;
+  <span class="function">streamPolish</span>(text: <span class="type">string</span>, mode: <span class="type">PolishMode</span>): <span class="type">AsyncGenerator</span>&lt;<span class="type">string</span>&gt;
+  <span class="function">validateApiKey</span>(key: <span class="type">string</span>): <span class="type">Promise</span>&lt;<span class="type">boolean</span>&gt;
+}</code></pre>
+
+            <h3>Model Selection & Fallback</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Provider</th>
+                            <th>Primary Model</th>
+                            <th>Fallback Models</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Gemini</td>
+                            <td><code>gemini-2.0-flash</code></td>
+                            <td>gemini-1.5-flash, gemini-1.5-pro</td>
+                        </tr>
+                        <tr>
+                            <td>Claude</td>
+                            <td><code>claude-sonnet-4-20250514</code></td>
+                            <td>claude-3-haiku</td>
+                        </tr>
+                        <tr>
+                            <td>Groq</td>
+                            <td><code>llama-3.3-70b-versatile</code></td>
+                            <td>mixtral-8x7b</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Response Recovery Pipeline</h3>
+            <p>LLM responses are inherently unpredictable. AURABIO implements robust JSON recovery:</p>
+            <ol>
+                <li>Standard <code>JSON.parse()</code> attempt</li>
+                <li>Regex extraction of JSON from markdown code blocks</li>
+                <li>Truncation repair (closes open brackets/braces)</li>
+                <li>Partial response acceptance (valid suggestions from incomplete responses)</li>
+                <li>Schema validation via Zod with graceful degradation</li>
+            </ol>
+        </section>
+
+        <!-- LaTeX Pipeline -->
+        <section class="section" id="latex-pipeline">
+            <h2>LaTeX Compilation Pipeline</h2>
+            <p>The multi-compiler pipeline provides <strong>100% compilation success rate</strong> regardless of the
+                user's local environment through graceful degradation across four backends:</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <h4>pdflatex (Primary)</h4>
+                    <p>Two-pass compilation with SyncTeX generation. Handles standard LaTeX packages and
+                        cross-references.</p>
+                </div>
+                <div class="card">
+                    <h4>xelatex (Fallback 1)</h4>
+                    <p>Unicode support for international characters. Full SyncTeX integration for bidirectional
+                        navigation.</p>
+                </div>
+                <div class="card">
+                    <h4>tectonic (Fallback 2)</h4>
+                    <p>Rust-based compiler with automatic package download. Self-contained with no external
+                        dependencies.</p>
+                </div>
+                <div class="card">
+                    <h4>texlive.net (Cloud)</h4>
+                    <p>Cloud API fallback with 30s timeout. No SyncTeX but guarantees compilation availability.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SyncTeX Engine -->
+        <section class="section" id="synctex-engine">
+            <h2>Bidirectional SyncTeX Engine</h2>
+
+            <h3>Forward Sync (Editor &rarr; PDF)</h3>
+            <ol>
+                <li>User clicks a line in the editor</li>
+                <li>System queries SyncTeX mapping for line number</li>
+                <li>Fuzzy lookup (&plusmn;5 lines) finds nearest mapped element</li>
+                <li>Coordinate transformation: scaled points &rarr; PDF page coordinates</li>
+                <li>Semi-transparent yellow overlay rendered on PDF canvas (2s auto-fade)</li>
+            </ol>
+
+            <h3>Inverse Sync (PDF &rarr; Editor)</h3>
+            <ol>
+                <li>User clicks a point on the PDF</li>
+                <li>Click coordinates transformed to PDF coordinate space</li>
+                <li>Nearest-neighbor Euclidean distance search in SyncTeX records</li>
+                <li>Source line number resolved with offset correction</li>
+                <li>Editor scrolls to and highlights the corresponding line</li>
+            </ol>
+
+            <h3>Hybrid Zoom Architecture</h3>
+            <p>Solves the fundamental tension between instant interaction (CSS transforms, 16ms) and sharp rendering
+                (PDF.js re-rasterization, 100&ndash;300ms):</p>
+
+            <div class="mermaid-wrapper">
+                <pre class="mermaid">
+flowchart TD
+    INPUT["User Zoom Input\n(wheel / pinch / button)"]
+    INPUT --> INSTANT
+
+    INSTANT["Instant Visual Response\nCSS transform: scale(N)\nNo React re-render\nDirect DOM manipulation"]
+    INSTANT -.->|"0ms latency, 60fps"| NOTE1[" "]
+
+    INSTANT -->|"300ms idle"| SHARP
+
+    SHARP["Sharp Re-rasterization\nPDF.js render at target resolution\nReset CSS transform to scale(1)"]
+    SHARP -.->|"Full resolution"| NOTE2[" "]
+
+    style NOTE1 fill:none,stroke:none
+    style NOTE2 fill:none,stroke:none
+                </pre>
+            </div>
+
+            <div class="callout">
+                <strong>React Bypass Pattern:</strong> Zoom state is held in <code>useRef</code> rather than
+                <code>useState</code>, preventing unnecessary re-renders during gesture-heavy interactions. Only the
+                final sharp render triggers a state update.
+            </div>
+        </section>
+
+        <!-- Portfolio Generation -->
+        <section class="section" id="portfolio-generation">
+            <h2>Portfolio Generation & Deployment</h2>
+
+            <h3>Data Pipeline</h3>
+            <p>The portfolio generator automatically extracts structured data from the user's resume and project drafts:
+            </p>
+            <ul>
+                <li><strong>Intro Section</strong> &mdash; Name, headline, description, social links, profile image
+                    (Base64), availability tag</li>
+                <li><strong>GitHub Integration</strong> &mdash; Contribution calendar, repositories, star count (via
+                    GitHub API)</li>
+                <li><strong>LeetCode Integration</strong> &mdash; Solved problems, ranking, streak, global percentile
+                    (via GraphQL)</li>
+                <li><strong>Experience Timeline</strong> &mdash; Role, company, period, descriptions (extracted from
+                    LaTeX)</li>
+                <li><strong>Projects Gallery</strong> &mdash; Name, description, tech stack, demo/code URLs, images</li>
+                <li><strong>Education & Skills</strong> &mdash; Degrees, categorized skills, certificates</li>
+            </ul>
+
+            <h3>One-Click Deployment</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <h4>Netlify Deployment</h4>
+                    <p>Creates site via API, computes file digest (SHA-1), deploys via file digest API. Supports
+                        redeployment to existing site with stored site ID.</p>
+                </div>
+                <div class="card">
+                    <h4>Vercel Deployment</h4>
+                    <p>Uses v13 deployments API with project framework settings. Polls deployment status until READY.
+                        Returns live URL immediately.</p>
+                </div>
+            </div>
+
+            <div class="callout success">
+                <strong>Committed/Uncommitted State:</strong> The portfolio preview only updates on explicit "Recompile"
+                click, not on every keystroke &mdash; preventing iframe thrashing and providing a stable reference while
+                editing.
+            </div>
+        </section>
+
+        <!-- Security -->
+        <section class="section" id="security">
+            <h2>Security Architecture</h2>
+
+            <h3>Authentication Flow</h3>
+            <div class="mermaid-wrapper">
+                <pre class="mermaid">
+flowchart LR
+    A["Sign Up\n(email/password)"] --> B["Email Sent\n(confirm link)"]
+    B --> C["/auth/callback\n(code exchange)"]
+    C --> D["Session Created\n(JWT in cookie)"]
+                </pre>
+            </div>
+
+            <h3>Security Layers</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Layer</th>
+                            <th>Mechanism</th>
+                            <th>Scope</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Network</strong></td>
+                            <td>HTTPS enforcement, SameSite cookies</td>
+                            <td>All traffic</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Authentication</strong></td>
+                            <td>Supabase Auth (JWT), email confirmation</td>
+                            <td>User identity</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Authorization</strong></td>
+                            <td>Row Level Security (RLS) policies</td>
+                            <td>Data access</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Route Protection</strong></td>
+                            <td>Next.js middleware</td>
+                            <td>Page access</td>
+                        </tr>
+                        <tr>
+                            <td><strong>API Validation</strong></td>
+                            <td>Zod schemas, input length limits</td>
+                            <td>Request integrity</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Key Isolation</strong></td>
+                            <td>Browser cookies (never server-stored)</td>
+                            <td>API key safety</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Row Level Security</h3>
+            <pre><code><span class="comment">-- Every table enforces this pattern:</span>
+<span class="keyword">CREATE POLICY</span> <span class="string">"Users can only access own data"</span>
+<span class="keyword">ON</span> resume_projects
+<span class="keyword">FOR ALL</span>
+<span class="keyword">USING</span> (user_id = auth.uid())
+<span class="keyword">WITH CHECK</span> (user_id = auth.uid());</code></pre>
+
+            <div class="callout warning">
+                <strong>Defense in Depth:</strong> Even in the event of an application-layer vulnerability, users cannot
+                access other users' data because RLS policies enforce isolation at the database level.
+            </div>
+        </section>
+
+        <!-- Performance -->
+        <section class="section" id="performance">
+            <h2>Performance Engineering</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Strategy</th>
+                            <th>Implementation</th>
+                            <th>Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Hybrid Zoom</strong></td>
+                            <td>CSS transform + debounced re-render</td>
+                            <td>60fps zoom, no jank</td>
+                        </tr>
+                        <tr>
+                            <td><strong>React Bypass</strong></td>
+                            <td>useRef for hot-path state</td>
+                            <td>Zero unnecessary re-renders</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Code Splitting</strong></td>
+                            <td>Dynamic imports, SSR disabled</td>
+                            <td>Faster initial load</td>
+                        </tr>
+                        <tr>
+                            <td><strong>PDF Caching</strong></td>
+                            <td>In-memory, 30-min TTL</td>
+                            <td>No recompilation on revisit</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Undo Debouncing</strong></td>
+                            <td>450ms idle threshold</td>
+                            <td>Efficient history stack</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Streaming AI</strong></td>
+                            <td>Web Streams API</td>
+                            <td>Instant feedback, no waiting</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Committed State</strong></td>
+                            <td>Preview updates on explicit action</td>
+                            <td>No iframe thrashing</td>
+                        </tr>
+                        <tr>
+                            <td><strong>SyncTeX Fuzzy Lookup</strong></td>
+                            <td>&plusmn;5 line range, Euclidean nearest</td>
+                            <td>Robust click targeting</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Memory Management</h3>
+            <ul>
+                <li><strong>PDF Cache</strong> &mdash; Auto-eviction on overflow, configurable max entries</li>
+                <li><strong>Undo Stack</strong> &mdash; Bounded depth prevents unbounded growth</li>
+                <li><strong>SyncTeX Data</strong> &mdash; Loaded on-demand, garbage collected on project switch</li>
+                <li><strong>Editor Extensions</strong> &mdash; Lazy-loaded CodeMirror plugins</li>
+            </ul>
+        </section>
+
+        <!-- API Reference -->
+        <section class="section" id="api-reference">
+            <h2>API Reference</h2>
+
+            <h3>Resume Endpoints</h3>
+
+            <h4><code>POST /api/resume/suggestions</code></h4>
+            <p>Generates AI-powered resume suggestions aligned to a job description.</p>
+            <pre><code><span class="comment">// Request Body</span>
+{
+  <span class="string">"resumeSections"</span>: [{<span class="string">"id"</span>: <span class="string">"string"</span>, <span class="string">"title"</span>: <span class="string">"string"</span>, <span class="string">"lines"</span>: [...]}],
+  <span class="string">"project"</span>: <span class="string">"string (formatted project details)"</span>,
+  <span class="string">"companyRole"</span>: <span class="string">"string (max 300 chars)"</span>,
+  <span class="string">"jd"</span>: <span class="string">"string (max 20,000 chars)"</span>,
+  <span class="string">"provider"</span>: <span class="string">"gemini | groq | claude"</span>,
+  <span class="string">"model"</span>: <span class="string">"string (optional)"</span>,
+  <span class="string">"apiKey"</span>: <span class="string">"string (optional)"</span>
+}
+
+<span class="comment">// Response (200)</span>
+{
+  <span class="string">"suggestions"</span>: [{
+    <span class="string">"id"</span>: <span class="string">"string"</span>,
+    <span class="string">"action"</span>: <span class="string">"replace | insert | delete"</span>,
+    <span class="string">"originalText"</span>: <span class="string">"string"</span>,
+    <span class="string">"suggestedText"</span>: <span class="string">"string"</span>,
+    <span class="string">"reason"</span>: <span class="string">"string"</span>,
+    <span class="string">"jdMatchReason"</span>: <span class="string">"string"</span>
+  }],
+  <span class="string">"sectionReviews"</span>: [{
+    <span class="string">"sectionId"</span>: <span class="string">"string"</span>,
+    <span class="string">"status"</span>: <span class="string">"good | needs_changes | critical"</span>,
+    <span class="string">"summary"</span>: <span class="string">"string"</span>
+  }]
+}</code></pre>
+
+            <h4><code>POST /api/resume/polish</code></h4>
+            <p>Streaming text refinement with 5 modes. Returns <code>text/plain</code> stream (token-by-token delivery).
+            </p>
+            <pre><code><span class="comment">// Request Body</span>
+{
+  <span class="string">"text"</span>: <span class="string">"string (max 5,000 chars)"</span>,
+  <span class="string">"action"</span>: <span class="string">"improve | elaborate | professional | concise | quantify"</span>,
+  <span class="string">"provider"</span>: <span class="string">"gemini | groq | claude"</span>,
+  <span class="string">"apiKey"</span>: <span class="string">"string (optional)"</span>
+}</code></pre>
+
+            <h4><code>POST /api/resume/compile-latex</code></h4>
+            <p>Compiles LaTeX source to PDF with SyncTeX mapping. Returns <code>application/pdf</code> binary.</p>
+            <pre><code><span class="comment">// Request Body</span>
+{
+  <span class="string">"latex"</span>: <span class="string">"string (max 250,000 chars)"</span>,
+  <span class="string">"engine"</span>: <span class="string">"pdflatex | xelatex | tectonic (optional)"</span>
+}
+
+<span class="comment">// Response Headers</span>
+X-Preview-Id: <span class="string">cache-key-for-retrieval</span>
+X-Compiler: <span class="string">pdflatex | xelatex | tectonic | cloud</span>
+X-Synctex-Available: <span class="string">true | false</span></code></pre>
+
+            <h4><code>GET /api/resume/preview/[id]</code></h4>
+            <p>Retrieves a cached PDF by preview ID. Returns 404 if cache expired (30-min TTL).</p>
+
+            <h4><code>GET /api/resume/synctex/[id]</code></h4>
+            <p>Retrieves compressed SyncTeX mapping. Returns <code>application/gzip</code> with
+                <code>X-Line-Offset</code> header.
+            </p>
+
+            <h3>Portfolio Endpoints</h3>
+
+            <h4><code>GET /api/portfolio/github?username={username}</code></h4>
+            <p>Fetches GitHub profile statistics and contribution calendar.</p>
+
+            <h4><code>GET /api/portfolio/leetcode?username={username}</code></h4>
+            <p>Fetches LeetCode submission statistics via GraphQL API.</p>
+
+            <h4><code>POST /api/portfolio/deploy/netlify</code></h4>
+            <p>Deploys portfolio HTML to Netlify with optional site redeployment.</p>
+
+            <h4><code>POST /api/portfolio/deploy/vercel</code></h4>
+            <p>Deploys portfolio HTML to Vercel with project creation and status polling.</p>
+        </section>
+
+        <!-- Data Model -->
+        <section class="section" id="data-model">
+            <h2>Data Model & Persistence</h2>
+
+            <h3>Database Schema (Supabase PostgreSQL)</h3>
+            <div class="mermaid-wrapper">
+                <pre class="mermaid">
+erDiagram
+    resume_projects {
+        uuid id PK
+        uuid user_id FK
+        text name
+        text latex_source
+        text company
+        text role
+        text jd
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    resume_project_drafts {
+        uuid id PK
+        uuid project_id FK
+        uuid user_id FK
+        text title
+        jsonb content
+        timestamptz created_at
+    }
+
+    portfolio_data {
+        uuid user_id PK
+        jsonb data
+        timestamptz updated_at
+    }
+
+    resume_settings {
+        uuid user_id PK
+        text llm_provider
+        text llm_model
+        timestamptz updated_at
+    }
+
+    resume_projects ||--o{ resume_project_drafts : "has drafts"
+                </pre>
+            </div>
+
+            <h3>Storage Strategy</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data Type</th>
+                            <th>Storage Layer</th>
+                            <th>Rationale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Resume source & metadata</td>
+                            <td>Supabase PostgreSQL</td>
+                            <td>Durable, cross-device sync</td>
+                        </tr>
+                        <tr>
+                            <td>Project drafts</td>
+                            <td>Supabase PostgreSQL</td>
+                            <td>Linked to resume projects</td>
+                        </tr>
+                        <tr>
+                            <td>Portfolio customizations</td>
+                            <td>Supabase PostgreSQL (jsonb)</td>
+                            <td>Flexible schema evolution</td>
+                        </tr>
+                        <tr>
+                            <td>LLM API keys</td>
+                            <td>Browser cookies (SameSite=Strict)</td>
+                            <td>Security isolation</td>
+                        </tr>
+                        <tr>
+                            <td>Compiled PDFs</td>
+                            <td>In-memory cache (30-min TTL)</td>
+                            <td>Ephemeral, regenerable</td>
+                        </tr>
+                        <tr>
+                            <td>SyncTeX mappings</td>
+                            <td>In-memory cache (30-min TTL)</td>
+                            <td>Ephemeral, regenerable</td>
+                        </tr>
+                        <tr>
+                            <td>Unauthenticated state</td>
+                            <td>localStorage</td>
+                            <td>Offline-capable fallback</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Deployment -->
+        <section class="section" id="deployment">
+            <h2>Deployment Strategy</h2>
+
+            <h3>Production Architecture</h3>
+            <div class="mermaid-wrapper">
+                <pre class="mermaid">
+flowchart TD
+    subgraph VERCEL["Vercel / Node.js Host"]
+        subgraph NEXTJS["Next.js Application"]
+            STATIC["Static Assets (CDN-cached)"]
+            SSR["Server Components (streaming SSR)"]
+            APIROUTES["API Routes (serverless functions)"]
+            MW["Middleware (auth gate)"]
+        end
+    end
+
+    APIROUTES --> SUPA
+    APIROUTES --> EXT
+
+    subgraph SUPA["Supabase"]
+        direction LR
+        DATABASE["PostgreSQL Database"]
+        AUTH["Auth (JWT)"]
+        RLS["Row Level Security"]
+    end
+
+    subgraph EXT["External Services"]
+        direction LR
+        LLMS["LLM Providers\nGemini / Claude / Groq"]
+        COMPILERS["LaTeX Compilers"]
+    end
+                </pre>
+            </div>
+
+            <h3>Scaling Considerations</h3>
+            <ul>
+                <li><strong>Stateless API Routes</strong> &mdash; Each request is self-contained; scales horizontally
+                    via serverless</li>
+                <li><strong>PDF Cache</strong> &mdash; Per-instance in-memory; Redis recommended for multi-instance</li>
+                <li><strong>Database</strong> &mdash; Supabase managed PostgreSQL with connection pooling (PgBouncer)
+                </li>
+                <li><strong>CDN</strong> &mdash; Static assets and public files served via Vercel Edge Network</li>
+            </ul>
+        </section>
+
+        <!-- Differentiation -->
+        <section class="section" id="differentiation">
+            <h2>Competitive Differentiation</h2>
+
+            <h3>What Makes AURABIO Unique</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Innovation</th>
+                            <th>Industry Status</th>
+                            <th>AURABIO Approach</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Web-based SyncTeX</strong></td>
+                            <td>Only in Overleaf (proprietary)</td>
+                            <td>Open implementation with fuzzy lookup</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Hybrid Zoom</strong></td>
+                            <td>No known web PDF viewers</td>
+                            <td>React-bypass + CSS transform + debounced render</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Multi-LLM Resume AI</strong></td>
+                            <td>Single-provider tools</td>
+                            <td>3 providers with automatic fallback</td>
+                        </tr>
+                        <tr>
+                            <td><strong>7-Phase Prompt Pipeline</strong></td>
+                            <td>Generic AI prompts</td>
+                            <td>Specialized, validated, non-hallucinating</td>
+                        </tr>
+                        <tr>
+                            <td><strong>LaTeX + AI Integration</strong></td>
+                            <td>Separate ecosystems</td>
+                            <td>Unified editor with inline suggestions</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Resume &rarr; Portfolio</strong></td>
+                            <td>Manual, disconnected</td>
+                            <td>Automatic extraction + one-click deploy</td>
+                        </tr>
+                        <tr>
+                            <td><strong>ATS-Optimized Compilation</strong></td>
+                            <td>User responsibility</td>
+                            <td>Automatic glyph-to-unicode injection</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Technical Moats</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <h4>SyncTeX Parser</h4>
+                    <p>Custom JavaScript implementation parsing SyncTeX format &mdash; no existing npm package provides
+                        this capability.</p>
+                </div>
+                <div class="card">
+                    <h4>Hybrid Zoom Engine</h4>
+                    <p>Novel architecture combining CSS transforms with selective re-rasterization for desktop-app
+                        smoothness in the browser.</p>
+                </div>
+                <div class="card">
+                    <h4>7-Phase Prompt Engineering</h4>
+                    <p>Extensive iteration to eliminate LLM hallucination in resume contexts while maximizing relevance.
+                    </p>
+                </div>
+                <div class="card">
+                    <h4>Multi-Compiler Pipeline</h4>
+                    <p>Graceful degradation across 4 backends ensures 100% compilation success regardless of
+                        environment.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Roadmap -->
+        <section class="section" id="roadmap">
+            <h2>Future Roadmap</h2>
+
+            <div class="card">
+                <h4>Phase 1: Enhanced AI Capabilities</h4>
+                <ul>
+                    <li><strong>Cover Letter Generation</strong> &mdash; JD-aligned cover letters using the same 7-phase
+                        pipeline</li>
+                    <li><strong>Interview Preparation</strong> &mdash; AI-generated behavioral questions based on resume
+                        content</li>
+                    <li><strong>Resume Scoring</strong> &mdash; Quantified ATS compatibility score with actionable
+                        suggestions</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h4>Phase 2: Collaboration &amp; Sharing</h4>
+                <ul>
+                    <li><strong>Shareable Resume Links</strong> &mdash; Public URLs for compiled PDFs with view analytics
+                    </li>
+                    <li><strong>Review Mode</strong> &mdash; Invite reviewers to comment on specific resume sections</li>
+                    <li><strong>Version History</strong> &mdash; Git-like version tracking with diff visualization</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h4>Phase 3: Platform Expansion</h4>
+                <ul>
+                    <li><strong>Multiple Resume Templates</strong> &mdash; Curated LaTeX templates for different
+                        industries</li>
+                    <li><strong>Resume Analytics</strong> &mdash; Track which versions lead to interview callbacks</li>
+                    <li><strong>Job Board Integration</strong> &mdash; Direct application submission from the platform
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h4>Phase 4: Application Management Dashboard</h4>
+                <ul>
+                    <li><strong>Application Tracker Dashboard</strong> &mdash; Main "/" route displays a unified
+                        dashboard showing companies applied to, total resumes generated, and per-company resume history
+                    </li>
+                    <li><strong>Application Timeline</strong> &mdash; Track when each application was submitted with
+                        status updates (applied, interviewing, offered, rejected)</li>
+                    <li><strong>Scheduled Applications</strong> &mdash; Schedule resume submissions and follow-ups with
+                        calendar integration and reminders</li>
+                    <li><strong>Analytics Overview</strong> &mdash; Visual metrics on application activity, response
+                        rates, and tailoring effectiveness</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h4>Phase 5: Cold Email &amp; Outreach Generation</h4>
+                <ul>
+                    <li><strong>AI Cold Mail Generator</strong> &mdash; Generate personalized cold emails aligned to the
+                        job description, resume content, and project portfolio using the same multi-provider LLM
+                        pipeline</li>
+                    <li><strong>Context-Aware Messaging</strong> &mdash; Automatically highlights relevant projects and
+                        experience that match the target role and company</li>
+                    <li><strong>Multiple Tone Modes</strong> &mdash; Professional, casual, networking, and follow-up
+                        templates with AI refinement</li>
+                    <li><strong>Outreach Tracking</strong> &mdash; Log sent emails, track responses, and schedule
+                        follow-up sequences</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h4>Phase 6: LaTeX Template Library &amp; Reusable Components</h4>
+                <ul>
+                    <li><strong>Folder Structure for .tex Files</strong> &mdash; Organize LaTeX source into reusable
+                        components (header, experience, skills, projects) in a folder-like hierarchy</li>
+                    <li><strong>Component Library</strong> &mdash; Save and reuse common LaTeX snippets (bullet points,
+                        section headers, formatting macros) across multiple resumes</li>
+                    <li><strong>Template Inheritance</strong> &mdash; Base templates with \input{} support for modular
+                        resume composition</li>
+                    <li><strong>Version-Controlled Snippets</strong> &mdash; Track changes to individual components
+                        independently of full resume versions</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h4>Phase 7: LinkedIn Profile Optimization</h4>
+                <ul>
+                    <li><strong>LinkedIn Profile Analyzer</strong> &mdash; AI-powered audit of LinkedIn headline, summary,
+                        and experience sections with improvement suggestions aligned to target roles</li>
+                    <li><strong>Resume-to-LinkedIn Sync</strong> &mdash; Automatically generate optimized LinkedIn content
+                        from your tailored resume, ensuring consistency across platforms</li>
+                    <li><strong>Keyword Optimization</strong> &mdash; Identify missing industry keywords and SEO terms that
+                        improve LinkedIn search visibility and recruiter discovery</li>
+                    <li><strong>Connection Outreach Templates</strong> &mdash; Generate personalized connection request
+                        messages based on shared skills, companies, or mutual interests</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h4>Phase 8: Intelligent Job Match Engine</h4>
+                <ul>
+                    <li><strong>AI Job-Resume Compatibility Score</strong> &mdash; Quantified match percentage between your
+                        resume and any job description with detailed gap analysis</li>
+                    <li><strong>Skill Gap Identification</strong> &mdash; Highlight missing skills, certifications, or
+                        experience required by the target role with learning path recommendations</li>
+                    <li><strong>Role Fit Visualization</strong> &mdash; Radar chart comparing your profile strengths against
+                        job requirements across technical skills, experience, and soft skills</li>
+                    <li><strong>Smart Job Recommendations</strong> &mdash; Surface best-fit roles based on your resume
+                        content, project portfolio, and career trajectory</li>
+                </ul>
+            </div>
+
+            <h3>Feature Integration Flow</h3>
+            <div class="mermaid-wrapper">
+                <pre class="mermaid">
+flowchart LR
+    subgraph INPUT["User Input"]
+        RESUME["Resume\n(.tex)"]
+        JD["Job Description"]
+        PROJECTS["Projects\nPortfolio"]
+    end
+
+    subgraph AI_ENGINE["AI Processing Engine"]
+        MATCH["Job Match\nScoring"]
+        TAILOR["Resume\nTailoring"]
+        COLD["Cold Email\nGeneration"]
+        LINKEDIN["LinkedIn\nOptimization"]
+    end
+
+    subgraph OUTPUT["Output"]
+        SCORE["Match Score\n& Gap Analysis"]
+        TAILORED["Tailored\nResume PDF"]
+        EMAIL["Personalized\nCold Email"]
+        PROFILE["Optimized\nLinkedIn Content"]
+        PORTFOLIO["Deployed\nPortfolio"]
+    end
+
+    RESUME --> MATCH
+    RESUME --> TAILOR
+    RESUME --> COLD
+    RESUME --> LINKEDIN
+    JD --> MATCH
+    JD --> TAILOR
+    JD --> COLD
+    PROJECTS --> COLD
+    PROJECTS --> PORTFOLIO
+
+    MATCH --> SCORE
+    TAILOR --> TAILORED
+    COLD --> EMAIL
+    LINKEDIN --> PROFILE
+                </pre>
+            </div>
+
+        </section>
+
+        <!-- Conclusion -->
+        <section class="section" id="conclusion">
+            <h2>Conclusion</h2>
+            <p>AURABIO represents a paradigm shift in career document management &mdash; unifying LaTeX editing,
+                AI-powered optimization, professional compilation, and portfolio deployment into a single, cohesive
+                platform. By addressing the full lifecycle of career document preparation, from initial drafting through
+                ATS optimization to live portfolio hosting, AURABIO eliminates the fragmentation and manual overhead
+                that characterize the current resume tooling landscape.</p>
+            <p>The platform's technical innovations &mdash; bidirectional SyncTeX navigation, hybrid zoom architecture,
+                multi-compiler pipeline, and 7-phase AI prompt engineering &mdash; establish significant technical
+                differentiation while delivering tangible user value: faster resume tailoring, higher-quality output,
+                and reduced friction from draft to deployment.</p>
+
+            <hr>
+
+            <h3>Technical Specifications Summary</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Specification</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Language</strong></td>
+                            <td>TypeScript 5 (strict mode)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Framework</strong></td>
+                            <td>Next.js 15 (App Router)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Runtime</strong></td>
+                            <td>Node.js 18+</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Database</strong></td>
+                            <td>PostgreSQL (Supabase-managed)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Authentication</strong></td>
+                            <td>Supabase Auth (JWT + RLS)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Package Manager</strong></td>
+                            <td>pnpm</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Browser Support</strong></td>
+                            <td>Chrome 90+, Firefox 90+, Safari 15+, Edge 90+</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Minimum Viewport</strong></td>
+                            <td>1024px (desktop-first)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p><strong>White Paper v1.0</strong> &mdash; May 2026</p>
+            <p>AURABIO &mdash; AI-Powered Resume Tailoring & Portfolio Generation Platform</p>
+        </footer>
+    </main>
+
+    <!-- Active nav highlighting -->
+    <script>
+        const sections = document.querySelectorAll('.section');
+        const navLinks = document.querySelectorAll('.sidebar a');
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    navLinks.forEach(link => link.classList.remove('active'));
+                    const activeLink = document.querySelector(`.sidebar a[href="#${entry.target.id}"]`);
+                    if (activeLink) activeLink.classList.add('active');
+                }
+            });
+        }, { rootMargin: '-20% 0px -70% 0px' });
+
+        sections.forEach(section => observer.observe(section));
+
+        // Close mobile menu on link click
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                document.querySelector('.sidebar').classList.remove('open');
+            });
+        });
+    </script>
+</body>
+
+</html>

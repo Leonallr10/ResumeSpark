@@ -68,6 +68,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { LatexDiagnostic } from "@/types/latex-diagnostics";
 import { createLatexSuggestionExtension } from "@/components/latex-editor-suggestions";
 import { createPolishExtension } from "@/components/latex-polish-extension";
+import { createErrorFixExtension, type ErrorFixState } from "@/components/latex-error-fix-extension";
 import {
   emptyProjectDraft,
   LatexProjectFields,
@@ -259,6 +260,8 @@ export function LatexResumeTailorApp() {
   const [isRecompiling, setIsRecompiling] = useState(false);
   const [lastCompileSuccess, setLastCompileSuccess] = useState<boolean | null>(null);
   const [diagnosticsPanelOpen, setDiagnosticsPanelOpen] = useState(false);
+  const [activeDiagFix, setActiveDiagFix] = useState<ErrorFixState>(null);
+  const errorFixAbortRef = useRef<AbortController | null>(null);
   const [committedLatex, setCommittedLatex] = useState(DEFAULT_LATEX_RESUME);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [toolbarCommand, setToolbarCommand] = useState<FormattingType>("section");
@@ -825,6 +828,7 @@ export function LatexResumeTailorApp() {
     setPdfFullscreen(false);
     pdfBlobRef.current = null;
     setDiagnostics([]);
+    setActiveDiagFix(null);
     setLastCompileSuccess(null);
     setDiagnosticsPanelOpen(false);
     setPreviewId(null);
@@ -1403,6 +1407,17 @@ export function LatexResumeTailorApp() {
     [polishState, suggestions.length, handleTriggerPolish, handleAcceptPolish, handleRejectPolish],
   );
 
+  const latexErrorFixExtension = useMemo(
+    () =>
+      createErrorFixExtension({
+        activeFix: activeDiagFix,
+        onApplyFix: applyErrorFix,
+        onDismiss: dismissErrorFix,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeDiagFix],
+  );
+
   function focusSuggestionAtIndex(index: number) {
     if (orderedSuggestions.length === 0) {
       return;
@@ -1548,6 +1563,7 @@ export function LatexResumeTailorApp() {
       if (newPreviewId) setPreviewId(newPreviewId);
       setCommittedLatex(latexCode);
       setDiagnostics([]);
+      setActiveDiagFix(null);
       setLastCompileSuccess(true);
       setDiagnosticsPanelOpen(false);
       setViewMode("pdf");
@@ -1577,6 +1593,79 @@ export function LatexResumeTailorApp() {
       recompileLatex();
     }
   };
+
+  async function requestErrorFix(diag: LatexDiagnostic) {
+    errorFixAbortRef.current?.abort();
+    const controller = new AbortController();
+    errorFixAbortRef.current = controller;
+
+    setActiveDiagFix({ line: diag.line, message: diag.message, loading: true });
+    focusEditorAtSourceLine(diag.line - 1);
+
+    const lines = latexCode.split("\n");
+    const errorLineIndex = diag.line - 1;
+    const fullLine = lines[errorLineIndex] ?? "";
+    const start = Math.max(0, errorLineIndex - 2);
+    const end = Math.min(lines.length, errorLineIndex + 3);
+    const codeSnippet = lines.slice(start, end).join("\n");
+
+    const resolvedKey = (
+      llmProvider === "groq" ? groqApiKey :
+      llmProvider === "claude" ? claudeApiKey :
+      geminiApiKey
+    ).trim() || undefined;
+
+    try {
+      const response = await fetch("/api/resume/error-fix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          diagnostic: { line: diag.line, message: diag.message, context: diag.context },
+          codeSnippet,
+          fullLine,
+          provider: llmProvider,
+          model: llmModel.trim() || undefined,
+          apiKey: resolvedKey,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const payload = await response.json() as { error?: string };
+        setActiveDiagFix((prev) => prev ? { ...prev, loading: false, error: payload.error ?? "Failed to get fix." } : null);
+        return;
+      }
+
+      const result = await response.json() as { fixedCode: string; explanation: string };
+      setActiveDiagFix((prev) => prev ? {
+        ...prev,
+        loading: false,
+        fixedCode: result.fixedCode,
+        explanation: result.explanation,
+      } : null);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setActiveDiagFix((prev) => prev ? { ...prev, loading: false, error: "Network error." } : null);
+    }
+  }
+
+  function applyErrorFix(fixedCode: string) {
+    if (!activeDiagFix) return;
+    const lines = latexCode.split("\n");
+    const lineIndex = activeDiagFix.line - 1;
+    if (lineIndex >= 0 && lineIndex < lines.length) {
+      lines[lineIndex] = fixedCode;
+      const newCode = lines.join("\n");
+      setLatexCode(newCode);
+      latestLatexRef.current = newCode;
+    }
+    setActiveDiagFix(null);
+  }
+
+  function dismissErrorFix() {
+    errorFixAbortRef.current?.abort();
+    setActiveDiagFix(null);
+  }
 
   async function downloadResumePdf() {
     setDownloading(true);
@@ -2761,7 +2850,7 @@ export function LatexResumeTailorApp() {
                     value={latexCode}
                     height="100%"
                     readOnly={suggesting}
-                    extensions={[latexLanguage, latexSuggestionExtension, latexPolishExtension]}
+                    extensions={[latexLanguage, latexSuggestionExtension, latexPolishExtension, latexErrorFixExtension]}
                     onCreateEditor={(view) => {
                       editorViewRef.current = view;
                     }}
@@ -2993,29 +3082,28 @@ export function LatexResumeTailorApp() {
                           <ScrollArea className="max-h-48">
                             <div className="space-y-0.5 px-3 pb-2">
                               {diagnostics.map((diag) => (
-                                <div
+                                <button
                                   key={diag.id}
-                                  className="flex items-start gap-2 rounded px-1.5 py-1 text-xs hover:bg-slate-800"
+                                  type="button"
+                                  className={`flex w-full items-start gap-2 rounded px-1.5 py-1 text-xs text-left transition-colors hover:bg-slate-800 cursor-pointer ${activeDiagFix?.line === diag.line ? "bg-slate-800 ring-1 ring-red-500/40" : ""}`}
+                                  onClick={() => requestErrorFix(diag)}
+                                  title={`Go to line ${diag.line} and get fix suggestion`}
                                 >
                                   <AlertTriangle
                                     className={`mt-0.5 h-3 w-3 shrink-0 ${diag.severity === "error" ? "text-red-400" : "text-amber-400"
                                       }`}
                                   />
-                                  <button
-                                    type="button"
-                                    className="shrink-0 font-mono text-blue-400 hover:underline"
-                                    onClick={() => focusEditorAtSourceLine(diag.line - 1)}
-                                    title={`Go to line ${diag.line}`}
-                                  >
+                                  <span className="shrink-0 font-mono text-blue-400">
                                     L{diag.line}
-                                  </button>
+                                  </span>
                                   <span className="text-slate-300">{diag.message}</span>
                                   {diag.context && (
                                     <code className="ml-auto shrink-0 truncate rounded bg-slate-800 px-1 text-[10px] text-slate-500">
                                       {diag.context}
                                     </code>
                                   )}
-                                </div>
+                                  <Sparkles className="ml-auto h-3 w-3 shrink-0 text-slate-500" />
+                                </button>
                               ))}
                             </div>
                           </ScrollArea>
