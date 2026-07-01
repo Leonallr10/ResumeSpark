@@ -3,17 +3,17 @@
 
 export function createClient() {
   const mockChain = {
-    select: (...args: any[]) => mockChain,
-    eq: (...args: any[]) => mockChain,
-    order: (...args: any[]) => mockChain,
-    limit: (...args: any[]) => mockChain,
-    single: async (...args: any[]) => ({ data: null, error: null }),
-    maybeSingle: async (...args: any[]) => ({ data: null, error: null }),
-    update: (...args: any[]) => mockChain,
-    insert: (...args: any[]) => mockChain,
-    upsert: async (...args: any[]) => ({ error: null }),
-    delete: (...args: any[]) => mockChain,
-    then: (cb: any) => cb({ data: null, error: null }),
+    select: (...args: unknown[]) => mockChain,
+    eq: (...args: unknown[]) => mockChain,
+    order: (...args: unknown[]) => mockChain,
+    limit: (...args: unknown[]) => mockChain,
+    single: async (...args: unknown[]) => ({ data: null, error: null }),
+    maybeSingle: async (...args: unknown[]) => ({ data: null, error: null }),
+    update: (...args: unknown[]) => mockChain,
+    insert: (...args: unknown[]) => mockChain,
+    upsert: async (...args: unknown[]) => ({ error: null }),
+    delete: (...args: unknown[]) => mockChain,
+    then: (cb: (value: unknown) => unknown) => cb({ data: null, error: null }),
   };
 
   return {
@@ -22,10 +22,10 @@ export function createClient() {
       getSession: async () => ({ data: { session: null } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       signOut: async () => {},
-      signUp: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
-      signInWithPassword: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
-      resetPasswordForEmail: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
+      signUp: async (...args: unknown[]) => ({ error: { message: "Auth is disabled" } }),
+      signInWithPassword: async (...args: unknown[]) => ({ error: { message: "Auth is disabled" } }),
+      resetPasswordForEmail: async (...args: unknown[]) => ({ error: { message: "Auth is disabled" } }),
     },
-    from: (...args: any[]) => mockChain,
+    from: (...args: unknown[]) => mockChain,
   };
 }

@@ -110,8 +110,8 @@ export default function ColdMailGenerator() {
         setSubject("");
         setBody(fullEmail.trim());
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setIsGenerating(false);
     }
