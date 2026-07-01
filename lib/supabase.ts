@@ -3,16 +3,16 @@
 
 export function createClient() {
   const mockChain = {
-    select: () => mockChain,
-    eq: () => mockChain,
-    order: () => mockChain,
-    limit: () => mockChain,
-    single: async () => ({ data: null, error: null }),
-    maybeSingle: async () => ({ data: null, error: null }),
-    update: () => mockChain,
-    insert: () => mockChain,
-    upsert: async () => ({ error: null }),
-    delete: () => mockChain,
+    select: (...args: any[]) => mockChain,
+    eq: (...args: any[]) => mockChain,
+    order: (...args: any[]) => mockChain,
+    limit: (...args: any[]) => mockChain,
+    single: async (...args: any[]) => ({ data: null, error: null }),
+    maybeSingle: async (...args: any[]) => ({ data: null, error: null }),
+    update: (...args: any[]) => mockChain,
+    insert: (...args: any[]) => mockChain,
+    upsert: async (...args: any[]) => ({ error: null }),
+    delete: (...args: any[]) => mockChain,
     then: (cb: any) => cb({ data: null, error: null }),
   };
 
@@ -22,10 +22,10 @@ export function createClient() {
       getSession: async () => ({ data: { session: null } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       signOut: async () => {},
-      signUp: async () => ({ error: { message: "Auth is disabled" } }),
-      signInWithPassword: async () => ({ error: { message: "Auth is disabled" } }),
-      resetPasswordForEmail: async () => ({ error: { message: "Auth is disabled" } }),
+      signUp: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
+      signInWithPassword: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
+      resetPasswordForEmail: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
     },
-    from: () => mockChain,
+    from: (...args: any[]) => mockChain,
   };
 }

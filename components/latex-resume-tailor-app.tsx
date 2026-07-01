@@ -59,7 +59,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from "@/components/ui/dialog";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -153,9 +153,7 @@ const MODEL_OPTIONS: { provider: LlmProvider; model: string; label: string }[] =
   { provider: "claude", model: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
 ];
 
-function providerForModel(model: string): LlmProvider {
-  return MODEL_OPTIONS.find((opt) => opt.model === model)?.provider ?? "gemini";
-}
+
 
 type FormattingType = string;
 
@@ -215,7 +213,6 @@ export function LatexResumeTailorApp() {
   const [isInputPanelOpen, setIsInputPanelOpen] = useState(true);
   const [inputSidebarTab, setInputSidebarTab] = useState<InputSidebarTab>("project");
   const [error, setError] = useState<string | null>(null);
-  const [geminiSettingsOpen, setGeminiSettingsOpen] = useState(false);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("gemini");
   const [llmModel, setLlmModel] = useState("gemini-2.5-pro");
   const [geminiApiKey, setGeminiApiKey] = useState("");
@@ -227,6 +224,8 @@ export function LatexResumeTailorApp() {
   const [synctexMapping, setSynctexMapping] = useState<SynctexMapping | null>(null);
   const [synctexLineOffset, setSynctexLineOffset] = useState(0);
   const [forwardHighlight, setForwardHighlight] = useState<SynctexRect | null>(null);
+  const forwardSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleForwardSyncRef = useRef<() => void>(() => { });
   const pdfViewerRef = useRef<PdfCanvasViewerHandle>(null);
   const pdfBlobRef = useRef<Blob | null>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
@@ -403,32 +402,19 @@ export function LatexResumeTailorApp() {
     setSupabaseProjects([]);
   }
 
-  async function loadUserSettings() {
-    if (!user) return;
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("resume_settings")
-      .select("provider, model")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (data) {
-      setLlmProvider(data.provider as LlmProvider);
-      setLlmModel(data.model);
-    }
-  }
 
   async function saveProjectToSupabase(projectId: string, updates: Partial<Pick<ResumeProject, "latex_code" | "company_role" | "jd" | "name">>) {
     setSavingProject(true);
-    
+
     // Extract latex_code to store it locally
     const { latex_code, ...metaUpdates } = updates;
-    
+
     if (latex_code !== undefined) {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(`resume-tex-${projectId}`, latex_code);
       }
     }
-    
+
     if (Object.keys(metaUpdates).length > 0) {
       setSupabaseProjects(prev => {
         const next = prev.map(p => p.id === projectId ? { ...p, ...metaUpdates, updated_at: new Date().toISOString() } : p);
@@ -438,7 +424,7 @@ export function LatexResumeTailorApp() {
         return next;
       });
     }
-    
+
     setSavingProject(false);
   }
 
@@ -451,15 +437,7 @@ export function LatexResumeTailorApp() {
     }
   }
 
-  async function saveSettingsToSupabase(settings: LlmSettings) {
-    if (!user) return;
-    const supabase = createClient();
-    await supabase.from("resume_settings").upsert({
-      user_id: user.id,
-      provider: settings.provider,
-      model: settings.model,
-    }, { onConflict: "user_id" });
-  }
+
 
   async function loadProjectIntoEditor(project: ResumeProject) {
     // Flush pending auto-save for the current project
@@ -507,7 +485,7 @@ export function LatexResumeTailorApp() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    
+
     setSupabaseProjects((prev) => {
       const next = [newProject, ...prev];
       if (typeof window !== "undefined") {
@@ -531,12 +509,12 @@ export function LatexResumeTailorApp() {
   async function deleteProject(projectId: string) {
     const remaining = supabaseProjects.filter((p) => p.id !== projectId);
     setSupabaseProjects(remaining);
-    
+
     if (typeof window !== "undefined") {
       window.localStorage.setItem("resume-projects-meta", JSON.stringify(remaining));
       window.localStorage.removeItem(`resume-tex-${projectId}`);
     }
-    
+
     if (activeProjectId === projectId) {
       if (remaining.length > 0) {
         loadProjectIntoEditor(remaining[0]);
@@ -658,9 +636,29 @@ export function LatexResumeTailorApp() {
     if (rect) {
       setForwardHighlight(rect);
       pdfViewerRef.current?.scrollToPage(rect.page);
+      setPreviewPage(rect.page);
+      setPreviewPageInput(String(rect.page));
       if (viewMode !== "pdf") setViewMode("pdf");
     }
   }, [synctexMapping, synctexLineOffset, viewMode]);
+
+  handleForwardSyncRef.current = handleForwardSync;
+
+  const synctexForwardSyncExtension = useMemo(
+    () =>
+      EditorView.updateListener.of((update) => {
+        if (!update.selectionSet) return;
+
+        if (forwardSyncTimerRef.current) {
+          clearTimeout(forwardSyncTimerRef.current);
+        }
+
+        forwardSyncTimerRef.current = setTimeout(() => {
+          handleForwardSyncRef.current();
+        }, 120);
+      }),
+    [],
+  );
 
   const canSubmit =
     resumeSections.length > 0 &&
@@ -818,6 +816,9 @@ export function LatexResumeTailorApp() {
     () => () => {
       if (typingIdleTimerRef.current) {
         clearTimeout(typingIdleTimerRef.current);
+      }
+      if (forwardSyncTimerRef.current) {
+        clearTimeout(forwardSyncTimerRef.current);
       }
       polishAbortRef.current?.abort();
       suggestAbortRef.current?.abort();
@@ -1466,6 +1467,10 @@ export function LatexResumeTailorApp() {
       } else {
         setSynctexMapping(null);
         setSynctexLineOffset(0);
+        toast.info(
+          "PDF compiled without SyncTeX. Install pdflatex or tectonic locally for PDF ↔ editor navigation.",
+          { duration: 6000 },
+        );
       }
 
       toast.success("Compiled successfully.", { duration: 3000 });
@@ -1501,8 +1506,8 @@ export function LatexResumeTailorApp() {
 
     const resolvedKey = (
       llmProvider === "groq" ? groqApiKey :
-      llmProvider === "claude" ? claudeApiKey :
-      geminiApiKey
+        llmProvider === "claude" ? claudeApiKey :
+          geminiApiKey
     ).trim() || undefined;
 
     try {
@@ -1939,169 +1944,6 @@ export function LatexResumeTailorApp() {
   return (
     <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-[#f4f8f8]">
       <Toaster position="top-right" richColors />
-
-      {geminiSettingsOpen ? (
-        <DialogContent onClose={() => { setGeminiSettingsOpen(false); setTestKeyResult(null); }}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-muted-foreground" />
-              AI Model Settings
-            </DialogTitle>
-            <DialogDescription>
-              Choose a model and configure API keys. Settings are saved locally in this browser.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="llmModel" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Model</Label>
-              <select
-                id="llmModel"
-                value={llmModel}
-                onChange={(event) => {
-                  setLlmModel(event.target.value);
-                  setLlmProvider(providerForModel(event.target.value));
-                }}
-                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <optgroup label="Gemini">
-                  {MODEL_OPTIONS.filter((o) => o.provider === "gemini").map((o) => (
-                    <option key={o.model} value={o.model}>{o.label}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="Groq">
-                  {MODEL_OPTIONS.filter((o) => o.provider === "groq").map((o) => (
-                    <option key={o.model} value={o.model}>{o.label}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="Claude">
-                  {MODEL_OPTIONS.filter((o) => o.provider === "claude").map((o) => (
-                    <option key={o.model} value={o.model}>{o.label}</option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
-            <Separator />
-            <div className="space-y-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">API Keys</p>
-              <div className={`space-y-1.5 rounded-lg border p-3 transition-colors ${llmProvider === "gemini" ? "border-emerald-300 bg-emerald-50/50" : "border-transparent bg-muted/30"}`}>
-                <Label htmlFor="geminiApiKey" className="flex items-center gap-1.5 text-sm">
-                  Gemini
-                  {llmProvider === "gemini" ? <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Active</Badge> : null}
-                </Label>
-                <Input
-                  id="geminiApiKey"
-                  type="password"
-                  value={geminiApiKey}
-                  onChange={(event) => setGeminiApiKey(event.target.value)}
-                  placeholder="AIza..."
-                  autoComplete="off"
-                  className="h-9"
-                />
-              </div>
-              <div className={`space-y-1.5 rounded-lg border p-3 transition-colors ${llmProvider === "groq" ? "border-emerald-300 bg-emerald-50/50" : "border-transparent bg-muted/30"}`}>
-                <Label htmlFor="groqApiKey" className="flex items-center gap-1.5 text-sm">
-                  Groq
-                  {llmProvider === "groq" ? <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Active</Badge> : null}
-                </Label>
-                <Input
-                  id="groqApiKey"
-                  type="password"
-                  value={groqApiKey}
-                  onChange={(event) => setGroqApiKey(event.target.value)}
-                  placeholder="gsk_..."
-                  autoComplete="off"
-                  className="h-9"
-                />
-              </div>
-              <div className={`space-y-1.5 rounded-lg border p-3 transition-colors ${llmProvider === "claude" ? "border-emerald-300 bg-emerald-50/50" : "border-transparent bg-muted/30"}`}>
-                <Label htmlFor="claudeApiKey" className="flex items-center gap-1.5 text-sm">
-                  Claude
-                  {llmProvider === "claude" ? <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Active</Badge> : null}
-                </Label>
-                <Input
-                  id="claudeApiKey"
-                  type="password"
-                  value={claudeApiKey}
-                  onChange={(event) => setClaudeApiKey(event.target.value)}
-                  placeholder="sk-ant-..."
-                  autoComplete="off"
-                  className="h-9"
-                />
-              </div>
-            </div>
-            {testKeyResult ? (
-              <div className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm ${testKeyResult.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
-                {testKeyResult.ok ? <CircleCheck className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}
-                <span className="line-clamp-2">{testKeyResult.message}</span>
-              </div>
-            ) : null}
-          </DialogBody>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={testingKey}
-              onClick={async () => {
-                const activeKey = (llmProvider === "groq" ? groqApiKey : llmProvider === "claude" ? claudeApiKey : geminiApiKey).trim();
-                if (!activeKey) {
-                  setTestKeyResult({ ok: false, message: `No ${llmProvider} API key entered.` });
-                  return;
-                }
-                setTestingKey(true);
-                setTestKeyResult(null);
-                try {
-                  const res = await fetch("/api/resume/test-key", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ provider: llmProvider, model: llmModel, apiKey: activeKey }),
-                  });
-                  const data = await res.json() as { ok: boolean; error?: string; reply?: string };
-                  if (data.ok) {
-                    setTestKeyResult({ ok: true, message: `Key works! Response: "${data.reply}"` });
-                    toast.success(`${llmProvider.toUpperCase()} API key is valid!`);
-                  } else {
-                    setTestKeyResult({ ok: false, message: data.error || "Test failed." });
-                    toast.error(`API key test failed: ${data.error || "Unknown error"}`);
-                  }
-                } catch {
-                  setTestKeyResult({ ok: false, message: "Network error." });
-                  toast.error("Network error during API key test.");
-                } finally {
-                  setTestingKey(false);
-                }
-              }}
-            >
-              {testingKey ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-              Test Key
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                const nextSettings: LlmSettings = {
-                  provider: llmProvider,
-                  model: llmModel.trim() || "gemini-2.5-pro",
-                  geminiApiKey: geminiApiKey.trim(),
-                  groqApiKey: groqApiKey.trim(),
-                  claudeApiKey: claudeApiKey.trim(),
-                };
-                setLlmProvider(nextSettings.provider);
-                setLlmModel(nextSettings.model);
-                setGeminiApiKey(nextSettings.geminiApiKey);
-                setGroqApiKey(nextSettings.groqApiKey);
-                setClaudeApiKey(nextSettings.claudeApiKey);
-                writeCachedLlmSettings(nextSettings);
-                saveSettingsToSupabase(nextSettings);
-                setGeminiSettingsOpen(false);
-                setTestKeyResult(null);
-                toast.success("AI model settings saved successfully!");
-              }}
-            >
-              Save Settings
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      ) : null}
       <div className="flex flex-1 min-h-0">
         <AnimatePresence>
           {sidebarOpen && (
@@ -2175,7 +2017,7 @@ export function LatexResumeTailorApp() {
                 </ScrollArea>
                 {user && (
                   <div className="border-t border-slate-750 p-2">
-                    <Button type="button" variant="ghost" size="sm" className="w-full gap-2 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" onClick={() => setSignOutModalOpen(true)}>
+                    <Button type="button" variant="ghost" size="sm" className="w-full gap-2 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" onClick={() => { }}>
                       <LogOut className="h-3.5 w-3.5" />
                       Sign Out
                     </Button>
@@ -2408,15 +2250,13 @@ export function LatexResumeTailorApp() {
                 ) : null}
 
                 <div className="ml-auto flex items-center gap-1">
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 w-8 p-0 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
-                    onClick={() => setGeminiSettingsOpen(true)}
+                  <a
+                    href="/api-key"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
                     title="AI Model Settings"
                   >
                     <KeyRound className="h-3.5 w-3.5" />
-                  </Button>
+                  </a>
                   <label className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-slate-700 bg-slate-700/40 text-sm shadow-sm text-slate-200 hover:text-white hover:bg-slate-700 transition-all duration-150" title="Upload .tex file">
                     <input
                       type="file"
@@ -2570,7 +2410,13 @@ export function LatexResumeTailorApp() {
                     value={latexCode}
                     height="100%"
                     readOnly={suggesting}
-                    extensions={[latexLanguage, latexSuggestionExtension, latexPolishExtension, latexErrorFixExtension]}
+                    extensions={[
+                      latexLanguage,
+                      latexSuggestionExtension,
+                      latexPolishExtension,
+                      latexErrorFixExtension,
+                      synctexForwardSyncExtension,
+                    ]}
                     onCreateEditor={(view) => {
                       editorViewRef.current = view;
                     }}
@@ -2627,6 +2473,21 @@ export function LatexResumeTailorApp() {
                           title={previewId ? "Open PDF in new tab" : "Compile first to preview PDF"}
                         >
                           <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-100 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40"
+                          onClick={handleForwardSync}
+                          disabled={!synctexMapping}
+                          title={
+                            synctexMapping
+                              ? "Locate current line in PDF (forward sync)"
+                              : "SyncTeX unavailable — compile with a local LaTeX engine"
+                          }
+                        >
+                          <Crosshair className="h-3.5 w-3.5" />
                         </Button>
                         <span className="mx-1 h-6 w-px bg-slate-600" />
 

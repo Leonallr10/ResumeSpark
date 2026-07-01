@@ -14,6 +14,7 @@ import {
   FileText,
   GitBranch,
   Globe,
+  KeyRound,
   Layers,
   Lightbulb,
   Rocket,
@@ -23,6 +24,7 @@ import {
   TrendingUp,
   Users,
   Zap,
+  Mail,
 } from "lucide-react";
 
 const fadeUp = {
@@ -55,6 +57,11 @@ const FEATURES = [
     icon: Globe,
     title: "One-Click Deploy",
     description: "Deploy your generated portfolio directly to Netlify or Vercel with a single click. Supports redeployment.",
+  },
+  {
+    icon: Mail,
+    title: "Cold Email Generator",
+    description: "Generate highly effective, tailored cold emails using our proven 5-part formula and multi-LLM support.",
   },
   {
     icon: GitBranch,
@@ -105,7 +112,7 @@ const USE_CASES = [
   {
     icon: Users,
     title: "Job Seekers",
-    description: "Tailor resumes to each JD, improve bullet points, and score ATS compatibility before applying.",
+    description: "Tailor resumes to each JD, improve bullet points, and generate personalized cold emails for recruiters.",
   },
   {
     icon: Rocket,
@@ -164,6 +171,13 @@ export function LandingPage() {
             <Link href="/api-docs" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">API Docs</Link>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/api-key"
+              className="flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
+            >
+              <KeyRound className="h-4 w-4" />
+              API Key
+            </Link>
             <Link href="/resume-generator" className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-emerald-400">
               Go to App
             </Link>
@@ -203,7 +217,7 @@ export function LandingPage() {
           <p className="mx-auto mb-10 max-w-xl text-sm text-gray-500">
             One platform to polish, audit, and present your professional story with AI that understands job descriptions.
           </p>
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap">
             <Link
               href="/resume-generator"
               className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-8 py-3.5 text-base font-semibold text-black transition-all hover:shadow-[0_0_40px_rgba(16,185,129,0.3)]"
@@ -218,6 +232,14 @@ export function LandingPage() {
             >
               <Globe className="h-5 w-5" />
               Portfolio Generator
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+            <Link
+              href="/cold-mail-generator"
+              className="group flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-8 py-3.5 text-base font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]"
+            >
+              <Mail className="h-5 w-5" />
+              Cold Mail Generator
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
@@ -442,7 +464,7 @@ export function LandingPage() {
             Ready to <span className="text-emerald-400">get started</span>?
           </h2>
           <p className="mb-8 text-gray-400">Create your account and build your professional presence in minutes.</p>
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap">
             <Link
               href="/resume-generator"
               className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-8 py-3.5 text-base font-semibold text-black transition-all hover:shadow-[0_0_40px_rgba(16,185,129,0.3)]"
@@ -457,6 +479,14 @@ export function LandingPage() {
             >
               <Globe className="h-5 w-5" />
               Portfolio Generator
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+            <Link
+              href="/cold-mail-generator"
+              className="group flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-8 py-3.5 text-base font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]"
+            >
+              <Mail className="h-5 w-5" />
+              Cold Mail Generator
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>

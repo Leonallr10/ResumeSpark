@@ -298,8 +298,10 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
 
         const rect = canvas.getBoundingClientRect();
         const canvasCssWidth = parseFloat(canvas.style.width);
+        if (!canvasCssWidth) return;
+
         const scaleOnScreen = rect.width / canvasCssWidth;
-        const displayScale = (liveZoomRef.current / 100);
+        const displayScale = liveZoomRef.current / 100;
 
         const clickX = (event.clientX - rect.left) / displayScale / scaleOnScreen;
         const clickY = (event.clientY - rect.top) / displayScale / scaleOnScreen;
@@ -370,6 +372,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
                 className="relative flex-shrink-0 bg-white shadow-md"
                 style={{ width: cssWidth, height: cssHeight, overflow: "hidden" }}
                 onClick={(e) => handlePageClick(e, pageNumber)}
+                title={synctexMapping ? "Click to jump to source line" : undefined}
               >
                 <canvas
                   ref={(el) => {
