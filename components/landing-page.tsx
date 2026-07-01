@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -16,8 +16,6 @@ import {
   Globe,
   Layers,
   Lightbulb,
-  LogIn,
-  LogOut,
   Rocket,
   SearchCheck,
   Sparkles,
@@ -26,8 +24,6 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -149,17 +145,7 @@ const METRICS = [
 ];
 
 export function LandingPage() {
-  const [user, setUser] = useState<User | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => setUser(data.user));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: { user: User | null } | null) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -178,26 +164,9 @@ export function LandingPage() {
             <Link href="/api-docs" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">API Docs</Link>
           </div>
           <div className="flex items-center gap-3">
-            {user ? (
-              <>
-                <span className="hidden text-sm text-emerald-400/80 sm:inline">{user.email}</span>
-                <button
-                  onClick={async () => { const s = createClient(); await s.auth.signOut(); setUser(null); }}
-                  className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 px-3 py-1.5 text-sm text-emerald-400 transition-colors hover:bg-emerald-500/10"
-                >
-                  <LogOut className="h-3.5 w-3.5" /> Sign Out
-                </button>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link href="/login" className="rounded-lg border border-emerald-500/30 px-4 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/10">
-                  Sign In
-                </Link>
-                <Link href="/register" className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-emerald-400">
-                  <LogIn className="h-3.5 w-3.5" /> Get Started
-                </Link>
-              </div>
-            )}
+            <Link href="/resume-generator" className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-emerald-400">
+              Go to App
+            </Link>
           </div>
         </div>
       </nav>
@@ -475,18 +444,20 @@ export function LandingPage() {
           <p className="mb-8 text-gray-400">Create your account and build your professional presence in minutes.</p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              href="/register"
+              href="/resume-generator"
               className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-8 py-3.5 text-base font-semibold text-black transition-all hover:shadow-[0_0_40px_rgba(16,185,129,0.3)]"
             >
-              <Rocket className="h-5 w-5" />
-              Create Free Account
+              <FileText className="h-5 w-5" />
+              Resume Generator
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <Link
-              href="/login"
-              className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-8 py-3.5 text-base font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20"
+              href="/portfolio-generator"
+              className="group flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-8 py-3.5 text-base font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]"
             >
-              Sign In
+              <Globe className="h-5 w-5" />
+              Portfolio Generator
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
         </motion.div>
@@ -502,7 +473,6 @@ export function LandingPage() {
           <div className="flex items-center gap-6">
             <Link href="/resume-generator" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">Resume Generator</Link>
             <Link href="/portfolio-generator" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">Portfolio Generator</Link>
-            <Link href="/login" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">Sign In</Link>
           </div>
         </div>
       </footer>
