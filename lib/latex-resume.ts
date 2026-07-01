@@ -1,5 +1,7 @@
 import { createId, detectSectionTitle } from "@/lib/resume";
 import type { AiSuggestion, ResumeLine, ResumeSection } from "@/types/resume";
+import { parse } from "@unified-latex/unified-latex-util-parse";
+import type * as Ast from "@unified-latex/unified-latex-types";
 
 export type ProjectDraft = {
   heading: string;
@@ -94,78 +96,237 @@ const visibleCommandArgCounts: Record<(typeof visibleCommandNames)[number], numb
   achievementEntry: 3,
 };
 
+export function astToText(node: Ast.Node | Ast.Argument | Ast.Node[]): string {
+  if (Array.isArray(node)) {
+    return node.map(astToText).join("").trim();
+  }
+  if (!node) return "";
+
+  if (node.type === "string") return node.content;
+  if (node.type === "whitespace") return " ";
+  if (node.type === "parbreak") return "\n\n";
+
+  if (node.type === "group" || node.type === "argument") {
+    return astToText(node.content);
+  }
+
+  if (node.type === "macro") {
+    if (
+      ["textbf", "textit", "emph", "small", "large", "Large", "LARGE", "huge", "Huge", "techstack"].includes(
+        node.content
+      )
+    ) {
+      return astToText(node.args?.[0] || []);
+    }
+    if (["&", "%", "$", "#", "_", "{", "}"].includes(node.content)) {
+      return node.content;
+    }
+    if (node.content === "textbackslash") return "\\";
+    if (node.content === "textasciitilde") return "~";
+    if (node.content === "textasciicircum") return "^";
+    if (node.content === "href") {
+      return astToText(node.args?.[1] || []);
+    }
+    return "";
+  }
+
+  if (node.type === "environment") {
+    return astToText(node.content);
+  }
+
+  return "";
+}
+
+function cleanExtractedText(text: string): string {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/\s+([:,.])/g, "$1")
+    .replace(/\s*\|\s*/g, " | ")
+    .replace(/\s+\|\s+/g, " | ")
+    .replace(/(?:^|\s)\|(?:\s*$|$)/g, " ")
+    .trim();
+}
+
 export function parseLatexResume(latex: string): ResumeSection[] {
-  const lines = latex.replace(/\r\n/g, "\n").split("\n");
+  const ast = parse(latex);
   const sections: ResumeSection[] = [];
   let activeSection = createSection("Header");
-  let isInsideDocument = !latex.includes("\\begin{document}");
 
   sections.push(activeSection);
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const trimmed = line.trim();
+  function walk(nodes: Ast.Node[]) {
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
 
-    if (trimmed === "\\begin{document}") {
-      isInsideDocument = true;
-      continue;
+      if (node.type === "environment" && node.env === "document") {
+        walk(node.content);
+        continue;
+      }
+
+      if (node.type === "environment") {
+        walk(node.content);
+        continue;
+      }
+
+      if (node.type === "macro") {
+        // Position is 1-indexed in unified-latex, but sourceLine is 0-indexed for us
+        const startLine = (node.position?.start.line ?? 1) - 1;
+        // Find the last argument's end line if available for a better end line estimation
+        let endLine = (node.position?.end.line ?? 1) - 1;
+        if (node.args && node.args.length > 0) {
+          const lastArg = node.args[node.args.length - 1];
+          if (lastArg?.position?.end?.line) {
+             endLine = Math.max(endLine, lastArg.position.end.line - 1);
+          }
+        }
+        const sectionId = activeSection.id;
+
+        if (node.content === "section" || node.content === "section*") {
+          const titleRaw = astToText(node.args?.[0] || []);
+          const title = cleanExtractedText(titleRaw);
+          if (title) {
+            activeSection = createSection(title);
+            sections.push(activeSection);
+          }
+          continue;
+        }
+
+        let parsedLine: Omit<ResumeLine, "id" | "page"> | undefined;
+
+        if (node.content === "resumeProjectHeading") {
+          parsedLine = {
+            sectionId,
+            sourceLine: startLine,
+            sourceEndLine: endLine,
+            sourceText: "", 
+            text: cleanExtractedText(astToText(node.args?.[0] || [])),
+            rightText: cleanExtractedText(astToText(node.args?.[1] || [])),
+            kind: "projectHeading",
+          };
+        } else if (node.content === "resumeSubheading") {
+          parsedLine = {
+            sectionId,
+            sourceLine: startLine,
+            sourceEndLine: endLine,
+            sourceText: "",
+            text: cleanExtractedText(astToText(node.args?.[0] || [])),
+            rightText: cleanExtractedText(astToText(node.args?.[1] || [])),
+            secondaryText: [astToText(node.args?.[2] || []), astToText(node.args?.[3] || [])]
+              .map(cleanExtractedText)
+              .filter(Boolean)
+              .join(" | "),
+            kind: "subheading",
+          };
+        } else if (node.content === "achievementEntry") {
+          parsedLine = {
+            sectionId,
+            sourceLine: startLine,
+            sourceEndLine: endLine,
+            sourceText: "",
+            text: cleanExtractedText(astToText(node.args?.[0] || [])),
+            rightText: cleanExtractedText(astToText(node.args?.[1] || [])),
+            secondaryText: cleanExtractedText(astToText(node.args?.[2] || [])),
+            kind: "subheading",
+          };
+        } else if (node.content === "resumeSubItem") {
+          parsedLine = {
+            sectionId,
+            sourceLine: startLine,
+            sourceEndLine: endLine,
+            sourceText: "",
+            text: [astToText(node.args?.[0] || []), astToText(node.args?.[1] || [])]
+              .map(cleanExtractedText)
+              .filter(Boolean)
+              .join(": "),
+            kind: "text",
+          };
+        } else if (node.content === "resumeItemNoBullet") {
+          parsedLine = {
+            sectionId,
+            sourceLine: startLine,
+            sourceEndLine: endLine,
+            sourceText: "",
+            text: cleanExtractedText(astToText(node.args?.[0] || [])),
+            kind: sectionId === "section-summary" ? "text" : "bullet",
+          };
+        } else if (node.content === "resumeItem") {
+          parsedLine = {
+            sectionId,
+            sourceLine: startLine,
+            sourceEndLine: endLine,
+            sourceText: "",
+            text: cleanExtractedText(astToText(node.args?.[0] || [])),
+            kind: "bullet",
+          };
+        } else if (node.content === "item") {
+          // Fallback generic item handling
+          const textNodes: Ast.Node[] = [];
+          let currentEndLine = endLine;
+          let j = i + 1;
+          for (; j < nodes.length; j++) {
+            const sibling = nodes[j];
+            if (sibling.type === "macro" && sibling.content === "item") {
+              break;
+            }
+            if (sibling.type === "environment") {
+              break;
+            }
+            textNodes.push(sibling);
+            if (sibling.position?.end?.line) {
+              currentEndLine = Math.max(currentEndLine, sibling.position.end.line - 1);
+            }
+          }
+          i = j - 1; // skip ahead
+
+          const textContent = cleanExtractedText(astToText(textNodes));
+          if (textContent) {
+            parsedLine = {
+              sectionId,
+              sourceLine: startLine,
+              sourceEndLine: currentEndLine,
+              sourceText: "",
+              text: textContent,
+              kind: "bullet",
+            };
+          }
+        }
+
+        if (parsedLine) {
+          const detectedTitle = detectSectionTitle(parsedLine.text);
+          if (activeSection.title === "Header" && activeSection.lines.length > 0 && detectedTitle) {
+            activeSection = createSection(detectedTitle);
+            sections.push(activeSection);
+          }
+          activeSection.lines.push(createLine(parsedLine));
+        }
+      }
     }
-
-    if (trimmed === "\\end{document}") {
-      isInsideDocument = false;
-      continue;
-    }
-
-    if (!isInsideDocument) {
-      continue;
-    }
-
-    if (!trimmed || isInvisibleLatexLine(trimmed)) {
-      continue;
-    }
-
-    const sectionTitle = parseSectionTitle(trimmed);
-
-    if (sectionTitle) {
-      activeSection = createSection(sectionTitle);
-      sections.push(activeSection);
-      continue;
-    }
-
-    const commandBlock = readVisibleCommandBlock(lines, index);
-    const sourceText = commandBlock?.text ?? trimmed;
-    const sourceEndLine = commandBlock?.endLine ?? index;
-    const parsedLine = parseVisibleLatexLine(
-      sourceText,
-      index,
-      sourceEndLine,
-      activeSection.id,
-    );
-
-    if (commandBlock) {
-      index = commandBlock.endLine;
-    }
-
-    if (!parsedLine) {
-      continue;
-    }
-
-    const detectedTitle = detectSectionTitle(parsedLine.text);
-
-    if (
-      activeSection.title === "Header" &&
-      activeSection.lines.length > 0 &&
-      detectedTitle
-    ) {
-      activeSection = createSection(detectedTitle);
-      sections.push(activeSection);
-      continue;
-    }
-
-    activeSection.lines.push(parsedLine);
   }
 
-  return sections.filter((section) => section.lines.length > 0);
+  const documentEnv = ast.content.find((n) => n.type === "environment" && n.env === "document");
+  if (documentEnv && documentEnv.type === "environment") {
+    walk(documentEnv.content);
+  } else {
+    walk(ast.content);
+  }
+
+  // Backfill `sourceText` by extracting original lines using `sourceLine` to `sourceEndLine`.
+  // We avoid string splitting upfront, but we do it once here for exact text.
+  const rawLines = latex.replace(/\r\n/g, "\n").split("\n");
+  for (const section of sections) {
+    for (const line of section.lines) {
+      if (typeof line.sourceLine === "number" && typeof line.sourceEndLine === "number") {
+        line.sourceText = rawLines
+          .slice(line.sourceLine, line.sourceEndLine + 1)
+          .join("\n")
+          .trim();
+      }
+    }
+  }
+
+  const finalSections = sections.filter((section) => section.lines.length > 0);
+  console.log("Extracted Sections:", JSON.stringify(finalSections, null, 2));
+  return finalSections;
 }
 
 export function formatProjectInput(project: ProjectDraft) {
