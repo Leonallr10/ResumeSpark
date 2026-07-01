@@ -126,11 +126,6 @@ const latexLanguage = StreamLanguage.define(stex);
 
 type ViewMode = "preview" | "pdf";
 type InputSidebarTab = "project" | "jd";
-type CompilerStatus = {
-  available: boolean;
-  compiler: string | null;
-  message: string;
-};
 
 type LlmSettings = {
   provider: LlmProvider;
@@ -219,9 +214,6 @@ export function LatexResumeTailorApp() {
   const [previewPageInput, setPreviewPageInput] = useState("1");
   const [isInputPanelOpen, setIsInputPanelOpen] = useState(true);
   const [inputSidebarTab, setInputSidebarTab] = useState<InputSidebarTab>("project");
-  const [compilerStatus, setCompilerStatus] = useState<CompilerStatus | null>(null);
-  const [checkingCompiler, setCheckingCompiler] = useState(true);
-  const [compilerEngine, setCompilerEngine] = useState<"pdflatex" | "xelatex" | "tectonic">("pdflatex");
   const [error, setError] = useState<string | null>(null);
   const [geminiSettingsOpen, setGeminiSettingsOpen] = useState(false);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("gemini");
@@ -783,48 +775,6 @@ export function LatexResumeTailorApp() {
 
   useEffect(() => revokePdfPreview, [revokePdfPreview]);
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function checkCompiler() {
-      setCheckingCompiler(true);
-
-      try {
-        const response = await fetch("/api/resume/compile-latex", {
-          method: "GET",
-          cache: "no-store",
-        });
-        const payload = (await response.json()) as CompilerStatus;
-
-        if (!ignore) {
-          setCompilerStatus({
-            available: response.ok && payload.available,
-            compiler: payload.compiler ?? null,
-            message: payload.message,
-          });
-        }
-      } catch {
-        if (!ignore) {
-          setCompilerStatus({
-            available: false,
-            compiler: null,
-            message:
-              "Unable to check the LaTeX compiler. Make sure the Next.js dev server is running.",
-          });
-        }
-      } finally {
-        if (!ignore) {
-          setCheckingCompiler(false);
-        }
-      }
-    }
-
-    void checkCompiler();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!isPaneResizing) {
@@ -1436,7 +1386,7 @@ export function LatexResumeTailorApp() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ latex: latexCode, engine: compilerEngine }),
+      body: JSON.stringify({ latex: latexCode }),
     });
 
     if (!response.ok) {
@@ -1466,7 +1416,7 @@ export function LatexResumeTailorApp() {
       const response = await fetch("/api/resume/compile-latex", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latex: latexCode, engine: compilerEngine }),
+        body: JSON.stringify({ latex: latexCode }),
       });
 
       if (!response.ok) {
@@ -2267,19 +2217,6 @@ export function LatexResumeTailorApp() {
                   <div className="flex items-center gap-2">
                     <div className="relative">
                       <select
-                        value={compilerEngine}
-                        onChange={(e) => setCompilerEngine(e.target.value as "pdflatex" | "xelatex" | "tectonic")}
-                        className="h-8 w-28 appearance-none rounded-md border border-slate-700 bg-slate-900/60 pl-2.5 pr-8 py-1 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 truncate"
-                        title="Compiler Engine"
-                      >
-                        <option value="pdflatex" className="bg-slate-800 text-slate-100">pdflatex</option>
-                        <option value="xelatex" className="bg-slate-800 text-slate-100">xelatex</option>
-                        <option value="tectonic" className="bg-slate-800 text-slate-100">tectonic</option>
-                      </select>
-                      <ChevronDown className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    </div>
-                    <div className="relative">
-                      <select
                         value={toolbarCommand}
                         onChange={(e) => {
                           setToolbarCommand(e.target.value);
@@ -2526,11 +2463,7 @@ export function LatexResumeTailorApp() {
                     className="h-8 w-8 p-0 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 border-0 text-white font-semibold transition-all shadow-md shadow-emerald-950/20 disabled:bg-slate-800/40 disabled:text-slate-500 disabled:border-0"
                     onClick={downloadResumePdf}
                     disabled={!canCompilePdf || downloading}
-                    title={
-                      compilerStatus?.available
-                        ? `Download PDF via ${compilerStatus.compiler}`
-                        : "No LaTeX compiler found"
-                    }
+                    title="Download PDF"
                   >
                     {downloading ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2564,11 +2497,6 @@ export function LatexResumeTailorApp() {
                 </div>
               ) : null}
 
-              {!compilerStatus?.available && !checkingCompiler ? (
-                <div className="px-4 pt-2">
-                  <CompilerNotice status={compilerStatus} checking={checkingCompiler} />
-                </div>
-              ) : null}
 
               <div
                 ref={paneGridRef}
@@ -3283,40 +3211,6 @@ function FieldCounter({ value, max }: { value: number; max: number }) {
   );
 }
 
-function CompilerNotice({
-  status,
-  checking,
-}: {
-  status: CompilerStatus | null;
-  checking: boolean;
-}) {
-  if (checking) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Checking for a LaTeX compiler before enabling PDF export...
-      </p>
-    );
-  }
-
-  if (!status?.available) {
-    return (
-      <Alert className="border-amber-400/50 bg-amber-50">
-        <AlertTitle>Install a LaTeX compiler to create PDFs</AlertTitle>
-        <AlertDescription>
-          Install MiKTeX, TeX Live, or Tectonic, make sure{" "}
-          <code>pdflatex</code>, <code>xelatex</code>, or <code>tectonic</code>{" "}
-          is on PATH, then restart <code>pnpm dev</code>.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  return (
-    <p className="text-xs text-muted-foreground">
-      PDF export compiles the current .tex source with {status.compiler}.
-    </p>
-  );
-}
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
