@@ -1,31 +1,33 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Mock Supabase client to completely remove the auth and database dependency.
 // This allows the app to function locally without breaking existing component code.
 
 export function createClient() {
   const mockChain = {
-    select: (...args: unknown[]) => mockChain,
-    eq: (...args: unknown[]) => mockChain,
-    order: (...args: unknown[]) => mockChain,
-    limit: (...args: unknown[]) => mockChain,
-    single: async (...args: unknown[]) => ({ data: null, error: null }),
-    maybeSingle: async (...args: unknown[]) => ({ data: null, error: null }),
-    update: (...args: unknown[]) => mockChain,
-    insert: (...args: unknown[]) => mockChain,
-    upsert: async (...args: unknown[]) => ({ error: null }),
-    delete: (...args: unknown[]) => mockChain,
-    then: (cb: (value: unknown) => unknown) => cb({ data: null, error: null }),
+    select: (...args: any[]) => mockChain,
+    eq: (...args: any[]) => mockChain,
+    order: (...args: any[]) => mockChain,
+    limit: (...args: any[]) => mockChain,
+    single: async (...args: any[]): Promise<any> => ({ data: null, error: null }),
+    maybeSingle: async (...args: any[]): Promise<any> => ({ data: null, error: null }),
+    update: (...args: any[]) => mockChain,
+    insert: (...args: any[]) => mockChain,
+    upsert: async (...args: any[]): Promise<any> => ({ error: null }),
+    delete: (...args: any[]) => mockChain,
+    then: (cb: (value: any) => any) => cb({ data: null, error: null }),
   };
+
 
   return {
     auth: {
       getUser: async () => ({ data: { user: null } }),
-      getSession: async () => ({ data: { session: null } }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      getSession: async () => ({ data: { session: null as { user: { id: string } } | null } }),
+      onAuthStateChange: (...args: any[]) => ({ data: { subscription: { unsubscribe: () => {} } } }),
       signOut: async () => {},
-      signUp: async (...args: unknown[]) => ({ error: { message: "Auth is disabled" } }),
-      signInWithPassword: async (...args: unknown[]) => ({ error: { message: "Auth is disabled" } }),
-      resetPasswordForEmail: async (...args: unknown[]) => ({ error: { message: "Auth is disabled" } }),
+      signUp: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
+      signInWithPassword: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
+      resetPasswordForEmail: async (...args: any[]) => ({ error: { message: "Auth is disabled" } }),
     },
-    from: (...args: unknown[]) => mockChain,
+    from: (...args: any[]) => mockChain,
   };
 }
