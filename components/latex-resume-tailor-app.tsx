@@ -266,16 +266,7 @@ export function LatexResumeTailorApp() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [toolbarCommand, setToolbarCommand] = useState<FormattingType>("section");
   const [formattingMenuOpen, setFormattingMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"signin" | "signup" | "forgot">("signin");
-  const [forgotSent, setForgotSent] = useState(false);
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authSubmitting, setAuthSubmitting] = useState(false);
-  const [signOutModalOpen, setSignOutModalOpen] = useState(false);
+  const user = null; // auth removed – local-only mode
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [supabaseProjects, setSupabaseProjects] = useState<ResumeProject[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -351,34 +342,15 @@ export function LatexResumeTailorApp() {
     setClaudeApiKey(cached.claudeApiKey);
   }, []);
 
-  // Auth listener
+  // Load projects from localStorage on mount
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: { user: User } | null } }) => {
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: { user: User } | null) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
+    loadUserProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load projects and settings when user signs in
+  // Auto-save latex + metadata to localStorage
   useEffect(() => {
-    if (!user) {
-      setSupabaseProjects([]);
-      setActiveProjectId(null);
-      return;
-    }
-    loadUserProjects();
-    loadUserSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  // Auto-save to Supabase
-  useEffect(() => {
-    if (!user || !activeProjectId) return;
+    if (!activeProjectId) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
       saveProjectToSupabase(activeProjectId, {
@@ -389,31 +361,54 @@ export function LatexResumeTailorApp() {
     }, 2000);
     return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, activeProjectId, latexCode, companyRole, jd]);
+  }, [activeProjectId, latexCode, companyRole, jd]);
 
-  // Auto-save project drafts to Supabase
+  // Auto-save project drafts to localStorage
   useEffect(() => {
-    if (!user || !activeProjectId) return;
+    if (!activeProjectId) return;
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
     draftSaveTimerRef.current = setTimeout(() => {
       saveProjectDraftsToSupabase(activeProjectId, projectDrafts);
     }, 2000);
     return () => { if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, activeProjectId, projectDrafts]);
+  }, [activeProjectId, projectDrafts]);
 
   async function loadUserProjects() {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("resume_projects")
-      .select("*")
-      .order("updated_at", { ascending: false });
-    if (data && data.length > 0) {
-      setSupabaseProjects(data as ResumeProject[]);
-      loadProjectIntoEditor(data[0] as ResumeProject);
-    } else {
-      setSupabaseProjects([]);
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("resume-projects-meta");
+      if (stored) {
+        try {
+          const data = JSON.parse(stored) as ResumeProject[];
+          if (data.length > 0) {
+            setSupabaseProjects(data);
+            loadProjectIntoEditor(data[0]);
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to load local projects", e);
+        }
+      }
+
+      // First visit – seed a default project
+      const defaultId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+      const defaultProject: ResumeProject = {
+        id: defaultId,
+        name: "My Resume",
+        latex_code: DEFAULT_LATEX_RESUME,
+        company_role: "",
+        jd: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      // Persist the .tex content separately
+      window.localStorage.setItem(`resume-tex-${defaultId}`, DEFAULT_LATEX_RESUME);
+      window.localStorage.setItem("resume-projects-meta", JSON.stringify([defaultProject]));
+      setSupabaseProjects([defaultProject]);
+      loadProjectIntoEditor(defaultProject);
+      return;
     }
+    setSupabaseProjects([]);
   }
 
   async function loadUserSettings() {
@@ -432,30 +427,35 @@ export function LatexResumeTailorApp() {
 
   async function saveProjectToSupabase(projectId: string, updates: Partial<Pick<ResumeProject, "latex_code" | "company_role" | "jd" | "name">>) {
     setSavingProject(true);
-    const supabase = createClient();
-    await supabase
-      .from("resume_projects")
-      .update(updates)
-      .eq("id", projectId);
+    
+    // Extract latex_code to store it locally
+    const { latex_code, ...metaUpdates } = updates;
+    
+    if (latex_code !== undefined) {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(`resume-tex-${projectId}`, latex_code);
+      }
+    }
+    
+    if (Object.keys(metaUpdates).length > 0) {
+      setSupabaseProjects(prev => {
+        const next = prev.map(p => p.id === projectId ? { ...p, ...metaUpdates, updated_at: new Date().toISOString() } : p);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("resume-projects-meta", JSON.stringify(next));
+        }
+        return next;
+      });
+    }
+    
     setSavingProject(false);
   }
 
   async function saveProjectDraftsToSupabase(projectId: string, drafts: ProjectDraft[]) {
-    const supabase = createClient();
-    await supabase.from("resume_project_drafts").delete().eq("project_id", projectId);
+    if (typeof window === "undefined") return;
     if (drafts.length > 0) {
-      await supabase.from("resume_project_drafts").insert(
-        drafts.map((d, i) => ({
-          project_id: projectId,
-          heading: d.heading,
-          explanation: d.explanation,
-          tech_stack: d.techStack,
-          link: d.link,
-          from_date: d.fromDate,
-          to_date: d.toDate,
-          sort_order: i,
-        })),
-      );
+      window.localStorage.setItem(`resume-drafts-${projectId}`, JSON.stringify(drafts));
+    } else {
+      window.localStorage.removeItem(`resume-drafts-${projectId}`);
     }
   }
 
@@ -489,72 +489,62 @@ export function LatexResumeTailorApp() {
     futureLatexRef.current = [];
     setHistoryVersion((v) => v + 1);
 
-    // Fetch fresh project data from Supabase
-    const supabase = createClient();
-    const { data: freshProject } = await supabase
-      .from("resume_projects")
-      .select("*")
-      .eq("id", project.id)
-      .single();
+    // Fetch fresh project data from local state
+    const p = supabaseProjects.find(sp => sp.id === project.id) || project;
 
-    if (freshProject) {
-      const p = freshProject as ResumeProject;
-      setLatexCode(p.latex_code || DEFAULT_LATEX_RESUME);
-      setCommittedLatex(p.latex_code || DEFAULT_LATEX_RESUME);
-      setCompanyRole(p.company_role || "");
-      setJd(p.jd || "");
-    } else {
-      setLatexCode(project.latex_code || DEFAULT_LATEX_RESUME);
-      setCommittedLatex(project.latex_code || DEFAULT_LATEX_RESUME);
-      setCompanyRole(project.company_role || "");
-      setJd(project.jd || "");
-    }
+    const localTex = typeof window !== "undefined" ? window.localStorage.getItem(`resume-tex-${p.id}`) : null;
+    setLatexCode(localTex || p.latex_code || DEFAULT_LATEX_RESUME);
+    setCommittedLatex(localTex || p.latex_code || DEFAULT_LATEX_RESUME);
+    setCompanyRole(p.company_role || "");
+    setJd(p.jd || "");
 
-    // Fetch project drafts
-    const { data: drafts } = await supabase
-      .from("resume_project_drafts")
-      .select("*")
-      .eq("project_id", project.id)
-      .order("sort_order");
-
-    const mapped = (drafts ?? []).map((d: Record<string, string>) => ({
-      heading: d.heading || "",
-      explanation: d.explanation || "",
-      techStack: d.tech_stack || "",
-      link: d.link || "",
-      fromDate: d.from_date || "",
-      toDate: d.to_date || "",
-    }));
+    // Load project drafts from localStorage
+    const draftsRaw = typeof window !== "undefined" ? window.localStorage.getItem(`resume-drafts-${project.id}`) : null;
+    const mapped: ProjectDraft[] = draftsRaw ? (JSON.parse(draftsRaw) as ProjectDraft[]) : [];
     setProjectDraft(mapped[0] ?? emptyProjectDraft);
     setProjectDrafts(mapped);
   }
 
   async function createNewProject() {
-    if (!user) return;
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("resume_projects")
-      .insert({ user_id: user.id, name: "Untitled Resume", latex_code: DEFAULT_LATEX_RESUME })
-      .select()
-      .single();
-    if (data) {
-      const project = data as ResumeProject;
-      setSupabaseProjects((prev) => [project, ...prev]);
-      loadProjectIntoEditor(project);
-    }
+    const newProject: ResumeProject = {
+      id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+      name: "Untitled Resume",
+      latex_code: DEFAULT_LATEX_RESUME,
+      company_role: "",
+      jd: "",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    setSupabaseProjects((prev) => {
+      const next = [newProject, ...prev];
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("resume-projects-meta", JSON.stringify(next));
+      }
+      return next;
+    });
+    loadProjectIntoEditor(newProject);
   }
 
   async function renameProject(projectId: string, newName: string) {
-    const supabase = createClient();
-    await supabase.from("resume_projects").update({ name: newName }).eq("id", projectId);
-    setSupabaseProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, name: newName } : p));
+    setSupabaseProjects((prev) => {
+      const next = prev.map((p) => p.id === projectId ? { ...p, name: newName, updated_at: new Date().toISOString() } : p);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("resume-projects-meta", JSON.stringify(next));
+      }
+      return next;
+    });
   }
 
   async function deleteProject(projectId: string) {
-    const supabase = createClient();
-    await supabase.from("resume_projects").delete().eq("id", projectId);
     const remaining = supabaseProjects.filter((p) => p.id !== projectId);
     setSupabaseProjects(remaining);
+    
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("resume-projects-meta", JSON.stringify(remaining));
+      window.localStorage.removeItem(`resume-tex-${projectId}`);
+    }
+    
     if (activeProjectId === projectId) {
       if (remaining.length > 0) {
         loadProjectIntoEditor(remaining[0]);
@@ -570,57 +560,7 @@ export function LatexResumeTailorApp() {
     }
   }
 
-  async function handleAuthSubmit() {
-    setAuthError(null);
-    setAuthSubmitting(true);
-    const supabase = createClient();
-    try {
-      if (authMode === "signup") {
-        const { error: err } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
-        if (err) { setAuthError(err.message); return; }
-        toast.success("Account created! Check your email to confirm.");
-        setAuthModalOpen(false);
-      } else {
-        const { error: err } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
-        if (err) { setAuthError(err.message); return; }
-        toast.success("Signed in successfully!");
-        setAuthModalOpen(false);
-      }
-    } catch {
-      setAuthError("An unexpected error occurred.");
-    } finally {
-      setAuthSubmitting(false);
-    }
-  }
-
-  async function handleForgotPassword() {
-    setAuthError(null);
-    setAuthSubmitting(true);
-    const supabase = createClient();
-    try {
-      const { error: err } = await supabase.auth.resetPasswordForEmail(authEmail, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-      });
-      if (err) { setAuthError(err.message); return; }
-      setForgotSent(true);
-    } catch {
-      setAuthError("An unexpected error occurred.");
-    } finally {
-      setAuthSubmitting(false);
-    }
-  }
-
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setUser(null);
-    setSupabaseProjects([]);
-    setActiveProjectId(null);
-    setSidebarOpen(false);
-    setSignOutModalOpen(false);
-    toast.success("Signed out.");
-    window.location.href = "/";
-  }
+  // Auth functions removed – local-only mode
 
   const currentProjectName = useMemo(() => {
     if (!activeProjectId) return "";
@@ -2049,134 +1989,7 @@ export function LatexResumeTailorApp() {
   return (
     <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-[#f4f8f8]">
       <Toaster position="top-right" richColors />
-      {authModalOpen ? (
-        <DialogContent onClose={() => { setAuthModalOpen(false); setAuthError(null); setForgotSent(false); }} className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {authMode === "forgot" ? "Reset Password" : authMode === "signup" ? "Create Account" : "Welcome back"}
-            </DialogTitle>
-            <DialogDescription>
-              {authMode === "forgot"
-                ? "Enter your email and we'll send you a link to reset your password."
-                : authMode === "signup"
-                  ? "Sign up to save your projects in the cloud."
-                  : "Sign in to access your saved projects."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
-            {authMode !== "forgot" ? (
-              <div className="flex rounded-lg border bg-muted/40 p-1">
-                <button
-                  type="button"
-                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${authMode === "signin" ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                  onClick={() => { setAuthMode("signin"); setAuthError(null); }}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${authMode === "signup" ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                  onClick={() => { setAuthMode("signup"); setAuthError(null); }}
-                >
-                  Sign Up
-                </button>
-              </div>
-            ) : null}
-            {authMode === "forgot" && forgotSent ? (
-              <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700">
-                <CircleCheck className="h-4 w-4 shrink-0" />
-                Password reset link sent! Check your email inbox.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="authEmail">Email</Label>
-                  <Input
-                    id="authEmail"
-                    type="email"
-                    value={authEmail}
-                    onChange={(e) => setAuthEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    onKeyDown={(e) => { if (e.key === "Enter" && authMode === "forgot") handleForgotPassword(); }}
-                    className="h-10"
-                  />
-                </div>
-                {authMode !== "forgot" ? (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="authPassword">Password</Label>
-                    <Input
-                      id="authPassword"
-                      type="password"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      placeholder="••••••••"
-                      autoComplete={authMode === "signup" ? "new-password" : "current-password"}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleAuthSubmit(); }}
-                      className="h-10"
-                    />
-                    {authMode === "signin" ? (
-                      <button
-                        type="button"
-                        className="text-sm text-primary hover:underline"
-                        onClick={() => { setAuthMode("forgot"); setAuthError(null); setForgotSent(false); }}
-                      >
-                        Forgot password?
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            )}
-            {authError ? (
-              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                {authError}
-              </div>
-            ) : null}
-          </DialogBody>
-          <DialogFooter>
-            {authMode === "forgot" ? (
-              <>
-                <Button type="button" variant="outline" onClick={() => { setAuthMode("signin"); setAuthError(null); setForgotSent(false); }}>
-                  Back to Sign In
-                </Button>
-                {!forgotSent ? (
-                  <Button type="button" onClick={handleForgotPassword} disabled={authSubmitting || !authEmail} className="min-w-[100px]">
-                    {authSubmitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-                    Send Reset Link
-                  </Button>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <Button type="button" variant="outline" onClick={() => { setAuthModalOpen(false); setAuthError(null); }}>Cancel</Button>
-                <Button type="button" onClick={handleAuthSubmit} disabled={authSubmitting} className="min-w-[100px]">
-                  {authSubmitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-                  {authMode === "signup" ? "Create Account" : "Sign In"}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      ) : null}
-      {signOutModalOpen ? (
-        <DialogContent onClose={() => setSignOutModalOpen(false)} className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Sign Out</DialogTitle>
-            <DialogDescription>Are you sure you want to sign out? Any unsaved changes will be lost.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setSignOutModalOpen(false)} className="flex-1">
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleSignOut} className="flex-1 bg-red-600 text-white hover:bg-red-700">
-              <LogOut className="mr-1.5 h-3.5 w-3.5" />
-              Sign Out
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      ) : null}
+
       {geminiSettingsOpen ? (
         <DialogContent onClose={() => { setGeminiSettingsOpen(false); setTestKeyResult(null); }}>
           <DialogHeader>
@@ -2185,7 +1998,7 @@ export function LatexResumeTailorApp() {
               AI Model Settings
             </DialogTitle>
             <DialogDescription>
-              Choose a model and configure API keys. {user ? "Settings sync across devices." : "Saved locally in this browser."}
+              Choose a model and configure API keys. Settings are saved locally in this browser.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
@@ -2356,79 +2169,69 @@ export function LatexResumeTailorApp() {
                   <h2 className="text-sm font-semibold text-slate-200">Projects</h2>
                 </div>
                 <div className="flex items-center gap-1">
-                  {user ? (
-                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-300 hover:text-white hover:bg-slate-800" onClick={createNewProject} title="New Project">
-                      <FilePlus className="h-4 w-4" />
-                    </Button>
-                  ) : null}
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-300 hover:text-white hover:bg-slate-800" onClick={createNewProject} title="New Project">
+                    <FilePlus className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              {user ? (
-                <>
-                  <ScrollArea className="flex-1">
-                    <div className="p-2">
-                      {supabaseProjects.length === 0 ? (
-                        <p className="px-2 py-4 text-center text-sm text-slate-400">No projects yet. Create one to get started.</p>
-                      ) : (
-                        supabaseProjects.map((project) => (
-                          <div
-                            key={project.id}
-                            className={`group flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-sm transition-all duration-150 ${activeProjectId === project.id
-                              ? "bg-gradient-to-r from-emerald-500/12 via-emerald-500/5 to-transparent border-l-emerald-450 text-white font-medium"
-                              : "border-l-transparent hover:bg-slate-800/40 hover:text-white text-slate-350"
-                              }`}
-                            onClick={() => { if (renamingProjectId !== project.id) loadProjectIntoEditor(project); }}
-                          >
-                            {renamingProjectId === project.id ? (
-                              <input
-                                className="flex-1 rounded border border-slate-700 bg-slate-950/60 text-slate-200 px-1.5 py-0.5 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
-                                value={renameValue}
-                                onChange={(e) => setRenameValue(e.target.value)}
-                                onBlur={() => { if (renameValue.trim()) renameProject(project.id, renameValue.trim()); setRenamingProjectId(null); }}
-                                onKeyDown={(e) => { if (e.key === "Enter") { e.currentTarget.blur(); } if (e.key === "Escape") setRenamingProjectId(null); }}
-                                autoFocus
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            ) : (
-                              <>
-                                <FileText className={`h-4 w-4 shrink-0 transition-colors ${activeProjectId === project.id ? "text-emerald-400" : "text-slate-400 group-hover:text-slate-300"}`} />
-                                <div className="min-w-0 flex-1">
-                                  <p className={`truncate text-sm transition-colors ${activeProjectId === project.id ? "text-white" : "text-slate-300 group-hover:text-slate-100"}`}>{project.name}</p>
-                                  <p className={`truncate text-xs transition-colors ${activeProjectId === project.id ? "text-emerald-400/80" : "text-slate-500"}`}>
-                                    {new Date(project.updated_at).toLocaleDateString()}
-                                  </p>
-                                </div>
-                                <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-slate-450 hover:text-white hover:bg-slate-700" onClick={(e) => { e.stopPropagation(); setRenamingProjectId(project.id); setRenameValue(project.name); }}>
-                                    <Pencil className="h-3 w-3" />
-                                  </Button>
-                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-rose-450 hover:text-rose-350 hover:bg-rose-950/30" onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}>
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
+              <>
+                <ScrollArea className="flex-1">
+                  <div className="p-2">
+                    {supabaseProjects.length === 0 ? (
+                      <p className="px-2 py-4 text-center text-sm text-slate-400">No projects yet. Create one to get started.</p>
+                    ) : (
+                      supabaseProjects.map((project) => (
+                        <div
+                          key={project.id}
+                          className={`group flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-sm transition-all duration-150 ${activeProjectId === project.id
+                            ? "bg-gradient-to-r from-emerald-500/12 via-emerald-500/5 to-transparent border-l-emerald-450 text-white font-medium"
+                            : "border-l-transparent hover:bg-slate-800/40 hover:text-white text-slate-350"
+                            }`}
+                          onClick={() => { if (renamingProjectId !== project.id) loadProjectIntoEditor(project); }}
+                        >
+                          {renamingProjectId === project.id ? (
+                            <input
+                              className="flex-1 rounded border border-slate-700 bg-slate-950/60 text-slate-200 px-1.5 py-0.5 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onBlur={() => { if (renameValue.trim()) renameProject(project.id, renameValue.trim()); setRenamingProjectId(null); }}
+                              onKeyDown={(e) => { if (e.key === "Enter") { e.currentTarget.blur(); } if (e.key === "Escape") setRenamingProjectId(null); }}
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <>
+                              <FileText className={`h-4 w-4 shrink-0 transition-colors ${activeProjectId === project.id ? "text-emerald-400" : "text-slate-400 group-hover:text-slate-300"}`} />
+                              <div className="min-w-0 flex-1">
+                                <p className={`truncate text-sm transition-colors ${activeProjectId === project.id ? "text-white" : "text-slate-300 group-hover:text-slate-100"}`}>{project.name}</p>
+                                <p className={`truncate text-xs transition-colors ${activeProjectId === project.id ? "text-emerald-400/80" : "text-slate-500"}`}>
+                                  {new Date(project.updated_at || Date.now()).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-slate-450 hover:text-white hover:bg-slate-700" onClick={(e) => { e.stopPropagation(); setRenamingProjectId(project.id); setRenameValue(project.name); }}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-rose-450 hover:text-rose-350 hover:bg-rose-950/30" onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+                {user && (
                   <div className="border-t border-slate-750 p-2">
                     <Button type="button" variant="ghost" size="sm" className="w-full gap-2 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" onClick={() => setSignOutModalOpen(true)}>
                       <LogOut className="h-3.5 w-3.5" />
                       Sign Out
                     </Button>
                   </div>
-                </>
-              ) : (
-                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4">
-                  <p className="text-center text-sm text-slate-400">Sign in to save and manage your resume projects in the cloud.</p>
-                  <Button type="button" className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 border-0 text-white font-semibold transition-all shadow-md shadow-emerald-950/20" onClick={() => { setAuthModalOpen(true); setAuthMode("signin"); }}>
-                    <LogIn className="h-4 w-4" />
-                    Sign In
-                  </Button>
-                </div>
-              )}
+                )}
+              </>
             </motion.aside>
           )}
         </AnimatePresence>
@@ -2668,17 +2471,6 @@ export function LatexResumeTailorApp() {
                 ) : null}
 
                 <div className="ml-auto flex items-center gap-1">
-                  {!user && !authLoading ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-8 gap-1.5 px-2.5 bg-slate-700/40 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-white transition-all shadow-sm duration-150"
-                      onClick={() => { setAuthModalOpen(true); setAuthMode("signin"); }}
-                    >
-                      <LogIn className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline text-xs">Sign In</span>
-                    </Button>
-                  ) : null}
                   <Button
                     type="button"
                     size="sm"
