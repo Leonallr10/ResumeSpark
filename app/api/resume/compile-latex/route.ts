@@ -103,16 +103,23 @@ export async function POST(request: Request) {
     const previewId = generatePreviewId();
     storePdf(previewId, Buffer.from(pdf), synctexBuffer, lineOffset);
 
-    return new NextResponse(pdf, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": 'inline; filename="resume.pdf"',
-        "Cache-Control": "no-store",
-        "X-Preview-Id": previewId,
-        "X-Compiler": engine,
-        "X-Synctex-Available": synctexBuffer ? "1" : "0",
+    return NextResponse.json(
+      {
+        pdf: pdf.toString("base64"),
+        synctex: synctexBuffer ? synctexBuffer.toString("base64") : null,
+        lineOffset,
+        compiler: engine,
+        synctexAvailable: !!synctexBuffer,
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store",
+          "X-Preview-Id": previewId,
+          "X-Compiler": engine,
+          "X-Synctex-Available": synctexBuffer ? "1" : "0",
+        },
+      }
+    );
   } catch (error) {
     return NextResponse.json(
       {
@@ -183,16 +190,23 @@ async function compileViaCloud(latex: string) {
     const previewId = generatePreviewId();
     storePdf(previewId, pdf);
 
-    return new NextResponse(pdf, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": 'inline; filename="resume.pdf"',
-        "Cache-Control": "no-store",
-        "X-Preview-Id": previewId,
-        "X-Compiler": "texlive.net",
-        "X-Synctex-Available": "0",
+    return NextResponse.json(
+      {
+        pdf: pdf.toString("base64"),
+        synctex: null,
+        lineOffset,
+        compiler: "texlive.net",
+        synctexAvailable: false,
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store",
+          "X-Preview-Id": previewId,
+          "X-Compiler": "texlive.net",
+          "X-Synctex-Available": "0",
+        },
+      }
+    );
   } catch (error) {
     const isTimeout =
       error instanceof Error &&

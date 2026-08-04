@@ -21,6 +21,25 @@ export async function fetchSynctexMapping(
   }
 }
 
+export async function parseBase64Synctex(
+  base64Gzip: string,
+  lineOffset: number,
+): Promise<{ mapping: SynctexMapping | null; lineOffset: number }> {
+  try {
+    const binary = atob(base64Gzip);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const raw = await decompressGzip(bytes.buffer);
+    const mapping = parseSynctex(raw);
+    return { mapping, lineOffset };
+  } catch {
+    return { mapping: null, lineOffset: 0 };
+  }
+}
+
 async function decompressGzip(buffer: ArrayBuffer): Promise<string> {
   const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream("gzip"));
   const reader = stream.getReader();

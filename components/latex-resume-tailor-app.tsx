@@ -80,7 +80,7 @@ import {
   PdfCanvasViewer,
   type PdfCanvasViewerHandle,
 } from "@/components/pdf-canvas-viewer";
-import { fetchSynctexMapping } from "@/lib/synctex-client";
+import { parseBase64Synctex } from "@/lib/synctex-client";
 import { forwardSync, type SynctexMapping, type SynctexRect } from "@/lib/synctex-parser";
 import {
   derivePreviewLayoutFromLatex,
@@ -1421,13 +1421,16 @@ export function LatexResumeTailorApp() {
       throw new Error([payload.error, payload.details].filter(Boolean).join(" "));
     }
 
-    const blob = await response.blob();
+    const payload = (await response.json()) as {
+      pdf: string;
+      synctex: string | null;
+      lineOffset: number;
+      compiler: string;
+      synctexAvailable: boolean;
+    };
 
-    if (blob.type !== "application/pdf") {
-      throw new Error("Expected a PDF response from the compiler.");
-    }
-
-    return blob;
+    const pdfBytes = Uint8Array.from(atob(payload.pdf), (c) => c.charCodeAt(0));
+    return new Blob([pdfBytes], { type: "application/pdf" });
   }
 
 
@@ -1467,9 +1470,17 @@ export function LatexResumeTailorApp() {
         return;
       }
 
+      const payload = (await response.json()) as {
+        pdf: string;
+        synctex: string | null;
+        lineOffset: number;
+        compiler: string;
+        synctexAvailable: boolean;
+      };
+
       const newPreviewId = response.headers.get("X-Preview-Id");
-      const hasSynctex = response.headers.get("X-Synctex-Available") === "1";
-      const blob = await response.blob();
+      const pdfBytes = Uint8Array.from(atob(payload.pdf), (c) => c.charCodeAt(0));
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
       pdfBlobRef.current = blob;
       const arrayBuffer = await blob.arrayBuffer();
       setPdfArrayBuffer(arrayBuffer);
@@ -1481,8 +1492,8 @@ export function LatexResumeTailorApp() {
       setDiagnosticsPanelOpen(false);
       setViewMode("pdf");
 
-      if (hasSynctex && newPreviewId) {
-        fetchSynctexMapping(newPreviewId).then(({ mapping, lineOffset }) => {
+      if (payload.synctexAvailable && payload.synctex) {
+        parseBase64Synctex(payload.synctex, payload.lineOffset).then(({ mapping, lineOffset }) => {
           setSynctexMapping(mapping);
           setSynctexLineOffset(lineOffset);
         });
@@ -1681,11 +1692,12 @@ export function LatexResumeTailorApp() {
   }
 
   function renderPdfPreview() {
-    if (!previewId) {
+    if (!pdfBlobRef.current) {
       toast.error("Compile first (Ctrl+S) to preview PDF.", { duration: 4000 });
       return;
     }
-    window.open(`/api/resume/preview/${previewId}`, "_blank");
+    const url = URL.createObjectURL(pdfBlobRef.current);
+    window.open(url, "_blank");
   }
 
   function wrapSelectionWith(prefix: string, suffix: string) {
