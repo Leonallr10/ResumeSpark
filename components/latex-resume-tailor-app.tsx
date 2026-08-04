@@ -112,6 +112,9 @@ import type {
   SectionReview,
   SuggestionResponse,
 } from "@/types/resume";
+import { analyzeJobMatch } from "@/lib/job-match";
+import type { JobMatchResult } from "@/types/job-match";
+import { JobMatchModal } from "@/components/job-match-modal";
 
 const COMPANY_ROLE_LIMIT = 300;
 const JD_LIMIT = 20000;
@@ -269,6 +272,10 @@ export function LatexResumeTailorApp() {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const LATEX_HISTORY_DEBOUNCE_MS = 450;
+  // Job matching state
+  const [jobMatchOpen, setJobMatchOpen] = useState(false);
+  const [jobMatchResult, setJobMatchResult] = useState<JobMatchResult | null>(null);
+  const [isJobMatchAnalyzing, setIsJobMatchAnalyzing] = useState(false);
 
   latestLatexRef.current = latexCode;
 
@@ -669,6 +676,21 @@ export function LatexResumeTailorApp() {
     jd.length <= JD_LIMIT &&
     !suggesting;
   const canCompilePdf = resumeSections.length > 0 && latexCode.trim().length > 0;
+
+  const canJobMatch =
+    resumeSections.length > 0 &&
+    latexCode.trim().length > 0 &&
+    jd.trim().length > 0;
+
+  const runJobMatch = useCallback(() => {
+    if (!canJobMatch) return;
+    setIsJobMatchAnalyzing(true);
+    setJobMatchOpen(true);
+    // Pass latexCode so the matcher can extract text directly when line.text is empty
+    const result = analyzeJobMatch(resumeSections, jd, latexCode);
+    setJobMatchResult(result);
+    setIsJobMatchAnalyzing(false);
+  }, [canJobMatch, resumeSections, jd, latexCode]);
 
   const suggestionsByLine = useMemo(() => {
     return suggestions.reduce<Record<string, AiSuggestion[]>>((acc, suggestion) => {
@@ -3002,6 +3024,24 @@ export function LatexResumeTailorApp() {
                                   </button>
                                 )}
                               </div>
+
+                              {/* Job Matching & ATS Score button */}
+                              <div className="pt-1">
+                                <button
+                                  id="job-match-btn"
+                                  type="button"
+                                  disabled={!canJobMatch}
+                                  onClick={runJobMatch}
+                                  className="group relative flex w-full items-center justify-center gap-2 rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 px-4 py-3 text-xs font-bold uppercase tracking-widest text-blue-300 shadow-lg shadow-blue-900/20 transition-all duration-300 hover:from-blue-600/35 hover:to-indigo-600/35 hover:border-blue-400/50 hover:text-blue-200 hover:shadow-blue-700/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:from-blue-600/20 disabled:hover:to-indigo-600/20"
+                                >
+                                  <svg className="h-4 w-4 transition-transform group-hover:rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                                    <circle cx="11" cy="11" r="8" />
+                                    <circle cx="11" cy="11" r="4" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                  </svg>
+                                  Job Matching &amp; ATS Score
+                                </button>
+                              </div>
                             </div>
                           </motion.div>
                         )}
@@ -3014,6 +3054,17 @@ export function LatexResumeTailorApp() {
           </div>
         </div>
       </div>
+      <JobMatchModal
+        isOpen={jobMatchOpen}
+        result={jobMatchResult}
+        sections={resumeSections}
+        latexCode={latexCode}
+        jd={jd}
+        companyRole={companyRole}
+        isAnalyzing={isJobMatchAnalyzing}
+        onClose={() => setJobMatchOpen(false)}
+        onReanalyze={runJobMatch}
+      />
     </main>
   );
 }
