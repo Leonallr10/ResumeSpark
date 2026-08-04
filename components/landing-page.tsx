@@ -78,11 +78,7 @@ const FEATURES = [
     title: "Text Polish Actions",
     description: "Five polish modes — improve, elaborate, professional, concise, quantify — with real-time streaming.",
   },
-  {
-    icon: Layers,
-    title: "Multi-Compiler Pipeline",
-    description: "Automatic fallback chain: pdflatex → xelatex → tectonic → cloud. Never fails to compile.",
-  },
+
 ];
 
 const STEPS = [
@@ -382,7 +378,7 @@ export function LandingPage() {
       </section>
 
       {/* 7. Results / Impact */}
-      <section className="relative px-6 py-24">
+      {/* <section className="relative px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-16 text-center">
             <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
@@ -401,12 +397,12 @@ export function LandingPage() {
             ))}
           </motion.div>
         </div>
-      </section>
+      </section> */}
 
 
 
       {/* 9. Testimonials / Social Proof */}
-      <section className="relative px-6 py-24">
+      {/* <section className="relative px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-16 text-center">
             <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
@@ -455,10 +451,10 @@ export function LandingPage() {
             </motion.div>
           </motion.div>
         </div>
-      </section>
+      </section> */}
 
       {/* CTA */}
-      <section className="relative px-6 py-24">
+      {/* <section className="relative px-6 py-24">
         <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mx-auto max-w-3xl text-center">
           <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
             Ready to <span className="text-emerald-400">get started</span>?
@@ -491,7 +487,7 @@ export function LandingPage() {
             </Link>
           </div>
         </motion.div>
-      </section>
+      </section> */}
 
       {/* Footer */}
       <footer className="border-t border-emerald-500/10 px-6 py-12">
