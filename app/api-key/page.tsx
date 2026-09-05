@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -122,6 +123,7 @@ const PROVIDER_META = {
 } as const;
 
 export default function ApiKeyPage() {
+  const router = useRouter();
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("gemini");
   const [llmModel, setLlmModel] = useState("gemini-2.5-pro");
   const [geminiApiKey, setGeminiApiKey] = useState("");
@@ -130,6 +132,20 @@ export default function ApiKeyPage() {
   const [testingKey, setTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  function handleBack() {
+    if (typeof window !== "undefined") {
+      if (document.referrer && !document.referrer.startsWith(window.location.origin)) {
+        router.push("/resume-generator");
+        return;
+      }
+      if (window.history.length > 1) {
+        router.back();
+        return;
+      }
+    }
+    router.push("/resume-generator");
+  }
 
   useEffect(() => {
     const cached = readCachedLlmSettings();
@@ -204,13 +220,14 @@ export default function ApiKeyPage() {
               AURABIO
             </span>
           </Link>
-          <Link
-            href="/resume-generator"
-            className="flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-400"
+          <button
+            type="button"
+            onClick={handleBack}
+            className="flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-400 cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to App
-          </Link>
+          </button>
         </div>
       </nav>
 
