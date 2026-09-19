@@ -79,7 +79,7 @@ export default function ResumeGeneratorPage() {
   const handleSelectFlow = (flow: "latex" | "pdf") => {
     try {
       localStorage.setItem("resume_active_flow", flow);
-    } catch {}
+    } catch { }
     router.push(flow === "latex" ? "/edit-latex" : "/Edit-a-PDF");
   };
 
@@ -311,46 +311,7 @@ export default function ResumeGeneratorPage() {
           </motion.div>
         </div>
 
-        {/* Recent Projects */}
-        <div className="border border-slate-800/80 bg-slate-900/40 rounded-2xl p-6 backdrop-blur">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <FolderGit2 className="w-4 h-4 text-emerald-400" />
-              <h3 className="font-bold text-sm text-white">Your Resume Projects &amp; Experience</h3>
-            </div>
-            <span className="text-xs text-slate-400">Synced across LaTeX &amp; PDF engines</span>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {recentProjects.map((p, idx) => (
-              <div
-                key={idx}
-                className="p-3.5 bg-slate-900/80 border border-slate-800/80 rounded-xl space-y-2 hover:border-slate-700 transition-colors text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-200 truncate">{p.heading}</span>
-                  <Badge variant="outline" className="text-[10px] text-slate-400 border-slate-700">
-                    {p.lastFlow === "pdf" ? "PDF" : "LaTeX"}
-                  </Badge>
-                </div>
-                <p className="text-slate-400 line-clamp-2 leading-relaxed text-[11px]">
-                  {p.explanation}
-                </p>
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                  <span className="truncate max-w-[160px] text-emerald-400/90">
-                    {p.techStack.split(",")[0]}
-                  </span>
-                  <button
-                    onClick={() => handleSelectFlow(p.lastFlow || "pdf")}
-                    className="text-slate-300 hover:text-white font-medium flex items-center gap-0.5 hover:underline"
-                  >
-                    Open <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </main>
 
       {/* Footer */}
