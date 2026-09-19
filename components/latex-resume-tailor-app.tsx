@@ -12,9 +12,11 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { Toaster, toast } from "sonner";
+import { parseLatexToDocumentModel } from "@/server/documents/from-latex";
 import {
   AlertTriangle,
   CheckCheck,
@@ -195,6 +197,7 @@ function latexSizePtForBase(cmd: string, basePt: number): number {
 }
 
 export function LatexResumeTailorApp() {
+  const router = useRouter();
   const [latexCode, setLatexCode] = useState(DEFAULT_LATEX_RESUME);
   const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
   const [sectionReviews, setSectionReviews] = useState<SectionReview[]>([]);
@@ -2330,6 +2333,27 @@ export function LatexResumeTailorApp() {
                     title="Generate Portfolio Website"
                   >
                     <Globe className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2.5 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 hover:text-white transition-all shadow-sm duration-150"
+                    onClick={() => {
+                      try {
+                        const doc = parseLatexToDocumentModel(latexCode);
+                        localStorage.setItem("resume_pdf_document_model_v1", JSON.stringify(doc));
+                        localStorage.setItem("resume_latex_source_v1", latexCode);
+                        localStorage.setItem("resume_active_flow", "pdf");
+                        toast.success("Converted to PDF template model!");
+                        router.push("/pdf-editor");
+                      } catch {
+                        toast.error("Could not parse LaTeX to template.");
+                      }
+                    }}
+                    title="Switch to PDF Template Studio"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span className="hidden lg:inline text-xs font-medium">PDF Studio</span>
                   </Button>
                   <Button
                     type="button"

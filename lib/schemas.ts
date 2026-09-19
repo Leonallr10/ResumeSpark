@@ -42,11 +42,21 @@ export const resumeSectionSchema = z.object({
   lines: z.array(resumeLineSchema),
 });
 
+export const companyToneSchema = z.enum([
+  "startup",
+  "faang",
+  "ai_lab",
+  "enterprise",
+  "unknown",
+]);
+
+export type CompanyTone = z.infer<typeof companyToneSchema>;
+
 const llmProviderSchema = z.enum(["gemini", "groq", "claude"]).default("gemini");
 
 export const suggestionRequestSchema = z.object({
   resumeSections: z.array(resumeSectionSchema).min(1),
-  project: z.string().min(1),
+  project: z.string().max(10000).optional().default(""),
   companyRole: z.string().min(1).max(300),
   jd: z.string().min(1).max(20000),
   provider: llmProviderSchema,
@@ -72,6 +82,7 @@ export const sectionReviewSchema = z.object({
 });
 
 export const suggestionResponseSchema = z.object({
+  companyTone: companyToneSchema.optional().default("startup"),
   suggestions: z.array(aiSuggestionSchema),
   sectionReviews: z.array(sectionReviewSchema),
 });

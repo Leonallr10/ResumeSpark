@@ -74,7 +74,10 @@ export type SectionReview = {
   summary: string;
 };
 
+export type CompanyTone = "startup" | "faang" | "ai_lab" | "enterprise" | "unknown";
+
 export type SuggestionResponse = {
+  companyTone?: CompanyTone;
   suggestions: AiSuggestion[];
   sectionReviews: SectionReview[];
 };
