@@ -24,6 +24,9 @@ import {
   ArrowRight,
   Eye,
   Edit3,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -67,6 +70,28 @@ export function PdfTemplateEditor() {
   const [zoomLevel, setZoomLevel] = useState(100);
 
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const previewPanelRef = useRef<HTMLDivElement>(null);
+
+  // Attach a native (non-passive) wheel listener so e.preventDefault() actually
+  // blocks the browser's built-in Ctrl+Scroll page zoom before it fires.
+  // React's synthetic onWheel is passive by default in modern browsers and
+  // cannot call preventDefault() in time to stop native zoom.
+  useEffect(() => {
+    const el = previewPanelRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault(); // blocks browser zoom
+      setZoomLevel((z) => {
+        const delta = e.deltaY > 0 ? -5 : 5;
+        return Math.min(200, Math.max(40, z + delta));
+      });
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // Load initial model from localStorage
   useEffect(() => {
@@ -215,7 +240,7 @@ export function PdfTemplateEditor() {
   const renderedHtml = getTemplateRenderer(model.templateId)(model);
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-950 text-slate-100">
       <Toaster position="top-right" richColors />
 
       {/* Top Header */}
@@ -317,9 +342,9 @@ export function PdfTemplateEditor() {
           />
         </div>
       ) : (
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* Left Panel: Structured Data Editor */}
-          <div className="w-full lg:w-[460px] xl:w-[500px] border-r border-slate-800 bg-slate-900/50 flex flex-col h-[calc(100vh-3.5rem)] overflow-y-auto p-4 space-y-6">
+          <div className="w-full lg:w-[460px] xl:w-[500px] border-r border-slate-800 bg-slate-900/50 flex flex-col overflow-y-auto p-4 space-y-6">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Structured Resume Data</span>
               <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/20">
@@ -620,39 +645,72 @@ export function PdfTemplateEditor() {
           </div>
 
           {/* Right Panel: High Fidelity Printable Canvas */}
-          <div className="flex-1 bg-slate-950 flex flex-col items-center justify-start overflow-y-auto p-6 relative">
-            {/* Zoom & Canvas controls */}
-            <div className="mb-4 flex items-center gap-3 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-400">
-              <span>Zoom:</span>
+          <div
+            ref={previewPanelRef}
+            className="flex-1 bg-slate-950 flex flex-col overflow-hidden relative"
+          >
+            {/* Sticky zoom toolbar */}
+            <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-sm">
+              <span className="text-[11px] text-slate-500 font-medium mr-1">Zoom</span>
+
               <button
-                onClick={() => setZoomLevel((z) => Math.max(70, z - 10))}
-                className="hover:text-white px-1.5 py-0.5 rounded bg-slate-800"
+                onClick={() => setZoomLevel((z) => Math.max(40, z - 10))}
+                title="Zoom Out (Ctrl + Scroll Down)"
+                className="flex items-center justify-center w-7 h-7 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-emerald-500/40 text-slate-300 hover:text-white transition-all"
               >
-                -
+                <ZoomOut className="w-3.5 h-3.5" />
               </button>
-              <span className="font-mono text-slate-200">{zoomLevel}%</span>
+
+              <span className="font-mono text-sm font-semibold text-slate-200 w-12 text-center tabular-nums">
+                {zoomLevel}%
+              </span>
+
               <button
-                onClick={() => setZoomLevel((z) => Math.min(150, z + 10))}
-                className="hover:text-white px-1.5 py-0.5 rounded bg-slate-800"
+                onClick={() => setZoomLevel((z) => Math.min(200, z + 10))}
+                title="Zoom In (Ctrl + Scroll Up)"
+                className="flex items-center justify-center w-7 h-7 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-emerald-500/40 text-slate-300 hover:text-white transition-all"
               >
-                +
+                <ZoomIn className="w-3.5 h-3.5" />
               </button>
-              <div className="h-3 w-px bg-slate-800 mx-1" />
+
+              <button
+                onClick={() => setZoomLevel(100)}
+                title="Reset Zoom"
+                className="flex items-center justify-center w-7 h-7 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-500 hover:text-slate-300 transition-all"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+
+              <div className="h-4 w-px bg-slate-800 mx-1" />
+
+              <span className="text-[10px] text-slate-600 hidden lg:inline">
+                Ctrl + Scroll to zoom
+              </span>
+
+              <div className="flex-1" />
+
               <button
                 onClick={handlePrintPdf}
-                className="hover:text-emerald-400 flex items-center gap-1"
+                className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-emerald-400 transition-colors px-2 py-1 rounded hover:bg-slate-800"
               >
                 <Printer className="w-3.5 h-3.5" /> Print
               </button>
             </div>
 
-            {/* Template Container Canvas */}
-            <div
-              ref={previewContainerRef}
-              style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top center" }}
-              className="shadow-2xl rounded-sm transition-transform duration-150"
-              dangerouslySetInnerHTML={{ __html: renderedHtml }}
-            />
+            {/* Scrollable canvas area */}
+            <div className="flex-1 overflow-auto p-6 flex justify-center items-start">
+              <div
+                ref={previewContainerRef}
+                style={{
+                  transform: `scale(${zoomLevel / 100})`,
+                  transformOrigin: "top center",
+                  // Preserve layout space so the parent scrollbar works correctly
+                  marginBottom: `${(zoomLevel / 100 - 1) * 100}%`,
+                }}
+                className="shadow-2xl rounded-sm transition-transform duration-100"
+                dangerouslySetInnerHTML={{ __html: renderedHtml }}
+              />
+            </div>
           </div>
         </div>
       )}
