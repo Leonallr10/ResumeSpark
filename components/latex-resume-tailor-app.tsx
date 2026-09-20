@@ -377,36 +377,88 @@ export function LatexResumeTailorApp() {
 
   async function loadUserProjects() {
     if (typeof window !== "undefined") {
+      const savedPdfLatex = window.localStorage.getItem("resume_latex_source_v1");
+      const switchTs = window.localStorage.getItem("resume_latex_switch_ts");
       const stored = window.localStorage.getItem("resume-projects-meta");
+
+      let existingProjects: ResumeProject[] = [];
       if (stored) {
         try {
-          const data = JSON.parse(stored) as ResumeProject[];
-          if (data.length > 0) {
-            setSupabaseProjects(data);
-            loadProjectIntoEditor(data[0]);
-            return;
-          }
+          existingProjects = JSON.parse(stored) as ResumeProject[];
         } catch (e) {
           console.error("Failed to load local projects", e);
         }
       }
 
+      // Check if user just switched from PDF Template Editor
+      if (savedPdfLatex && switchTs) {
+        window.localStorage.removeItem("resume_latex_switch_ts");
+
+        let targetProj = existingProjects[0];
+        if (!targetProj) {
+          const defaultId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+          targetProj = {
+            id: defaultId,
+            name: "My Resume",
+            latex_code: savedPdfLatex,
+            company_role: "",
+            jd: "",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          existingProjects = [targetProj];
+        } else {
+          targetProj = {
+            ...targetProj,
+            latex_code: savedPdfLatex,
+            updated_at: new Date().toISOString(),
+          };
+          existingProjects[0] = targetProj;
+        }
+
+        window.localStorage.setItem(`resume-tex-${targetProj.id}`, savedPdfLatex);
+        window.localStorage.setItem("resume-projects-meta", JSON.stringify(existingProjects));
+        setSupabaseProjects(existingProjects);
+        loadProjectIntoEditor(targetProj, savedPdfLatex);
+
+        // Auto compile the synchronized template
+        setTimeout(() => {
+          recompileLatex(savedPdfLatex);
+        }, 200);
+        return;
+      }
+
+      if (existingProjects.length > 0) {
+        setSupabaseProjects(existingProjects);
+        loadProjectIntoEditor(existingProjects[0]);
+        // Trigger initial compilation if needed
+        setTimeout(() => {
+          const firstTex = window.localStorage.getItem(`resume-tex-${existingProjects[0].id}`) || existingProjects[0].latex_code;
+          if (firstTex) recompileLatex(firstTex);
+        }, 400);
+        return;
+      }
+
       // First visit – seed a default project
       const defaultId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+      const initialLatex = savedPdfLatex || DEFAULT_LATEX_RESUME;
       const defaultProject: ResumeProject = {
         id: defaultId,
         name: "My Resume",
-        latex_code: DEFAULT_LATEX_RESUME,
+        latex_code: initialLatex,
         company_role: "",
         jd: "",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
       // Persist the .tex content separately
-      window.localStorage.setItem(`resume-tex-${defaultId}`, DEFAULT_LATEX_RESUME);
+      window.localStorage.setItem(`resume-tex-${defaultId}`, initialLatex);
       window.localStorage.setItem("resume-projects-meta", JSON.stringify([defaultProject]));
       setSupabaseProjects([defaultProject]);
-      loadProjectIntoEditor(defaultProject);
+      loadProjectIntoEditor(defaultProject, initialLatex);
+      setTimeout(() => {
+        recompileLatex(initialLatex);
+      }, 300);
       return;
     }
     setSupabaseProjects([]);
@@ -449,7 +501,7 @@ export function LatexResumeTailorApp() {
 
 
 
-  async function loadProjectIntoEditor(project: ResumeProject) {
+  async function loadProjectIntoEditor(project: ResumeProject, explicitLatex?: string) {
     // Flush pending auto-save for the current project
     if (activeProjectId && activeProjectId !== project.id) {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -472,9 +524,10 @@ export function LatexResumeTailorApp() {
     // Fetch fresh project data from local state
     const p = supabaseProjects.find(sp => sp.id === project.id) || project;
 
-    const localTex = typeof window !== "undefined" ? window.localStorage.getItem(`resume-tex-${p.id}`) : null;
-    setLatexCode(localTex || p.latex_code || DEFAULT_LATEX_RESUME);
-    setCommittedLatex(localTex || p.latex_code || DEFAULT_LATEX_RESUME);
+    const localTex = explicitLatex || (typeof window !== "undefined" ? window.localStorage.getItem(`resume-tex-${p.id}`) : null);
+    const resolvedCode = localTex || p.latex_code || DEFAULT_LATEX_RESUME;
+    setLatexCode(resolvedCode);
+    setCommittedLatex(resolvedCode);
     setCompanyRole(p.company_role || "");
     setJd(p.jd || "");
 
@@ -1437,15 +1490,16 @@ export function LatexResumeTailorApp() {
   }
 
 
-  async function recompileLatex() {
+  async function recompileLatex(codeOverride?: string) {
     setIsRecompiling(true);
     setError(null);
+    const targetCode = codeOverride ?? latexCode;
 
     try {
       const response = await fetch("/api/resume/compile-latex", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latex: latexCode }),
+        body: JSON.stringify({ latex: targetCode }),
       });
 
       if (!response.ok) {
@@ -1488,7 +1542,7 @@ export function LatexResumeTailorApp() {
       const arrayBuffer = await blob.arrayBuffer();
       setPdfArrayBuffer(arrayBuffer);
       if (newPreviewId) setPreviewId(newPreviewId);
-      setCommittedLatex(latexCode);
+      setCommittedLatex(targetCode);
       setDiagnostics([]);
       setActiveDiagFix(null);
       setLastCompileSuccess(true);
@@ -2344,6 +2398,23 @@ export function LatexResumeTailorApp() {
                         localStorage.setItem("resume_pdf_document_model_v1", JSON.stringify(doc));
                         localStorage.setItem("resume_latex_source_v1", latexCode);
                         localStorage.setItem("resume_active_flow", "pdf");
+                        localStorage.setItem("resume_pdf_switch_ts", Date.now().toString());
+
+                        if (pdfBlobRef.current) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const result = reader.result as string;
+                            const base64 = result.includes(",") ? result.split(",")[1] : result;
+                            if (base64) {
+                              localStorage.setItem("resume_compiled_pdf_base64", base64);
+                            }
+                            toast.success("Synchronized compiled PDF with PDF Studio!");
+                            router.push("/pdf-editor");
+                          };
+                          reader.readAsDataURL(pdfBlobRef.current);
+                          return;
+                        }
+
                         toast.success("Converted to PDF template model!");
                         router.push("/pdf-editor");
                       } catch {
@@ -2558,7 +2629,7 @@ export function LatexResumeTailorApp() {
                               ? "text-green-400"
                               : "text-slate-100"
                             }`}
-                          onClick={recompileLatex}
+                          onClick={() => { void recompileLatex(); }}
                           disabled={isRecompiling || !canCompilePdf}
                           title="Recompile LaTeX and show diagnostics"
                         >

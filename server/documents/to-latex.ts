@@ -1,31 +1,97 @@
-import type { ResumeDocumentModel } from "./resume-document-model";
+import type { ResumeDocumentModel, CustomSection } from "./resume-document-model";
 
 /**
  * Generates compilable LaTeX source from ResumeDocumentModel.
- * Can format according to Template 1 (Times New Roman Academic) or Template 2 (Trey Hunner CV).
+ * Supports Template 1 (Ivy Academic), Template 2 (Classic CV),
+ * Template 3 (Silicon Valley Tech), and Template 4 (Minimalist Executive).
  */
 export function generateLatexFromDocumentModel(
   model: ResumeDocumentModel,
-  templateVariant: "template-1" | "template-2" = "template-1",
+  templateVariant?: string,
 ): string {
-  if (templateVariant === "template-2" || model.templateId === "template-2") {
-    return generateTemplate2Latex(model);
+  const variant = templateVariant || model.templateId || "template-1";
+
+  switch (variant) {
+    case "template-2":
+      return generateTemplate2Latex(model);
+    case "template-3":
+      return generateTemplate3Latex(model);
+    case "template-4":
+      return generateTemplate4Latex(model);
+    case "template-1":
+    default:
+      return generateTemplate1Latex(model);
   }
-  return generateTemplate1Latex(model);
 }
 
 function escapeLatex(text: string): string {
   if (!text) return "";
   return text
+    .replace(/\\/g, "\\textbackslash{}")
     .replace(/&/g, "\\&")
     .replace(/%/g, "\\%")
     .replace(/\$/g, "\\$")
     .replace(/#/g, "\\#")
-    .replace(/_/g, "\\_");
+    .replace(/_/g, "\\_")
+    .replace(/\{/g, "\\{")
+    .replace(/\}/g, "\\}")
+    .replace(/~/g, "\\textasciitilde{}")
+    .replace(/\^/g, "\\textasciicircum{}");
+}
+
+function renderCustomSectionsTemplate1(customSections: CustomSection[]): string {
+  if (!customSections || customSections.length === 0) return "";
+
+  return customSections
+    .map((sec) => {
+      const sectionTitle = escapeLatex(sec.title || "ADDITIONAL SECTION").toUpperCase();
+      let body = "";
+
+      if (sec.items && sec.items.length > 0) {
+        const itemRows = sec.items
+          .map((item) => {
+            const bulletItems = (item.bullets || [])
+              .map((b) => `      \\resumeItem{${escapeLatex(b)}}`)
+              .join("\n");
+
+            const bulletsBlock =
+              bulletItems.length > 0
+                ? `    \\resumeItemListStart\n${bulletItems}\n    \\resumeItemListEnd`
+                : "";
+
+            return `  \\resumeSubheading
+    {${escapeLatex(item.title)}}{${escapeLatex(item.date)}}
+    {${escapeLatex(item.subtitle)}}{${escapeLatex("")}}
+${bulletsBlock}`;
+          })
+          .join("\n\n");
+
+        body = `\\resumeSubHeadingListStart\n${itemRows}\n\\resumeSubHeadingListEnd`;
+      } else if (sec.bullets && sec.bullets.length > 0) {
+        const bulletItems = sec.bullets
+          .map((b) => `  \\resumeItem{${escapeLatex(b)}}`)
+          .join("\n");
+        body = `\\resumeItemListStart\n${bulletItems}\n\\resumeItemListEnd`;
+      } else if (sec.content) {
+        body = `\\itemtext\n${escapeLatex(sec.content)}`;
+      }
+
+      return `\\section{${sectionTitle}}\n\\vspace{2pt}\n${body}\n\\vspace{2pt}`;
+    })
+    .join("\n\n");
 }
 
 function generateTemplate1Latex(model: ResumeDocumentModel): string {
-  const { personalInfo, summary, experience, education, skills, projects, achievements } = model;
+  const { personalInfo, summary, experience, education, skills, projects, achievements, customSections, sectionTitles } = model;
+
+  const titles = {
+    summary: (sectionTitles?.summary || "Summary").toUpperCase(),
+    experience: (sectionTitles?.experience || "Work Experience").toUpperCase(),
+    education: (sectionTitles?.education || "Education").toUpperCase(),
+    skills: (sectionTitles?.skills || "Skills").toUpperCase(),
+    projects: (sectionTitles?.projects || "Projects").toUpperCase(),
+    achievements: (sectionTitles?.achievements || "Achievements and Activities").toUpperCase(),
+  };
 
   const contactLinks: string[] = [];
   if (personalInfo.phone) contactLinks.push(`\\href{tel:${personalInfo.phone}}{${escapeLatex(personalInfo.phone)}}`);
@@ -35,14 +101,14 @@ function generateTemplate1Latex(model: ResumeDocumentModel): string {
   if (personalInfo.portfolio) contactLinks.push(`\\href{https://${personalInfo.portfolio}}{portfolio}`);
 
   const headerBlock = `\\begin{center}
-  {\\namesize\\textbf{${escapeLatex(personalInfo.fullName.toUpperCase())}}}\\\\[2pt]
-  {\\fontsize{9}{11}\\selectfont ${escapeLatex(personalInfo.location)}}\\\\[2pt]
+  {\\namesize\\textbf{${escapeLatex((personalInfo.fullName || "Your Name").toUpperCase())}}}\\\\[2pt]
+  ${personalInfo.location ? `{\\fontsize{9}{11}\\selectfont ${escapeLatex(personalInfo.location)}}\\\\[2pt]` : ""}
   {\\fontsize{9}{12}\\selectfont ${contactLinks.join(" $\\vert$ ")}}
 \\end{center}`;
 
   // Summary Section
   const summaryBlock = summary
-    ? `\\section{SUMMARY}
+    ? `\\section{${titles.summary}}
 \\itemtext
 ${escapeLatex(summary)}
 \\vspace{2pt}`
@@ -65,7 +131,7 @@ ${bulletItems}
     .join("\n\n");
 
   const experienceBlock = experience.length > 0
-    ? `\\section{WORK EXPERIENCE}
+    ? `\\section{${titles.experience}}
 \\vspace{2pt}
 \\resumeSubHeadingListStart
 ${expItems}
@@ -78,12 +144,12 @@ ${expItems}
     .map((edu) => {
       return `  \\resumeSubheading
     {${escapeLatex(edu.institution)}}{${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}}
-    {${escapeLatex(edu.degree)}}{${escapeLatex(edu.location)}}`;
+    {${escapeLatex(edu.degree)}${edu.field ? `, ${escapeLatex(edu.field)}` : ""}}{${escapeLatex(edu.location)}}`;
     })
     .join("\n\n");
 
   const educationBlock = education.length > 0
-    ? `\\section{EDUCATION}
+    ? `\\section{${titles.education}}
 \\vspace{2pt}
 \\resumeSubHeadingListStart
 ${eduItems}
@@ -97,7 +163,7 @@ ${eduItems}
     .join("\n");
 
   const skillsBlock = skills.length > 0
-    ? `\\section{SKILLS}\\vspace{2pt}
+    ? `\\section{${titles.skills}}\\vspace{2pt}
 \\resumeItemListStart
 ${skillRows}
 \\resumeItemListEnd`
@@ -119,7 +185,7 @@ ${bulletItems}
     .join("\n\n");
 
   const projectsBlock = projects.length > 0
-    ? `\\section{PROJECTS}
+    ? `\\section{${titles.projects}}
 \\vspace{2pt}
 \\resumeSubHeadingListStart
 ${projItems}
@@ -138,11 +204,13 @@ ${projItems}
     .join("\n");
 
   const achievementsBlock = achievements.length > 0
-    ? `\\section{ACHIEVEMENTS AND ACTIVITIES} \\vspace{2pt}
+    ? `\\section{${titles.achievements}} \\vspace{2pt}
 \\resumeSubHeadingListStart
 ${achRows}
 \\resumeSubHeadingListEnd`
     : "";
+
+  const customSectionsBlock = renderCustomSectionsTemplate1(customSections);
 
   return `%-------------------------
 % Resume in LaTeX - Auto Generated
@@ -223,12 +291,23 @@ ${projectsBlock}
 
 ${achievementsBlock}
 
+${customSectionsBlock}
+
 \\end{document}
 `;
 }
 
 function generateTemplate2Latex(model: ResumeDocumentModel): string {
-  const { personalInfo, experience, education, skills, projects } = model;
+  const { personalInfo, summary, experience, education, skills, projects, achievements, customSections, sectionTitles } = model;
+
+  const titles = {
+    summary: sectionTitles?.summary || "Professional Summary",
+    experience: sectionTitles?.experience || "Work Experience",
+    education: sectionTitles?.education || "Education",
+    skills: sectionTitles?.skills || "Technical Skills",
+    projects: sectionTitles?.projects || "Projects",
+    achievements: sectionTitles?.achievements || "Achievements",
+  };
 
   const contactParts: string[] = [];
   if (personalInfo.phone) contactParts.push(escapeLatex(personalInfo.phone));
@@ -236,19 +315,26 @@ function generateTemplate2Latex(model: ResumeDocumentModel): string {
   if (personalInfo.github) contactParts.push(escapeLatex(personalInfo.github));
   if (personalInfo.linkedin) contactParts.push(escapeLatex(personalInfo.linkedin));
 
-  const addressLine = contactParts.join(" \\\\ ");
+  const addressLine = contactParts.join(" $\\cdot$ ");
+
+  // Summary
+  const summaryBlock = summary
+    ? `\\begin{rSection}{${escapeLatex(titles.summary)}}
+${escapeLatex(summary)}
+\\end{rSection}`
+    : "";
 
   // Education Section
   const eduItems = education
     .map((edu) => {
-      return `\\begin{rSubsection}{${escapeLatex(edu.institution)}}{${escapeLatex(edu.startDate)} - ${escapeLatex(edu.endDate)}}{${escapeLatex(edu.degree)}}{${escapeLatex(edu.location)}}
+      return `\\begin{rSubsection}{${escapeLatex(edu.institution)}}{${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}}{${escapeLatex(edu.degree)}${edu.field ? `, ${escapeLatex(edu.field)}` : ""}}{${escapeLatex(edu.location)}}
 \\item[]
 \\end{rSubsection}`;
     })
     .join("\n");
 
   const educationBlock = education.length > 0
-    ? `\\begin{rSection}{Education}
+    ? `\\begin{rSection}{${escapeLatex(titles.education)}}
 ${eduItems}
 \\end{rSection}`
     : "";
@@ -257,14 +343,14 @@ ${eduItems}
   const expItems = experience
     .map((exp) => {
       const bullets = exp.bullets.map((b) => `\\item ${escapeLatex(b)}`).join("\n");
-      return `\\begin{rSubsection}{${escapeLatex(exp.company)}}{${escapeLatex(exp.startDate)} - ${escapeLatex(exp.endDate)}}{${escapeLatex(exp.role)}}{${escapeLatex(exp.location)}}
+      return `\\begin{rSubsection}{${escapeLatex(exp.company)}}{${escapeLatex(exp.startDate)} -- ${escapeLatex(exp.endDate)}}{${escapeLatex(exp.role)}}{${escapeLatex(exp.location)}}
 ${bullets}
 \\end{rSubsection}`;
     })
     .join("\n");
 
   const experienceBlock = experience.length > 0
-    ? `\\begin{rSection}{Work Experience}
+    ? `\\begin{rSection}{${escapeLatex(titles.experience)}}
 ${expItems}
 \\end{rSection}`
     : "";
@@ -273,14 +359,14 @@ ${expItems}
   const projItems = projects
     .map((proj) => {
       const bullets = proj.bullets.map((b) => `\\item ${escapeLatex(b)}`).join("\n");
-      return `\\begin{rSubsection}{${escapeLatex(proj.title)}}{${escapeLatex(proj.startDate)} - ${escapeLatex(proj.endDate)}}{${escapeLatex(proj.subtitle || "Developer")}}{}
+      return `\\begin{rSubsection}{${escapeLatex(proj.title)}}{${escapeLatex(proj.startDate)} -- ${escapeLatex(proj.endDate)}}{${escapeLatex(proj.subtitle || "Developer")}}{}
 ${bullets}
 \\end{rSubsection}`;
     })
     .join("\n");
 
   const projectsBlock = projects.length > 0
-    ? `\\begin{rSection}{Projects}
+    ? `\\begin{rSection}{${escapeLatex(titles.projects)}}
 ${projItems}
 \\end{rSection}`
     : "";
@@ -291,25 +377,90 @@ ${projItems}
     .join("\n");
 
   const skillsBlock = skills.length > 0
-    ? `\\begin{rSection}{Technical Skills}
-\\begin{tabular}{ @{} >{\\bfseries}l @{\\hspace{6ex}} l }
+    ? `\\begin{rSection}{${escapeLatex(titles.skills)}}
+\\begin{tabular}{ @{} >{\\bfseries}l @{\\hspace{4ex}} l }
 ${skillRows}
 \\end{tabular}
 \\end{rSection}`
     : "";
 
+  // Achievements
+  const achItems = achievements
+    .map((a) => `\\item \\textbf{${escapeLatex(a.title)}}${a.subtitle ? ` -- ${escapeLatex(a.subtitle)}` : ""} \\hfill ${escapeLatex(a.date)}`)
+    .join("\n");
+
+  const achievementsBlock = achievements.length > 0
+    ? `\\begin{rSection}{${escapeLatex(titles.achievements)}}
+\\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+${achItems}
+\\end{itemize}
+\\end{rSection}`
+    : "";
+
+  // Custom Sections
+  const customSectionsBlock = (customSections || [])
+    .map((sec) => {
+      const items = (sec.items || [])
+        .map((item) => {
+          const bullets = (item.bullets || []).map((b) => `\\item ${escapeLatex(b)}`).join("\n");
+          return `\\begin{rSubsection}{${escapeLatex(item.title)}}{${escapeLatex(item.date)}}{${escapeLatex(item.subtitle)}}{}\n${bullets}\n\\end{rSubsection}`;
+        })
+        .join("\n");
+      return `\\begin{rSection}{${escapeLatex(sec.title || "Additional Section")}}\n${items}\n\\end{rSection}`;
+    })
+    .join("\n\n");
+
   return `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Medium Length Professional CV
-% LaTeX Template (Template 2)
+% Classic CV Template (Template 2)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\\documentclass{resume}
-\\usepackage[left=0.7in,top=0.4in,right=0.7in,bottom=0.5in]{geometry}
+\\documentclass[letterpaper,10pt]{article}
+\\usepackage[left=0.65in,top=0.4in,right=0.65in,bottom=0.45in]{geometry}
+\\usepackage{array}
+\\usepackage{enumitem}
+\\usepackage{titlesec}
+\\usepackage{ifthen}
+\\usepackage[hidelinks]{hyperref}
 
-\\name{${escapeLatex(personalInfo.fullName)}}
-\\address{${addressLine}}
+\\pagestyle{empty}
+\\setlength{\\parindent}{0pt}
+
+% Section formatting
+\\newenvironment{rSection}[1]{
+  \\vspace{4pt}
+  {\\bfseries\\MakeUppercase{#1}}
+  \\vspace{-4pt}
+  \\hrule height 0.8pt
+  \\vspace{4pt}
+  \\begin{list}{}{
+    \\setlength{\\leftmargin}{0em}
+  }
+  \\item[]
+}{
+  \\end{list}
+}
+
+\\newenvironment{rSubsection}[4]{
+  {\\bfseries #1} \\hfill {#2}
+  \\ifthenelse{\\equal{#3}{}}{}{
+    \\\\
+    {\\em #3} \\hfill {\\em #4}
+  }
+  \\smallskip
+  \\begin{list}{$\\cdot$}{\\leftmargin=1.2em \\itemsep=-0.2em \\topsep=0.1em}
+}{
+  \\end{list}
+  \\vspace{2pt}
+}
 
 \\begin{document}
+
+\\begin{center}
+  {\\LARGE\\bfseries ${escapeLatex(personalInfo.fullName || "Your Name")}}\\\\[4pt]
+  ${addressLine}
+\\end{center}
+
+${summaryBlock}
 
 ${educationBlock}
 
@@ -319,6 +470,313 @@ ${projectsBlock}
 
 ${skillsBlock}
 
+${achievementsBlock}
+
+${customSectionsBlock}
+
 \\end{document}
 `;
 }
+
+function generateTemplate3Latex(model: ResumeDocumentModel): string {
+  const { personalInfo, summary, experience, education, skills, projects, achievements, customSections, sectionTitles } = model;
+
+  const titles = {
+    summary: (sectionTitles?.summary || "Summary").toUpperCase(),
+    experience: (sectionTitles?.experience || "Experience").toUpperCase(),
+    education: (sectionTitles?.education || "Education").toUpperCase(),
+    skills: (sectionTitles?.skills || "Technical Skills").toUpperCase(),
+    projects: (sectionTitles?.projects || "Projects").toUpperCase(),
+    achievements: (sectionTitles?.achievements || "Honors & Awards").toUpperCase(),
+  };
+
+  const contactLinks: string[] = [];
+  if (personalInfo.email) contactLinks.push(`\\href{mailto:${personalInfo.email}}{${escapeLatex(personalInfo.email)}}`);
+  if (personalInfo.phone) contactLinks.push(`\\href{tel:${personalInfo.phone}}{${escapeLatex(personalInfo.phone)}}`);
+  if (personalInfo.linkedin) contactLinks.push(`\\href{https://${personalInfo.linkedin}}{LinkedIn}`);
+  if (personalInfo.github) contactLinks.push(`\\href{https://${personalInfo.github}}{GitHub}`);
+  if (personalInfo.portfolio) contactLinks.push(`\\href{https://${personalInfo.portfolio}}{Portfolio}`);
+
+  const summaryBlock = summary
+    ? `\\section{${titles.summary}}
+${escapeLatex(summary)}
+\\vspace{3pt}`
+    : "";
+
+  const expItems = experience
+    .map((exp) => {
+      const bullets = exp.bullets
+        .map((b) => `  \\item ${escapeLatex(b)}`)
+        .join("\n");
+
+      return `\\textbf{${escapeLatex(exp.role)}} \\hfill {\\small ${escapeLatex(exp.startDate)} -- ${escapeLatex(exp.endDate)}}\\\\
+\\textsl{${escapeLatex(exp.company)}} \\hfill {\\small ${escapeLatex(exp.location)}}
+\\begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=2pt]
+${bullets}
+\\end{itemize}
+\\vspace{3pt}`;
+    })
+    .join("\n\n");
+
+  const experienceBlock = experience.length > 0
+    ? `\\section{${titles.experience}}
+${expItems}`
+    : "";
+
+  const eduItems = education
+    .map((edu) => {
+      return `\\textbf{${escapeLatex(edu.institution)}} \\hfill {\\small ${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}}\\\\
+\\textsl{${escapeLatex(edu.degree)}${edu.field ? `, ${escapeLatex(edu.field)}` : ""}} \\hfill {\\small ${escapeLatex(edu.location)}}
+\\vspace{3pt}`;
+    })
+    .join("\n\n");
+
+  const educationBlock = education.length > 0
+    ? `\\section{${titles.education}}
+${eduItems}`
+    : "";
+
+  const skillRows = skills
+    .map((s) => `\\textbf{${escapeLatex(s.category)}:} ${escapeLatex(s.skills.join(", "))}`)
+    .join("\\\\\n");
+
+  const skillsBlock = skills.length > 0
+    ? `\\section{${titles.skills}}
+${skillRows}
+\\vspace{3pt}`
+    : "";
+
+  const projItems = projects
+    .map((proj) => {
+      const bullets = proj.bullets
+        .map((b) => `  \\item ${escapeLatex(b)}`)
+        .join("\n");
+
+      return `\\textbf{${escapeLatex(proj.title)}}${proj.subtitle ? ` -- \\textsl{${escapeLatex(proj.subtitle)}}` : ""} \\hfill {\\small ${escapeLatex(proj.startDate)} -- ${escapeLatex(proj.endDate)}}
+\\begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=2pt]
+${bullets}
+\\end{itemize}
+\\vspace{3pt}`;
+    })
+    .join("\n\n");
+
+  const projectsBlock = projects.length > 0
+    ? `\\section{${titles.projects}}
+${projItems}`
+    : "";
+
+  const achRows = achievements
+    .map((a) => `\\textbf{${escapeLatex(a.title)}}${a.subtitle ? ` -- ${escapeLatex(a.subtitle)}` : ""} \\hfill {\\small ${escapeLatex(a.date)}}`)
+    .join("\\\\\n");
+
+  const achievementsBlock = achievements.length > 0
+    ? `\\section{${titles.achievements}}
+${achRows}
+\\vspace{3pt}`
+    : "";
+
+  const customSectionsBlock = (customSections || [])
+    .map((sec) => {
+      const title = (sec.title || "ADDITIONAL").toUpperCase();
+      const items = (sec.items || [])
+        .map((item) => {
+          const bullets = (item.bullets || []).map((b) => `  \\item ${escapeLatex(b)}`).join("\n");
+          return `\\textbf{${escapeLatex(item.title)}}${item.subtitle ? ` -- \\textsl{${escapeLatex(item.subtitle)}}` : ""} \\hfill {\\small ${escapeLatex(item.date)}}\n\\begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=2pt]\n${bullets}\n\\end{itemize}\n\\vspace{3pt}`;
+        })
+        .join("\n\n");
+      return `\\section{${escapeLatex(title)}}\n${items}`;
+    })
+    .join("\n\n");
+
+  return `% Modern Tech Resume (Template 3)
+\\documentclass[letterpaper,10pt]{article}
+\\usepackage[margin=0.55in,top=0.35in,bottom=0.35in]{geometry}
+\\usepackage{helvet}
+\\renewcommand{\\familydefault}{\\sfdefault}
+\\usepackage{titlesec}
+\\usepackage{enumitem}
+\\usepackage[hidelinks]{hyperref}
+
+\\pagestyle{empty}
+\\setlength{\\parindent}{0pt}
+
+\\titleformat{\\section}{\\bfseries\\fontsize{11}{13}\\selectfont\\raggedright}{}{0em}{}[\\vspace{1pt}\\hrule height 0.6pt]
+\\titlespacing*{\\section}{0pt}{5pt}{3pt}
+
+\\begin{document}
+
+{\\LARGE\\bfseries ${escapeLatex(personalInfo.fullName || "Your Name")}}\\\\[2pt]
+{\\small ${contactLinks.join(" $\\cdot$ ")}}\\\\[4pt]
+
+${summaryBlock}
+
+${experienceBlock}
+
+${projectsBlock}
+
+${skillsBlock}
+
+${educationBlock}
+
+${achievementsBlock}
+
+${customSectionsBlock}
+
+\\end{document}
+`;
+}
+
+function generateTemplate4Latex(model: ResumeDocumentModel): string {
+  // Minimalist Executive — Georgia serif, left-aligned, em-dash job rows, minimal visual noise
+  const { personalInfo, summary, experience, education, skills, projects, achievements, customSections, sectionTitles } = model;
+
+  const titles = {
+    summary: (sectionTitles?.summary || "Profile").toUpperCase(),
+    experience: (sectionTitles?.experience || "Experience").toUpperCase(),
+    education: (sectionTitles?.education || "Education").toUpperCase(),
+    skills: (sectionTitles?.skills || "Competencies").toUpperCase(),
+    projects: (sectionTitles?.projects || "Selected Projects").toUpperCase(),
+    achievements: (sectionTitles?.achievements || "Achievements").toUpperCase(),
+  };
+
+  const contactParts: string[] = [];
+  if (personalInfo.email) contactParts.push(escapeLatex(personalInfo.email));
+  if (personalInfo.phone) contactParts.push(escapeLatex(personalInfo.phone));
+  if (personalInfo.location) contactParts.push(escapeLatex(personalInfo.location));
+  if (personalInfo.linkedin) contactParts.push(escapeLatex(personalInfo.linkedin));
+
+  const headerBlock = `{\\fontsize{21}{24}\\selectfont ${escapeLatex(personalInfo.fullName || "Your Name")}}\\\\[4pt]
+{\\small\\color{mygray} ${contactParts.join(" \\enspace|\\enspace ")}}
+\\vspace{4pt}\\hrule height 0.4pt\\vspace{8pt}`;
+
+  const summaryBlock = summary
+    ? `\\minsection{${titles.summary}}
+${escapeLatex(summary)}
+\\vspace{6pt}`
+    : "";
+
+  const expItems = experience
+    .map((exp) => {
+      const bullets = exp.bullets
+        .map((b) => `  \\item ${escapeLatex(b)}`)
+        .join("\n");
+      return `{\\bfseries ${escapeLatex(exp.company)} --- ${escapeLatex(exp.role)}} \\hfill {\\small ${escapeLatex(exp.startDate)} -- ${escapeLatex(exp.endDate)}}
+\\begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=2pt, parsep=0pt]
+${bullets}
+\\end{itemize}
+\\vspace{3pt}`;
+    })
+    .join("\n");
+
+  const experienceBlock = experience.length > 0
+    ? `\\minsection{${titles.experience}}
+${expItems}`
+    : "";
+
+  const projItems = projects
+    .map((proj) => {
+      const bullets = proj.bullets
+        .map((b) => `  \\item ${escapeLatex(b)}`)
+        .join("\n");
+      return `{\\bfseries ${escapeLatex(proj.title)}}${proj.subtitle ? ` --- {\\itshape ${escapeLatex(proj.subtitle)}}` : ""} \\hfill {\\small ${escapeLatex(proj.startDate)} -- ${escapeLatex(proj.endDate)}}
+\\begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=2pt, parsep=0pt]
+${bullets}
+\\end{itemize}
+\\vspace{3pt}`;
+    })
+    .join("\n");
+
+  const projectsBlock = projects.length > 0
+    ? `\\minsection{${titles.projects}}
+${projItems}`
+    : "";
+
+  const skillRows = skills
+    .map((s) => `{\\bfseries ${escapeLatex(s.category)}:} ${escapeLatex(s.skills.join(", "))}`)
+    .join("\\\\\n");
+
+  const skillsBlock = skills.length > 0
+    ? `\\minsection{${titles.skills}}
+${skillRows}
+\\vspace{4pt}`
+    : "";
+
+  const eduItems = education
+    .map((edu) => `{\\bfseries ${escapeLatex(edu.institution)} --- ${escapeLatex(edu.degree)}${edu.field ? `, ${escapeLatex(edu.field)}` : ""}} \\hfill {\\small ${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}}`)
+    .join("\\\\\n");
+
+  const educationBlock = education.length > 0
+    ? `\\minsection{${titles.education}}
+${eduItems}
+\\vspace{4pt}`
+    : "";
+
+  const achRows = achievements
+    .map((a) => `{\\bfseries ${escapeLatex(a.title)}}${a.subtitle ? ` --- ${escapeLatex(a.subtitle)}` : ""} \\hfill {\\small\\color{mygray} ${escapeLatex(a.date)}}`)
+    .join("\\\\\n");
+
+  const achievementsBlock = achievements.length > 0
+    ? `\\minsection{${titles.achievements}}
+${achRows}
+\\vspace{4pt}`
+    : "";
+
+  const customSectionsBlock = (customSections || [])
+    .map((sec) => {
+      const title = (sec.title || "Additional").toUpperCase();
+      const items = (sec.items || [])
+        .map((item) => {
+          const bullets = (item.bullets || []).map((b) => `  \\item ${escapeLatex(b)}`).join("\n");
+          return `{\\bfseries ${escapeLatex(item.title)}}${item.subtitle ? ` --- {\\itshape ${escapeLatex(item.subtitle)}}` : ""} \\hfill {\\small ${escapeLatex(item.date)}}
+\\begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=2pt, parsep=0pt]
+${bullets}
+\\end{itemize}
+\\vspace{3pt}`;
+        })
+        .join("\n");
+      return `\\minsection{${escapeLatex(title)}}
+${items}`;
+    })
+    .join("\n\n");
+
+  return `% Minimalist Executive Resume (Template 4)
+\\documentclass[letterpaper,10pt]{article}
+\\usepackage[margin=0.65in,top=0.5in,bottom=0.5in]{geometry}
+\\usepackage{mathptmx}
+\\usepackage{enumitem}
+\\usepackage[hidelinks]{hyperref}
+\\usepackage{xcolor}
+
+\\definecolor{mygray}{gray}{0.45}
+\\pagestyle{empty}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{0pt}
+
+\\newcommand{\\minsection}[1]{%
+  {\\bfseries\\fontsize{10.5}{13}\\selectfont\\MakeUppercase{#1}}%
+  \\vspace{2pt}\\\\[-4pt]%
+  \\vspace{6pt}%
+}
+
+\\begin{document}
+
+${headerBlock}
+
+${summaryBlock}
+
+${experienceBlock}
+
+${projectsBlock}
+
+${skillsBlock}
+
+${educationBlock}
+
+${achievementsBlock}
+
+${customSectionsBlock}
+
+\\end{document}
+`;
+}
+

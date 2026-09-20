@@ -25,7 +25,16 @@ function escapeHtml(str: string): string {
 // TEMPLATE 1: Academic & LaTeX Ivy (template1.tex fidelity)
 // ==========================================
 export function renderTemplate1Academic(model: ResumeDocumentModel): string {
-  const { personalInfo, summary, experience, education, skills, projects, achievements } = model;
+  const { personalInfo, summary, experience, education, skills, projects, achievements, customSections, sectionTitles } = model;
+
+  const titles = {
+    summary: (sectionTitles?.summary || "SUMMARY").toUpperCase(),
+    experience: (sectionTitles?.experience || "WORK EXPERIENCE").toUpperCase(),
+    education: (sectionTitles?.education || "EDUCATION").toUpperCase(),
+    skills: (sectionTitles?.skills || "SKILLS").toUpperCase(),
+    projects: (sectionTitles?.projects || "PROJECTS").toUpperCase(),
+    achievements: (sectionTitles?.achievements || "ACHIEVEMENTS AND ACTIVITIES").toUpperCase(),
+  };
 
   const contactLinks: string[] = [];
   if (personalInfo.phone) contactLinks.push(`<a href="tel:${escapeHtml(personalInfo.phone)}">${escapeHtml(personalInfo.phone)}</a>`);
@@ -36,14 +45,14 @@ export function renderTemplate1Academic(model: ResumeDocumentModel): string {
 
   const summaryHtml = summary ? `
     <section class="sec">
-      <h2 class="sec-title">SUMMARY</h2>
+      <h2 class="sec-title">${escapeHtml(titles.summary)}</h2>
       <div class="summary-text" contenteditable="true" data-field="summary">${escapeHtml(summary)}</div>
     </section>
   ` : "";
 
   const experienceHtml = experience.length > 0 ? `
     <section class="sec">
-      <h2 class="sec-title">WORK EXPERIENCE</h2>
+      <h2 class="sec-title">${escapeHtml(titles.experience)}</h2>
       <div class="items-list">
         ${experience.map((exp) => `
           <div class="subheading-block">
@@ -68,7 +77,7 @@ export function renderTemplate1Academic(model: ResumeDocumentModel): string {
 
   const educationHtml = education.length > 0 ? `
     <section class="sec">
-      <h2 class="sec-title">EDUCATION</h2>
+      <h2 class="sec-title">${escapeHtml(titles.education)}</h2>
       <div class="items-list">
         ${education.map((edu) => `
           <div class="subheading-block">
@@ -88,7 +97,7 @@ export function renderTemplate1Academic(model: ResumeDocumentModel): string {
 
   const skillsHtml = skills.length > 0 ? `
     <section class="sec">
-      <h2 class="sec-title">SKILLS</h2>
+      <h2 class="sec-title">${escapeHtml(titles.skills)}</h2>
       <ul class="bullet-list skills-list">
         ${skills.map((s) => `
           <li>
@@ -102,7 +111,7 @@ export function renderTemplate1Academic(model: ResumeDocumentModel): string {
 
   const projectsHtml = projects.length > 0 ? `
     <section class="sec">
-      <h2 class="sec-title">PROJECTS</h2>
+      <h2 class="sec-title">${escapeHtml(titles.projects)}</h2>
       <div class="items-list">
         ${projects.map((p) => `
           <div class="subheading-block">
@@ -126,7 +135,7 @@ export function renderTemplate1Academic(model: ResumeDocumentModel): string {
 
   const achievementsHtml = achievements.length > 0 ? `
     <section class="sec">
-      <h2 class="sec-title">ACHIEVEMENTS AND ACTIVITIES</h2>
+      <h2 class="sec-title">${escapeHtml(titles.achievements)}</h2>
       <div class="items-list">
         ${achievements.map((a) => `
           <div class="row-between ach-row">
@@ -140,6 +149,34 @@ export function renderTemplate1Academic(model: ResumeDocumentModel): string {
       </div>
     </section>
   ` : "";
+
+  const customSectionsHtml = (customSections || []).map((sec) => `
+    <section class="sec">
+      <h2 class="sec-title">${escapeHtml((sec.title || "ADDITIONAL SECTION").toUpperCase())}</h2>
+      <div class="items-list">
+        ${(sec.items || []).map((item) => `
+          <div class="subheading-block">
+            <div class="row-between">
+              <strong class="item-head">${escapeHtml(item.title)}</strong>
+              <span class="subtext">${escapeHtml(item.date)}</span>
+            </div>
+            ${item.subtitle ? `<div class="row-between"><em class="subtext italic">${escapeHtml(item.subtitle)}</em></div>` : ""}
+            ${item.bullets && item.bullets.length > 0 ? `
+              <ul class="bullet-list">
+                ${item.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}
+              </ul>
+            ` : ""}
+          </div>
+        `).join("")}
+        ${sec.bullets && sec.bullets.length > 0 ? `
+          <ul class="bullet-list">
+            ${sec.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}
+          </ul>
+        ` : ""}
+        ${sec.content ? `<div class="summary-text">${escapeHtml(sec.content)}</div>` : ""}
+      </div>
+    </section>
+  `).join("");
 
   return `
   <div class="resume-sheet template-academic">
@@ -200,6 +237,7 @@ export function renderTemplate1Academic(model: ResumeDocumentModel): string {
     ${skillsHtml}
     ${projectsHtml}
     ${achievementsHtml}
+    ${customSectionsHtml}
   </div>
   `;
 }
@@ -208,7 +246,16 @@ export function renderTemplate1Academic(model: ResumeDocumentModel): string {
 // TEMPLATE 2: Trey Hunner Classic CV (template2.tex fidelity)
 // ==========================================
 export function renderTemplate2Classic(model: ResumeDocumentModel): string {
-  const { personalInfo, experience, education, skills, projects } = model;
+  const { personalInfo, summary, experience, education, skills, projects, achievements, customSections, sectionTitles } = model;
+
+  const titles = {
+    summary: sectionTitles?.summary || "Professional Summary",
+    experience: sectionTitles?.experience || "Work Experience",
+    education: sectionTitles?.education || "Education",
+    skills: sectionTitles?.skills || "Technical Skills",
+    projects: sectionTitles?.projects || "Projects",
+    achievements: sectionTitles?.achievements || "Achievements",
+  };
 
   const contactItems: string[] = [
     personalInfo.phone,
@@ -297,16 +344,23 @@ export function renderTemplate2Classic(model: ResumeDocumentModel): string {
       ${contactItems.map(escapeHtml).join(" &bull; ")}
     </div>
 
+    ${summary ? `
+      <div class="cv-sec">
+        <div class="cv-sec-title">${escapeHtml(titles.summary)}</div>
+        <p style="margin: 0 0 6px 0;">${escapeHtml(summary)}</p>
+      </div>
+    ` : ""}
+
     ${education.length > 0 ? `
       <div class="cv-sec">
-        <div class="cv-sec-title">Education</div>
+        <div class="cv-sec-title">${escapeHtml(titles.education)}</div>
         ${education.map((edu) => `
           <div class="cv-subheading">
             <span contenteditable="true" data-field="edu-${edu.id}-inst">${escapeHtml(edu.institution)}</span>
             <span contenteditable="true" data-field="edu-${edu.id}-dates">${escapeHtml(edu.startDate)} – ${escapeHtml(edu.endDate)}</span>
           </div>
           <div class="cv-subline">
-            <span contenteditable="true" data-field="edu-${edu.id}-deg">${escapeHtml(edu.degree)}</span>
+            <span contenteditable="true" data-field="edu-${edu.id}-deg">${escapeHtml(edu.degree)}${edu.field ? `, ${escapeHtml(edu.field)}` : ""}</span>
             <span contenteditable="true" data-field="edu-${edu.id}-loc">${escapeHtml(edu.location)}</span>
           </div>
         `).join("")}
@@ -315,7 +369,7 @@ export function renderTemplate2Classic(model: ResumeDocumentModel): string {
 
     ${experience.length > 0 ? `
       <div class="cv-sec">
-        <div class="cv-sec-title">Work Experience</div>
+        <div class="cv-sec-title">${escapeHtml(titles.experience)}</div>
         ${experience.map((exp) => `
           <div class="cv-subheading">
             <span contenteditable="true" data-field="exp-${exp.id}-comp">${escapeHtml(exp.company)}</span>
@@ -336,7 +390,7 @@ export function renderTemplate2Classic(model: ResumeDocumentModel): string {
 
     ${projects.length > 0 ? `
       <div class="cv-sec">
-        <div class="cv-sec-title">Projects</div>
+        <div class="cv-sec-title">${escapeHtml(titles.projects)}</div>
         ${projects.map((p) => `
           <div class="cv-subheading">
             <span contenteditable="true" data-field="proj-${p.id}-title">${escapeHtml(p.title)}</span>
@@ -354,7 +408,7 @@ export function renderTemplate2Classic(model: ResumeDocumentModel): string {
 
     ${skills.length > 0 ? `
       <div class="cv-sec">
-        <div class="cv-sec-title">Technical Skills</div>
+        <div class="cv-sec-title">${escapeHtml(titles.skills)}</div>
         <table class="cv-skill-table">
           ${skills.map((s) => `
             <tr>
@@ -365,6 +419,38 @@ export function renderTemplate2Classic(model: ResumeDocumentModel): string {
         </table>
       </div>
     ` : ""}
+
+    ${achievements.length > 0 ? `
+      <div class="cv-sec">
+        <div class="cv-sec-title">${escapeHtml(titles.achievements)}</div>
+        <ul class="cv-bullets" style="list-style-type: none; padding-left: 0; margin-left: 0;">
+          ${achievements.map((a) => `
+            <li style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+              <span><strong>${escapeHtml(a.title)}</strong>${a.subtitle ? ` -- ${escapeHtml(a.subtitle)}` : ""}</span>
+              <span style="color: #64748b;">${escapeHtml(a.date)}</span>
+            </li>
+          `).join("")}
+        </ul>
+      </div>
+    ` : ""}
+
+    ${(customSections || []).map((sec) => `
+      <div class="cv-sec">
+        <div class="cv-sec-title">${escapeHtml(sec.title || "Additional Section")}</div>
+        ${(sec.items || []).map((item) => `
+          <div class="cv-subheading">
+            <span>${escapeHtml(item.title)}</span>
+            <span>${escapeHtml(item.date)}</span>
+          </div>
+          ${item.subtitle ? `<div class="cv-subline"><span>${escapeHtml(item.subtitle)}</span></div>` : ""}
+          ${item.bullets && item.bullets.length > 0 ? `
+            <ul class="cv-bullets">
+              ${item.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}
+            </ul>
+          ` : ""}
+        `).join("")}
+      </div>
+    `).join("")}
   </div>
   `;
 }
@@ -373,7 +459,16 @@ export function renderTemplate2Classic(model: ResumeDocumentModel): string {
 // TEMPLATE 3: Modern Tech / Silicon Valley
 // ==========================================
 export function renderTemplate3ModernTech(model: ResumeDocumentModel): string {
-  const { personalInfo, summary, experience, education, skills, projects, achievements } = model;
+  const { personalInfo, summary, experience, education, skills, projects, achievements, customSections, sectionTitles } = model;
+
+  const titles = {
+    summary: sectionTitles?.summary || "About",
+    experience: sectionTitles?.experience || "Experience",
+    education: sectionTitles?.education || "Education",
+    skills: sectionTitles?.skills || "Skills & Technologies",
+    projects: sectionTitles?.projects || "Featured Projects",
+    achievements: sectionTitles?.achievements || "Achievements & Honors",
+  };
 
   return `
   <div class="resume-sheet template-tech">
@@ -473,14 +568,14 @@ export function renderTemplate3ModernTech(model: ResumeDocumentModel): string {
 
     ${summary ? `
       <div class="tech-sec">
-        <div class="tech-sec-title">About</div>
+        <div class="tech-sec-title">${escapeHtml(titles.summary)}</div>
         <div style="font-size: 9.1pt; line-height: 1.4;" contenteditable="true" data-field="summary">${escapeHtml(summary)}</div>
       </div>
     ` : ""}
 
     ${experience.length > 0 ? `
       <div class="tech-sec">
-        <div class="tech-sec-title">Experience</div>
+        <div class="tech-sec-title">${escapeHtml(titles.experience)}</div>
         ${experience.map((exp) => `
           <div style="margin-bottom: 8px;">
             <div class="tech-row">
@@ -499,7 +594,7 @@ export function renderTemplate3ModernTech(model: ResumeDocumentModel): string {
 
     ${projects.length > 0 ? `
       <div class="tech-sec">
-        <div class="tech-sec-title">Featured Projects</div>
+        <div class="tech-sec-title">${escapeHtml(titles.projects)}</div>
         ${projects.map((p) => `
           <div style="margin-bottom: 8px;">
             <div class="tech-row">
@@ -518,7 +613,7 @@ export function renderTemplate3ModernTech(model: ResumeDocumentModel): string {
 
     ${skills.length > 0 ? `
       <div class="tech-sec">
-        <div class="tech-sec-title">Skills & Technologies</div>
+        <div class="tech-sec-title">${escapeHtml(titles.skills)}</div>
         ${skills.map((s) => `
           <div style="margin-bottom: 4px;">
             <strong style="font-size: 8.8pt; color: #334155;">${escapeHtml(s.category)}:</strong>
@@ -530,15 +625,46 @@ export function renderTemplate3ModernTech(model: ResumeDocumentModel): string {
 
     ${education.length > 0 ? `
       <div class="tech-sec">
-        <div class="tech-sec-title">Education</div>
+        <div class="tech-sec-title">${escapeHtml(titles.education)}</div>
         ${education.map((edu) => `
           <div class="tech-row">
-            <span class="tech-bold">${escapeHtml(edu.institution)} (${escapeHtml(edu.degree)})</span>
+            <span class="tech-bold">${escapeHtml(edu.institution)} (${escapeHtml(edu.degree)}${edu.field ? `, ${escapeHtml(edu.field)}` : ""})</span>
             <span class="tech-sub">${escapeHtml(edu.startDate)} - ${escapeHtml(edu.endDate)}</span>
           </div>
         `).join("")}
       </div>
     ` : ""}
+
+    ${achievements.length > 0 ? `
+      <div class="tech-sec">
+        <div class="tech-sec-title">${escapeHtml(titles.achievements)}</div>
+        ${achievements.map((a) => `
+          <div class="tech-row" style="margin-bottom: 4px;">
+            <span class="tech-bold">${escapeHtml(a.title)}${a.subtitle ? ` -- <span class="tech-sub">${escapeHtml(a.subtitle)}</span>` : ""}</span>
+            <span class="tech-sub">${escapeHtml(a.date)}</span>
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    ${(customSections || []).map((sec) => `
+      <div class="tech-sec">
+        <div class="tech-sec-title">${escapeHtml(sec.title || "Additional")}</div>
+        ${(sec.items || []).map((item) => `
+          <div style="margin-bottom: 8px;">
+            <div class="tech-row">
+              <span class="tech-bold">${escapeHtml(item.title)}${item.subtitle ? ` -- <span class="tech-sub">${escapeHtml(item.subtitle)}</span>` : ""}</span>
+              <span class="tech-sub">${escapeHtml(item.date)}</span>
+            </div>
+            ${item.bullets && item.bullets.length > 0 ? `
+              <ul class="tech-bullets">
+                ${item.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}
+              </ul>
+            ` : ""}
+          </div>
+        `).join("")}
+      </div>
+    `).join("")}
   </div>
   `;
 }
@@ -547,7 +673,16 @@ export function renderTemplate3ModernTech(model: ResumeDocumentModel): string {
 // TEMPLATE 4: Minimalist Executive
 // ==========================================
 export function renderTemplate4Minimal(model: ResumeDocumentModel): string {
-  const { personalInfo, summary, experience, education, skills, projects } = model;
+  const { personalInfo, summary, experience, education, skills, projects, achievements, customSections, sectionTitles } = model;
+
+  const titles = {
+    summary: sectionTitles?.summary || "Profile",
+    experience: sectionTitles?.experience || "Experience",
+    education: sectionTitles?.education || "Education",
+    skills: sectionTitles?.skills || "Competencies",
+    projects: sectionTitles?.projects || "Selected Projects",
+    achievements: sectionTitles?.achievements || "Achievements",
+  };
 
   return `
   <div class="resume-sheet template-minimal">
@@ -583,14 +718,14 @@ export function renderTemplate4Minimal(model: ResumeDocumentModel): string {
 
     ${summary ? `
       <div>
-        <div class="min-sec-title">Profile</div>
+        <div class="min-sec-title">${escapeHtml(titles.summary)}</div>
         <p style="margin: 0 0 10px 0;">${escapeHtml(summary)}</p>
       </div>
     ` : ""}
 
     ${experience.length > 0 ? `
       <div>
-        <div class="min-sec-title">Experience</div>
+        <div class="min-sec-title">${escapeHtml(titles.experience)}</div>
         ${experience.map((exp) => `
           <div style="margin-bottom: 8px;">
             <div class="min-row">
@@ -607,7 +742,7 @@ export function renderTemplate4Minimal(model: ResumeDocumentModel): string {
 
     ${projects.length > 0 ? `
       <div>
-        <div class="min-sec-title">Selected Projects</div>
+        <div class="min-sec-title">${escapeHtml(titles.projects)}</div>
         ${projects.map((p) => `
           <div style="margin-bottom: 8px;">
             <div class="min-row">
@@ -624,7 +759,7 @@ export function renderTemplate4Minimal(model: ResumeDocumentModel): string {
 
     ${skills.length > 0 ? `
       <div>
-        <div class="min-sec-title">Competencies</div>
+        <div class="min-sec-title">${escapeHtml(titles.skills)}</div>
         <ul class="min-bullets" style="list-style-type: none; padding-left: 0; margin-left: 0;">
           ${skills.map((s) => `<li><strong>${escapeHtml(s.category)}:</strong> ${escapeHtml(s.skills.join(", "))}</li>`).join("")}
         </ul>
@@ -633,15 +768,48 @@ export function renderTemplate4Minimal(model: ResumeDocumentModel): string {
 
     ${education.length > 0 ? `
       <div>
-        <div class="min-sec-title">Education</div>
+        <div class="min-sec-title">${escapeHtml(titles.education)}</div>
         ${education.map((edu) => `
           <div class="min-row">
-            <span>${escapeHtml(edu.institution)} — ${escapeHtml(edu.degree)}</span>
+            <span>${escapeHtml(edu.institution)} — ${escapeHtml(edu.degree)}${edu.field ? `, ${escapeHtml(edu.field)}` : ""}</span>
             <span>${escapeHtml(edu.startDate)} – ${escapeHtml(edu.endDate)}</span>
           </div>
         `).join("")}
       </div>
     ` : ""}
+
+    ${achievements.length > 0 ? `
+      <div>
+        <div class="min-sec-title">${escapeHtml(titles.achievements)}</div>
+        <ul class="min-bullets" style="list-style-type: none; padding-left: 0; margin-left: 0;">
+          ${achievements.map((a) => `
+            <li style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+              <span><strong>${escapeHtml(a.title)}</strong>${a.subtitle ? ` -- ${escapeHtml(a.subtitle)}` : ""}</span>
+              <span style="color: #737373;">${escapeHtml(a.date)}</span>
+            </li>
+          `).join("")}
+        </ul>
+      </div>
+    ` : ""}
+
+    ${(customSections || []).map((sec) => `
+      <div>
+        <div class="min-sec-title">${escapeHtml(sec.title || "Additional Section")}</div>
+        ${(sec.items || []).map((item) => `
+          <div style="margin-bottom: 8px;">
+            <div class="min-row">
+              <span><strong>${escapeHtml(item.title)}</strong>${item.subtitle ? ` — ${escapeHtml(item.subtitle)}` : ""}</span>
+              <span>${escapeHtml(item.date)}</span>
+            </div>
+            ${item.bullets && item.bullets.length > 0 ? `
+              <ul class="min-bullets">
+                ${item.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}
+              </ul>
+            ` : ""}
+          </div>
+        `).join("")}
+      </div>
+    `).join("")}
   </div>
   `;
 }

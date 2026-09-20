@@ -71,19 +71,49 @@ export const achievementEntrySchema = z.object({
 
 export type AchievementEntry = z.infer<typeof achievementEntrySchema>;
 
-export const customSectionSchema = z.object({
+export const customSectionItemSchema = z.object({
   id: z.string(),
-  title: z.string(),
-  content: z.string().default(""),
+  title: z.string().default(""),
+  subtitle: z.string().default(""),
+  date: z.string().default(""),
   bullets: z.array(z.string()).default([]),
 });
 
+export type CustomSectionItem = z.infer<typeof customSectionItemSchema>;
+
+export const customSectionSchema = z.object({
+  id: z.string(),
+  title: z.string().default("Custom Section"),
+  items: z.array(customSectionItemSchema).default([]),
+  content: z.string().optional(),
+  bullets: z.array(z.string()).optional(),
+});
+
 export type CustomSection = z.infer<typeof customSectionSchema>;
+
+export const sectionTitlesSchema = z.object({
+  summary: z.string().default("Professional Summary"),
+  experience: z.string().default("Work Experience"),
+  education: z.string().default("Education"),
+  skills: z.string().default("Skills"),
+  projects: z.string().default("Projects"),
+  achievements: z.string().default("Achievements and Activities"),
+});
+
+export type SectionTitles = z.infer<typeof sectionTitlesSchema>;
 
 export const resumeDocumentModelSchema = z.object({
   version: z.string().default("1.0.0"),
   templateId: z.string().default("template-1"),
   personalInfo: contactInfoSchema,
+  sectionTitles: sectionTitlesSchema.default({
+    summary: "Professional Summary",
+    experience: "Work Experience",
+    education: "Education",
+    skills: "Skills",
+    projects: "Projects",
+    achievements: "Achievements and Activities",
+  }),
   summary: z.string().default(""),
   experience: z.array(experienceEntrySchema).default([]),
   education: z.array(educationEntrySchema).default([]),
@@ -122,6 +152,14 @@ export function createEmptyResumeDocument(): ResumeDocumentModel {
       github: "github.com/yourname",
       portfolio: "yourportfolio.dev",
       website: "",
+    },
+    sectionTitles: {
+      summary: "Professional Summary",
+      experience: "Work Experience",
+      education: "Education",
+      skills: "Skills",
+      projects: "Projects",
+      achievements: "Achievements and Activities",
     },
     summary: "Full-Stack and AI Engineer with expertise in building scalable, production-ready web applications, agentic workflows, and distributed backend systems.",
     experience: [
@@ -218,6 +256,14 @@ export function createSampleResumeTemplate1(): ResumeDocumentModel {
       github: "github.com/Leonallr10",
       portfolio: "leonalrobin.vercel.app",
       website: "",
+    },
+    sectionTitles: {
+      summary: "Professional Summary",
+      experience: "Work Experience",
+      education: "Education",
+      skills: "Skills",
+      projects: "Projects",
+      achievements: "Achievements and Activities",
     },
     summary: "Full-Stack and AI Engineer with 1.5+ years designing and deploying agent systems and interactive web applications. Expertise in Python, TypeScript, React/Next.js, LLM integration, and vector search to build multi-step reasoning workflows and production-ready scalable solutions.",
     experience: [

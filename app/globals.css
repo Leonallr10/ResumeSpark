@@ -99,17 +99,61 @@
 }
 
 @media print {
-  body {
-    background: white;
+  @page {
+    size: letter portrait;
+    margin: 0;
   }
 
-  .no-print {
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  /* Hide UI chrome — preserve resume content */
+  header,
+  nav,
+  aside,
+  .no-print,
+  .print\:hidden,
+  [data-no-print="true"],
+  [data-sonner-toaster] {
     display: none !important;
   }
 
+  .printable-resume-container {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .resume-sheet {
+    transform: none !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    width: 8.5in !important;
+    min-height: 11in !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   .resume-page {
-    box-shadow: none;
-    min-height: auto;
+    box-shadow: none !important;
+    min-height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .changed-line {
@@ -117,3 +161,4 @@
     box-shadow: none !important;
   }
 }
+

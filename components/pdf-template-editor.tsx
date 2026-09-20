@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { toast, Toaster } from "sonner";
 import {
   FileText,
@@ -14,15 +13,7 @@ import {
   Layout,
   Plus,
   Trash2,
-  ChevronDown,
-  ChevronUp,
   ShieldCheck,
-  CheckCircle2,
-  Sliders,
-  ExternalLink,
-  Save,
-  ArrowRight,
-  Eye,
   Edit3,
   ZoomIn,
   ZoomOut,
@@ -34,12 +25,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 
 import {
   type ResumeDocumentModel,
+  type CustomSection,
   createSampleResumeTemplate1,
-  createEmptyResumeDocument,
 } from "@/server/documents/resume-document-model";
 import { parseLatexToDocumentModel } from "@/server/documents/from-latex";
 import { generateLatexFromDocumentModel } from "@/server/documents/to-latex";
@@ -47,6 +37,7 @@ import { documentModelToSections, applySuggestionToDocumentModel } from "@/serve
 import { TEMPLATE_REGISTRY, getTemplateRenderer } from "@/lib/templates/registry";
 import { PdfTemplateGallery } from "./pdf-template-gallery";
 import { PdfSuggestionDiffModal } from "./pdf-suggestion-diff-modal";
+import { PdfCanvasViewer } from "./pdf-canvas-viewer";
 import type { AiSuggestion, SuggestionResponse, LlmProvider } from "@/types/resume";
 
 const PDF_STORAGE_KEY = "resume_pdf_document_model_v1";
@@ -59,6 +50,9 @@ export function PdfTemplateEditor() {
   // State
   const [model, setModel] = useState<ResumeDocumentModel>(createSampleResumeTemplate1);
   const [activeTab, setActiveTab] = useState<"editor" | "gallery">("editor");
+  const [previewMode, setPreviewMode] = useState<"html" | "compiled">("html");
+  const [pdfArrayBuffer, setPdfArrayBuffer] = useState<ArrayBuffer | null>(null);
+  const [isCompilingPdf, setIsCompilingPdf] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiDrawer, setShowAiDrawer] = useState(false);
   const [targetCompanyRole, setTargetCompanyRole] = useState("Software Engineer / AI Engineer");
@@ -74,8 +68,6 @@ export function PdfTemplateEditor() {
 
   // Attach a native (non-passive) wheel listener so e.preventDefault() actually
   // blocks the browser's built-in Ctrl+Scroll page zoom before it fires.
-  // React's synthetic onWheel is passive by default in modern browsers and
-  // cannot call preventDefault() in time to stop native zoom.
   useEffect(() => {
     const el = previewPanelRef.current;
     if (!el) return;
@@ -93,13 +85,26 @@ export function PdfTemplateEditor() {
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  // Load initial model from localStorage
+  // Load initial model and compiled PDF from localStorage
   useEffect(() => {
     try {
       localStorage.setItem(ACTIVE_FLOW_KEY, "pdf");
       const savedPdf = localStorage.getItem(PDF_STORAGE_KEY);
       if (savedPdf) {
-        setModel(JSON.parse(savedPdf));
+        const parsed = JSON.parse(savedPdf);
+        // Ensure sectionTitles exists
+        if (!parsed.sectionTitles) {
+          parsed.sectionTitles = {
+            summary: "Professional Summary",
+            experience: "Work Experience",
+            education: "Education",
+            skills: "Skills",
+            projects: "Projects",
+            achievements: "Achievements and Activities",
+          };
+        }
+        if (!parsed.customSections) parsed.customSections = [];
+        setModel(parsed);
       } else {
         const savedLatex = localStorage.getItem(LATEX_STORAGE_KEY);
         if (savedLatex) {
@@ -107,10 +112,56 @@ export function PdfTemplateEditor() {
           setModel(parsed);
         }
       }
+
+      // Check if exact compiled PDF is available from LaTeX editor
+      const savedPdfBase64 = localStorage.getItem("resume_compiled_pdf_base64");
+      const switchTs = localStorage.getItem("resume_pdf_switch_ts");
+      if (savedPdfBase64) {
+        try {
+          const bytes = Uint8Array.from(atob(savedPdfBase64), (c) => c.charCodeAt(0));
+          setPdfArrayBuffer(bytes.buffer);
+          if (switchTs) {
+            localStorage.removeItem("resume_pdf_switch_ts");
+            setPreviewMode("compiled");
+            toast.success("Loaded exact compiled LaTeX PDF preview!");
+          }
+        } catch {
+          // ignore decode error
+        }
+      }
     } catch {
       // fallback to initial
     }
   }, []);
+
+  // On-demand LaTeX compilation from PDF Studio
+  const handleCompileLatexPdf = async () => {
+    setIsCompilingPdf(true);
+    const toastId = toast.loading("Compiling LaTeX template to vector PDF...");
+    try {
+      const latex = generateLatexFromDocumentModel(model, model.templateId);
+      const res = await fetch("/api/resume/compile-latex", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latex }),
+      });
+
+      if (!res.ok) {
+        throw new Error("LaTeX compilation failed.");
+      }
+
+      const data = await res.json();
+      const pdfBytes = Uint8Array.from(atob(data.pdf), (c) => c.charCodeAt(0));
+      setPdfArrayBuffer(pdfBytes.buffer);
+      localStorage.setItem("resume_compiled_pdf_base64", data.pdf);
+      setPreviewMode("compiled");
+      toast.success("Compiled exact PDF preview!", { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to compile LaTeX PDF.", { id: toastId });
+    } finally {
+      setIsCompilingPdf(false);
+    }
+  };
 
   // Save to localStorage whenever model updates
   const saveModel = useCallback((nextModel: ResumeDocumentModel) => {
@@ -118,7 +169,7 @@ export function PdfTemplateEditor() {
     try {
       localStorage.setItem(PDF_STORAGE_KEY, JSON.stringify(nextModel));
       // Keep LaTeX model in sync for cross-flow switching
-      const generatedLatex = generateLatexFromDocumentModel(nextModel);
+      const generatedLatex = generateLatexFromDocumentModel(nextModel, nextModel.templateId);
       localStorage.setItem(LATEX_STORAGE_KEY, generatedLatex);
     } catch {
       // storage error
@@ -128,10 +179,11 @@ export function PdfTemplateEditor() {
   // Cross-Flow Transition to LaTeX Editor
   const handleSwitchToLatex = () => {
     try {
-      const generatedLatex = generateLatexFromDocumentModel(model);
+      const generatedLatex = generateLatexFromDocumentModel(model, model.templateId);
       localStorage.setItem(LATEX_STORAGE_KEY, generatedLatex);
       localStorage.setItem(ACTIVE_FLOW_KEY, "latex");
-      toast.success("Synchronized data model with LaTeX editor.");
+      localStorage.setItem("resume_latex_switch_ts", Date.now().toString());
+      toast.success("Synchronized template with LaTeX editor. Loading compiler...");
       router.push("/latex-editor");
     } catch (err) {
       toast.error("Failed to convert model to LaTeX.");
@@ -208,11 +260,47 @@ export function PdfTemplateEditor() {
 
   // Print / PDF Export
   const handlePrintPdf = () => {
+    if (previewMode === "compiled" && pdfArrayBuffer) {
+      const blob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          URL.revokeObjectURL(url);
+        }, 60000);
+      };
+      return;
+    }
     window.print();
   };
 
-  // 1-Click Client PDF Download via html2pdf
+  // 1-Click Client PDF Download via html2pdf or Vector PDF
   const handleDownloadPdf = async () => {
+    if (previewMode === "compiled" && pdfArrayBuffer) {
+      const blob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${model.personalInfo.fullName.replace(/\s+/g, "_") || "Resume"}_Compiled.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Downloaded compiled PDF!");
+      return;
+    }
+
     const toastId = toast.loading("Rendering printable PDF...");
     try {
       const html2pdfModule = await import("html2pdf.js");
@@ -236,15 +324,37 @@ export function PdfTemplateEditor() {
     }
   };
 
+  // Helper to add a custom section
+  const handleAddCustomSection = (presetTitle = "New Section") => {
+    const newSection: CustomSection = {
+      id: `custom-${Date.now()}`,
+      title: presetTitle,
+      items: [
+        {
+          id: `item-${Date.now()}`,
+          title: "Item Heading / Award / Role",
+          subtitle: "Organization / Subtitle",
+          date: "2025",
+          bullets: ["Key accomplishment or point detail here."],
+        },
+      ],
+    };
+    saveModel({
+      ...model,
+      customSections: [...(model.customSections || []), newSection],
+    });
+    toast.success(`Added new section: "${presetTitle}"`);
+  };
+
   // Template HTML Render
   const renderedHtml = getTemplateRenderer(model.templateId)(model);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-slate-950 text-slate-100">
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-950 text-slate-100 print:h-auto print:overflow-visible print:bg-white print:text-black print:block print:p-0 print:m-0">
       <Toaster position="top-right" richColors />
 
       {/* Top Header */}
-      <header className="h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 flex items-center justify-between z-30 sticky top-0">
+      <header className="no-print print:hidden h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 flex items-center justify-between z-30 sticky top-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
@@ -252,10 +362,6 @@ export function PdfTemplateEditor() {
             </div>
             <span className="font-bold text-sm tracking-tight text-white">ResumeSpark</span>
           </div>
-
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[11px]">
-            PDF Template Flow
-          </Badge>
 
           <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
 
@@ -298,24 +404,24 @@ export function PdfTemplateEditor() {
             </button>
           </div>
 
+          <div className="h-4 w-px bg-slate-800 mx-1 hidden md:block" />
+
+          {/* Switch to LaTeX Editor Button */}
+          <Button
+            size="sm"
+            onClick={handleSwitchToLatex}
+            className="h-8 text-xs bg-indigo-600/90 hover:bg-indigo-600 text-white gap-1.5 border border-indigo-500/40 shadow-sm"
+          >
+            <Code2 className="w-3.5 h-3.5 text-indigo-200" /> Switch to LaTeX
+          </Button>
+
           {/* AI Tailor Button */}
           <Button
             size="sm"
-            onClick={() => setShowAiDrawer(!showAiDrawer)}
-            className="h-8 text-xs bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white gap-1.5 shadow-sm shadow-emerald-500/20"
+            onClick={() => setShowAiDrawer(true)}
+            className="h-8 text-xs bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white gap-1.5 shadow-sm"
           >
-            <Sparkles className="w-3.5 h-3.5" /> AI Tailor from JD
-          </Button>
-
-          {/* Switch to LaTeX */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleSwitchToLatex}
-            className="h-8 text-xs border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white gap-1.5 hidden md:flex"
-            title="Convert and open in CodeMirror LaTeX editor with SyncTeX"
-          >
-            <Code2 className="w-3.5 h-3.5 text-emerald-400" /> Switch to LaTeX
+            <Sparkles className="w-3.5 h-3.5 text-emerald-200" /> AI Tailor
           </Button>
 
           {/* PDF Download Button */}
@@ -331,7 +437,7 @@ export function PdfTemplateEditor() {
 
       {/* Main Workspace Body */}
       {activeTab === "gallery" ? (
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 p-6 overflow-y-auto no-print print:hidden">
           <PdfTemplateGallery
             selectedTemplateId={model.templateId}
             onSelectTemplate={(tplId) => {
@@ -342,17 +448,20 @@ export function PdfTemplateEditor() {
           />
         </div>
       ) : (
-        <div className="flex-1 flex overflow-hidden min-h-0">
+        <div className="flex-1 flex overflow-hidden min-h-0 print:h-auto print:overflow-visible print:block print:p-0 print:m-0">
           {/* Left Panel: Structured Data Editor */}
-          <div className="w-full lg:w-[460px] xl:w-[500px] border-r border-slate-800 bg-slate-900/50 flex flex-col overflow-y-auto p-4 space-y-6">
+          <div className="no-print print:hidden w-full lg:w-[480px] xl:w-[520px] border-r border-slate-800 bg-slate-900/50 flex flex-col overflow-y-auto p-4 space-y-6">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Structured Resume Data</span>
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Structured Resume Data</span>
+                <p className="text-[11px] text-slate-500">Edit sections, customize headings, and add custom blocks.</p>
+              </div>
               <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/20">
                 <ShieldCheck className="w-3 h-3 mr-1 inline" /> Auto-Saved
               </Badge>
             </div>
 
-            {/* Personal Info */}
+            {/* 1. Personal Info */}
             <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
               <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">1. Contact & Header</h4>
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -437,22 +546,71 @@ export function PdfTemplateEditor() {
               </div>
             </div>
 
-            {/* Summary */}
-            <div className="space-y-2 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">2. Professional Summary</h4>
+            {/* 2. Professional Summary */}
+            <div className="space-y-2.5 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-1">
+                  <span className="text-xs font-bold text-emerald-400">2.</span>
+                  <Input
+                    value={model.sectionTitles?.summary || "Professional Summary"}
+                    onChange={(e) =>
+                      saveModel({
+                        ...model,
+                        sectionTitles: {
+                          ...(model.sectionTitles || {
+                            summary: "Professional Summary",
+                            experience: "Work Experience",
+                            education: "Education",
+                            skills: "Skills",
+                            projects: "Projects",
+                            achievements: "Achievements and Activities",
+                          }),
+                          summary: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    title="Click to rename section heading"
+                  />
+                </div>
+                <Edit3 className="w-3 h-3 text-slate-500" />
+              </div>
               <Textarea
                 rows={3}
                 value={model.summary}
                 onChange={(e) => saveModel({ ...model, summary: e.target.value })}
-                className="text-xs bg-slate-950 border-slate-800"
+                className="text-xs bg-slate-950 border-slate-800 leading-relaxed"
                 placeholder="Brief impact summary..."
               />
             </div>
 
-            {/* Experience List */}
+            {/* 3. Work Experience */}
             <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">3. Work Experience</h4>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-1">
+                  <span className="text-xs font-bold text-emerald-400">3.</span>
+                  <Input
+                    value={model.sectionTitles?.experience || "Work Experience"}
+                    onChange={(e) =>
+                      saveModel({
+                        ...model,
+                        sectionTitles: {
+                          ...(model.sectionTitles || {
+                            summary: "Professional Summary",
+                            experience: "Work Experience",
+                            education: "Education",
+                            skills: "Skills",
+                            projects: "Projects",
+                            achievements: "Achievements and Activities",
+                          }),
+                          experience: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    title="Click to rename section heading"
+                  />
+                </div>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -461,7 +619,7 @@ export function PdfTemplateEditor() {
                       ...model.experience,
                       {
                         id: `exp-${Date.now()}`,
-                        company: "New Company",
+                        company: "Company Name",
                         role: "Software Engineer",
                         location: "City, Country",
                         startDate: "2024",
@@ -516,8 +674,8 @@ export function PdfTemplateEditor() {
                       className="h-7 text-xs bg-slate-900 border-slate-800"
                     />
                     <Input
-                      placeholder="Dates"
-                      value={`${exp.startDate} – ${exp.endDate}`}
+                      placeholder="Start – End Date"
+                      value={`${exp.startDate}${exp.endDate ? ` – ${exp.endDate}` : ""}`}
                       onChange={(e) => {
                         const parts = e.target.value.split(/–|-/);
                         const copy = [...model.experience];
@@ -586,10 +744,159 @@ export function PdfTemplateEditor() {
               ))}
             </div>
 
-            {/* Skills */}
+            {/* 4. Education */}
             <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">4. Skills Categories</h4>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-1">
+                  <span className="text-xs font-bold text-emerald-400">4.</span>
+                  <Input
+                    value={model.sectionTitles?.education || "Education"}
+                    onChange={(e) =>
+                      saveModel({
+                        ...model,
+                        sectionTitles: {
+                          ...(model.sectionTitles || {
+                            summary: "Professional Summary",
+                            experience: "Work Experience",
+                            education: "Education",
+                            skills: "Skills",
+                            projects: "Projects",
+                            achievements: "Achievements and Activities",
+                          }),
+                          education: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    title="Click to rename section heading"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const nextEdu = [
+                      ...model.education,
+                      {
+                        id: `edu-${Date.now()}`,
+                        institution: "University Name",
+                        degree: "Bachelor of Science",
+                        field: "Computer Science",
+                        location: "City, Country",
+                        startDate: "2021",
+                        endDate: "2025",
+                        bullets: [],
+                      },
+                    ];
+                    saveModel({ ...model, education: nextEdu });
+                  }}
+                  className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Add Degree
+                </Button>
+              </div>
+
+              {model.education.map((edu, idx) => (
+                <div key={edu.id || idx} className="p-3 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200">{edu.institution || `Institution #${idx + 1}`}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        const filtered = model.education.filter((_, i) => i !== idx);
+                        saveModel({ ...model, education: filtered });
+                      }}
+                      className="h-6 w-6 text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Institution"
+                      value={edu.institution}
+                      onChange={(e) => {
+                        const copy = [...model.education];
+                        copy[idx].institution = e.target.value;
+                        saveModel({ ...model, education: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                    />
+                    <Input
+                      placeholder="Degree / Major"
+                      value={edu.degree}
+                      onChange={(e) => {
+                        const copy = [...model.education];
+                        copy[idx].degree = e.target.value;
+                        saveModel({ ...model, education: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                    />
+                    <Input
+                      placeholder="Field (Optional)"
+                      value={edu.field || ""}
+                      onChange={(e) => {
+                        const copy = [...model.education];
+                        copy[idx].field = e.target.value;
+                        saveModel({ ...model, education: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                    />
+                    <Input
+                      placeholder="Dates (e.g. 2021 – 2025)"
+                      value={`${edu.startDate}${edu.endDate ? ` – ${edu.endDate}` : ""}`}
+                      onChange={(e) => {
+                        const parts = e.target.value.split(/–|-/);
+                        const copy = [...model.education];
+                        copy[idx].startDate = parts[0]?.trim() || "";
+                        copy[idx].endDate = parts[1]?.trim() || "";
+                        saveModel({ ...model, education: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                    />
+                    <Input
+                      placeholder="Location"
+                      value={edu.location}
+                      onChange={(e) => {
+                        const copy = [...model.education];
+                        copy[idx].location = e.target.value;
+                        saveModel({ ...model, education: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800 col-span-2"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 5. Skills */}
+            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-1">
+                  <span className="text-xs font-bold text-emerald-400">5.</span>
+                  <Input
+                    value={model.sectionTitles?.skills || "Skills"}
+                    onChange={(e) =>
+                      saveModel({
+                        ...model,
+                        sectionTitles: {
+                          ...(model.sectionTitles || {
+                            summary: "Professional Summary",
+                            experience: "Work Experience",
+                            education: "Education",
+                            skills: "Skills",
+                            projects: "Projects",
+                            achievements: "Achievements and Activities",
+                          }),
+                          skills: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    title="Click to rename section heading (e.g. Skills, Technical Skills, Core Stack)"
+                  />
+                </div>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -642,15 +949,458 @@ export function PdfTemplateEditor() {
                 </div>
               ))}
             </div>
+
+            {/* 6. Projects */}
+            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-1">
+                  <span className="text-xs font-bold text-emerald-400">6.</span>
+                  <Input
+                    value={model.sectionTitles?.projects || "Projects"}
+                    onChange={(e) =>
+                      saveModel({
+                        ...model,
+                        sectionTitles: {
+                          ...(model.sectionTitles || {
+                            summary: "Professional Summary",
+                            experience: "Work Experience",
+                            education: "Education",
+                            skills: "Skills",
+                            projects: "Projects",
+                            achievements: "Achievements and Activities",
+                          }),
+                          projects: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    title="Click to rename section heading"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const nextProjects = [
+                      ...model.projects,
+                      {
+                        id: `proj-${Date.now()}`,
+                        title: "Project Name",
+                        subtitle: "Tech Stack / Scope",
+                        startDate: "2025",
+                        endDate: "2026",
+                        link: "",
+                        technologies: [],
+                        bullets: ["Built high-impact application with modern frameworks."],
+                      },
+                    ];
+                    saveModel({ ...model, projects: nextProjects });
+                  }}
+                  className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Add Project
+                </Button>
+              </div>
+
+              {model.projects.map((proj, idx) => (
+                <div key={proj.id || idx} className="p-3 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200">{proj.title || `Project #${idx + 1}`}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        const filtered = model.projects.filter((_, i) => i !== idx);
+                        saveModel({ ...model, projects: filtered });
+                      }}
+                      className="h-6 w-6 text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Project Title"
+                      value={proj.title}
+                      onChange={(e) => {
+                        const copy = [...model.projects];
+                        copy[idx].title = e.target.value;
+                        saveModel({ ...model, projects: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                    />
+                    <Input
+                      placeholder="Subtitle / Role / Stack"
+                      value={proj.subtitle || ""}
+                      onChange={(e) => {
+                        const copy = [...model.projects];
+                        copy[idx].subtitle = e.target.value;
+                        saveModel({ ...model, projects: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                    />
+                    <Input
+                      placeholder="Dates (e.g. Jan 2026 – Mar 2026)"
+                      value={`${proj.startDate}${proj.endDate ? ` – ${proj.endDate}` : ""}`}
+                      onChange={(e) => {
+                        const parts = e.target.value.split(/–|-/);
+                        const copy = [...model.projects];
+                        copy[idx].startDate = parts[0]?.trim() || "";
+                        copy[idx].endDate = parts[1]?.trim() || "";
+                        saveModel({ ...model, projects: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800 col-span-2"
+                    />
+                  </div>
+
+                  {/* Bullets */}
+                  <div className="space-y-1.5 pt-1">
+                    <Label className="text-[10px] text-slate-400">Bullet Points</Label>
+                    {proj.bullets.map((bullet, bIdx) => (
+                      <div key={bIdx} className="flex gap-1.5 items-start">
+                        <span className="text-emerald-500 mt-1">•</span>
+                        <Textarea
+                          rows={2}
+                          value={bullet}
+                          onChange={(e) => {
+                            const copy = [...model.projects];
+                            copy[idx].bullets[bIdx] = e.target.value;
+                            saveModel({ ...model, projects: copy });
+                          }}
+                          className="text-xs bg-slate-900 border-slate-800 flex-1 leading-relaxed"
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            const copy = [...model.projects];
+                            copy[idx].bullets.splice(bIdx, 1);
+                            saveModel({ ...model, projects: copy });
+                          }}
+                          className="h-6 w-6 text-slate-500 hover:text-red-400 mt-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const copy = [...model.projects];
+                        copy[idx].bullets.push("Engineered core feature optimizing performance.");
+                        saveModel({ ...model, projects: copy });
+                      }}
+                      className="h-5 text-[10px] text-slate-400 hover:text-emerald-400 px-1"
+                    >
+                      + Add Bullet
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 7. Achievements & Activities */}
+            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-1">
+                  <span className="text-xs font-bold text-emerald-400">7.</span>
+                  <Input
+                    value={model.sectionTitles?.achievements || "Achievements and Activities"}
+                    onChange={(e) =>
+                      saveModel({
+                        ...model,
+                        sectionTitles: {
+                          ...(model.sectionTitles || {
+                            summary: "Professional Summary",
+                            experience: "Work Experience",
+                            education: "Education",
+                            skills: "Skills",
+                            projects: "Projects",
+                            achievements: "Achievements and Activities",
+                          }),
+                          achievements: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    title="Click to rename section heading"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const nextAch = [
+                      ...model.achievements,
+                      {
+                        id: `ach-${Date.now()}`,
+                        title: "Achievement Title",
+                        subtitle: "Details / Rank",
+                        date: "2025",
+                        description: "",
+                      },
+                    ];
+                    saveModel({ ...model, achievements: nextAch });
+                  }}
+                  className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Add Entry
+                </Button>
+              </div>
+
+              {model.achievements.map((ach, idx) => (
+                <div key={ach.id || idx} className="p-2.5 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Title"
+                      value={ach.title}
+                      onChange={(e) => {
+                        const copy = [...model.achievements];
+                        copy[idx].title = e.target.value;
+                        saveModel({ ...model, achievements: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800 flex-1 font-semibold"
+                    />
+                    <Input
+                      placeholder="Subtitle (Optional)"
+                      value={ach.subtitle || ""}
+                      onChange={(e) => {
+                        const copy = [...model.achievements];
+                        copy[idx].subtitle = e.target.value;
+                        saveModel({ ...model, achievements: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800 w-2/5"
+                    />
+                    <Input
+                      placeholder="Date"
+                      value={ach.date}
+                      onChange={(e) => {
+                        const copy = [...model.achievements];
+                        copy[idx].date = e.target.value;
+                        saveModel({ ...model, achievements: copy });
+                      }}
+                      className="h-7 text-xs bg-slate-900 border-slate-800 w-24"
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        const filtered = model.achievements.filter((_, i) => i !== idx);
+                        saveModel({ ...model, achievements: filtered });
+                      }}
+                      className="h-6 w-6 text-slate-500 hover:text-red-400"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 8. Custom Sections */}
+            {(model.customSections || []).map((sec, sIdx) => (
+              <div key={sec.id || sIdx} className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-emerald-500/30">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <span className="text-xs font-bold text-emerald-400">{8 + sIdx}.</span>
+                    <Input
+                      value={sec.title}
+                      onChange={(e) => {
+                        const copy = [...(model.customSections || [])];
+                        copy[sIdx].title = e.target.value;
+                        saveModel({ ...model, customSections: copy });
+                      }}
+                      placeholder="Section Title (e.g. Certifications, Publications)"
+                      className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-slate-950/60 border-slate-800 px-2"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const copy = [...(model.customSections || [])];
+                        const items = copy[sIdx].items || [];
+                        items.push({
+                          id: `item-${Date.now()}`,
+                          title: "Item Heading",
+                          subtitle: "Subtitle / Organization",
+                          date: "2025",
+                          bullets: ["Key detail or accomplishment point."],
+                        });
+                        copy[sIdx].items = items;
+                        saveModel({ ...model, customSections: copy });
+                      }}
+                      className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Add Item
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        const filtered = (model.customSections || []).filter((_, i) => i !== sIdx);
+                        saveModel({ ...model, customSections: filtered });
+                        toast.info(`Deleted section "${sec.title}"`);
+                      }}
+                      className="h-6 w-6 text-red-400 hover:text-red-300"
+                      title="Delete Section"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Items within custom section */}
+                {((sec.items && sec.items.length > 0) ? sec.items : []).map((item, itemIdx) => (
+                  <div key={item.id || itemIdx} className="p-3 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-200">{item.title || `Item #${itemIdx + 1}`}</span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          const copy = [...(model.customSections || [])];
+                          copy[sIdx].items = copy[sIdx].items.filter((_, i) => i !== itemIdx);
+                          saveModel({ ...model, customSections: copy });
+                        }}
+                        className="h-6 w-6 text-red-400 hover:text-red-300"
+                        title="Delete Item"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Title / Heading (e.g. AWS Solutions Architect)"
+                        value={item.title}
+                        onChange={(e) => {
+                          const copy = [...(model.customSections || [])];
+                          copy[sIdx].items[itemIdx].title = e.target.value;
+                          saveModel({ ...model, customSections: copy });
+                        }}
+                        className="h-7 text-xs bg-slate-900 border-slate-800"
+                      />
+                      <Input
+                        placeholder="Subtitle / Org (e.g. Amazon Web Services)"
+                        value={item.subtitle || ""}
+                        onChange={(e) => {
+                          const copy = [...(model.customSections || [])];
+                          copy[sIdx].items[itemIdx].subtitle = e.target.value;
+                          saveModel({ ...model, customSections: copy });
+                        }}
+                        className="h-7 text-xs bg-slate-900 border-slate-800"
+                      />
+                      <Input
+                        placeholder="Date (e.g. 2024 - Present)"
+                        value={item.date}
+                        onChange={(e) => {
+                          const copy = [...(model.customSections || [])];
+                          copy[sIdx].items[itemIdx].date = e.target.value;
+                          saveModel({ ...model, customSections: copy });
+                        }}
+                        className="h-7 text-xs bg-slate-900 border-slate-800 col-span-2"
+                      />
+                    </div>
+
+                    {/* Heading points / Bullets */}
+                    <div className="space-y-1.5 pt-1">
+                      <Label className="text-[10px] text-slate-400">Heading Points / Bullets ({(item.bullets || []).length})</Label>
+                      {(item.bullets || []).map((bullet, bIdx) => (
+                        <div key={bIdx} className="flex gap-1.5 items-start">
+                          <span className="text-emerald-500 mt-1">•</span>
+                          <Textarea
+                            rows={2}
+                            value={bullet}
+                            onChange={(e) => {
+                              const copy = [...(model.customSections || [])];
+                              copy[sIdx].items[itemIdx].bullets[bIdx] = e.target.value;
+                              saveModel({ ...model, customSections: copy });
+                            }}
+                            className="text-xs bg-slate-900 border-slate-800 flex-1 leading-relaxed"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              const copy = [...(model.customSections || [])];
+                              copy[sIdx].items[itemIdx].bullets.splice(bIdx, 1);
+                              saveModel({ ...model, customSections: copy });
+                            }}
+                            className="h-6 w-6 text-slate-500 hover:text-red-400 mt-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          const copy = [...(model.customSections || [])];
+                          if (!copy[sIdx].items[itemIdx].bullets) copy[sIdx].items[itemIdx].bullets = [];
+                          copy[sIdx].items[itemIdx].bullets.push("Added notable contribution / detail point.");
+                          saveModel({ ...model, customSections: copy });
+                        }}
+                        className="h-5 text-[10px] text-slate-400 hover:text-emerald-400 px-1"
+                      >
+                        + Add Point
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {/* Bottom Add Section Controls */}
+            <div className="pt-2 border-t border-slate-800/80 space-y-2">
+              <div className="text-[11px] font-semibold text-slate-400">Add New Section to Resume:</div>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAddCustomSection("Certifications & Licenses")}
+                  className="h-7 text-[11px] border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+                >
+                  <Plus className="w-3 h-3 mr-1 text-emerald-400" /> Certifications
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAddCustomSection("Publications & Research")}
+                  className="h-7 text-[11px] border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+                >
+                  <Plus className="w-3 h-3 mr-1 text-emerald-400" /> Publications
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAddCustomSection("Leadership & Volunteering")}
+                  className="h-7 text-[11px] border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+                >
+                  <Plus className="w-3 h-3 mr-1 text-emerald-400" /> Leadership
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAddCustomSection("Custom Section")}
+                  className="h-7 text-[11px] border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300"
+                >
+                  <Plus className="w-3 h-3 mr-1" /> + Custom Section
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Right Panel: High Fidelity Printable Canvas */}
           <div
             ref={previewPanelRef}
-            className="flex-1 bg-slate-950 flex flex-col overflow-hidden relative"
+            className="flex-1 bg-slate-950 flex flex-col overflow-hidden relative print:overflow-visible print:bg-white print:block print:w-full"
           >
-            {/* Sticky zoom toolbar */}
-            <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-sm">
+            {/* Sticky zoom toolbar - hidden on print */}
+            <div className="no-print print:hidden shrink-0 flex items-center gap-2 px-4 py-2 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-sm">
               <span className="text-[11px] text-slate-500 font-medium mr-1">Zoom</span>
 
               <button
@@ -683,7 +1433,45 @@ export function PdfTemplateEditor() {
 
               <div className="h-4 w-px bg-slate-800 mx-1" />
 
-              <span className="text-[10px] text-slate-600 hidden lg:inline">
+              {/* View Switcher: Live HTML vs Exact Compiled PDF */}
+              <div className="flex items-center bg-slate-800/90 p-0.5 rounded-md border border-slate-700 text-xs">
+                <button
+                  onClick={() => setPreviewMode("html")}
+                  className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${
+                    previewMode === "html"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                  title="Interactive pure HTML/CSS live preview"
+                >
+                  HTML Live
+                </button>
+                <button
+                  onClick={() => {
+                    if (!pdfArrayBuffer) {
+                      void handleCompileLatexPdf();
+                    } else {
+                      setPreviewMode("compiled");
+                    }
+                  }}
+                  disabled={isCompilingPdf}
+                  className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${
+                    previewMode === "compiled"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                  title="Exact compiled vector PDF from LaTeX engine"
+                >
+                  {isCompilingPdf ? (
+                    <RefreshCw className="w-3 h-3 inline mr-1 animate-spin" />
+                  ) : (
+                    <FileText className="w-3 h-3 inline mr-1 text-emerald-400" />
+                  )}
+                  Compiled PDF
+                </button>
+              </div>
+
+              <span className="text-[10px] text-slate-600 hidden xl:inline">
                 Ctrl + Scroll to zoom
               </span>
 
@@ -698,18 +1486,33 @@ export function PdfTemplateEditor() {
             </div>
 
             {/* Scrollable canvas area */}
-            <div className="flex-1 overflow-auto p-6 flex justify-center items-start">
-              <div
-                ref={previewContainerRef}
-                style={{
-                  transform: `scale(${zoomLevel / 100})`,
-                  transformOrigin: "top center",
-                  // Preserve layout space so the parent scrollbar works correctly
-                  marginBottom: `${(zoomLevel / 100 - 1) * 100}%`,
-                }}
-                className="shadow-2xl rounded-sm transition-transform duration-100"
-                dangerouslySetInnerHTML={{ __html: renderedHtml }}
-              />
+            <div className="flex-1 overflow-auto p-6 flex justify-center items-start print:overflow-visible print:p-0 print:m-0 print:block">
+              {previewMode === "compiled" && pdfArrayBuffer ? (
+                <div className="w-full h-full flex justify-center items-start overflow-auto print:hidden">
+                  <PdfCanvasViewer
+                    pdfData={pdfArrayBuffer}
+                    zoom={zoomLevel}
+                    onZoomChange={(z) => setZoomLevel(Math.min(200, Math.max(40, z)))}
+                    synctexMapping={null}
+                    lineOffset={0}
+                    highlightRect={null}
+                    onPdfClick={() => {}}
+                    onHighlightFade={() => {}}
+                  />
+                </div>
+              ) : (
+                <div
+                  ref={previewContainerRef}
+                  style={{
+                    transform: `scale(${zoomLevel / 100})`,
+                    transformOrigin: "top center",
+                    // Preserve layout space so the parent scrollbar works correctly
+                    marginBottom: `${(zoomLevel / 100 - 1) * 100}%`,
+                  }}
+                  className="shadow-2xl rounded-sm transition-transform duration-100 print:shadow-none print:transform-none print:m-0 print:p-0"
+                  dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -717,7 +1520,7 @@ export function PdfTemplateEditor() {
 
       {/* AI Tailoring Drawer / Modal */}
       {showAiDrawer && (
-        <div className="fixed inset-y-0 right-0 w-full sm:w-[440px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 p-5 flex flex-col justify-between overflow-y-auto">
+        <div className="no-print print:hidden fixed inset-y-0 right-0 w-full sm:w-[440px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 p-5 flex flex-col justify-between overflow-y-auto">
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">

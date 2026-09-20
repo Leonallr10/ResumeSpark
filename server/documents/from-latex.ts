@@ -5,6 +5,8 @@ import type {
   ProjectEntry,
   SkillCategory,
   AchievementEntry,
+  CustomSection,
+  CustomSectionItem,
 } from "./resume-document-model";
 import { createEmptyResumeDocument } from "./resume-document-model";
 
@@ -25,7 +27,11 @@ export function parseLatexToDocumentModel(latex: string): ResumeDocumentModel {
   const fullText = cleanLines.join("\n");
 
   // 1. Detect Template Type
-  if (latex.includes("resume.cls") || latex.includes("\\begin{rSection}")) {
+  if (latex.includes("Modern Tech Resume (Template 3)") || (latex.includes("helvet") && latex.includes("\\renewcommand{\\familydefault}{\\sfdefault}"))) {
+    model.templateId = "template-3";
+  } else if (latex.includes("Minimalist Executive (Template 4)")) {
+    model.templateId = "template-4";
+  } else if (latex.includes("resume.cls") || latex.includes("Classic CV Template") || latex.includes("\\begin{rSection}")) {
     model.templateId = "template-2";
   } else {
     model.templateId = "template-1";
@@ -43,6 +49,7 @@ export function parseLatexToDocumentModel(latex: string): ResumeDocumentModel {
   parseProjects(latex, model);
   parseSkills(latex, model);
   parseAchievements(latex, model);
+  parseCustomSections(latex, model);
 
   model.metadata.lastModified = new Date().toISOString();
   model.metadata.lastFlow = "latex";
@@ -396,6 +403,118 @@ function parseAchievements(latex: string, model: ResumeDocumentModel) {
 
   if (achievements.length > 0) {
     model.achievements = achievements;
+  }
+}
+
+function parseCustomSections(latex: string, model: ResumeDocumentModel) {
+  const customSections: CustomSection[] = [];
+  const standardSections = ["SUMMARY", "WORK EXPERIENCE", "EXPERIENCE", "EDUCATION", "SKILLS", "TECHNICAL SKILLS", "PROJECTS", "FEATURED PROJECTS", "ACHIEVEMENTS", "ACHIEVEMENTS AND ACTIVITIES", "HONORS", "AWARDS"];
+
+  // Find all \section{...} matches
+  const sectionRegex = /\\section\*?\{([^}]+)\}([\s\S]*?)(?=\\section|\%-----------|\\end\{document\}|$)/g;
+  let secMatch: RegExpExecArray | null;
+
+  while ((secMatch = sectionRegex.exec(latex)) !== null) {
+    const rawTitle = secMatch[1].trim();
+    const cleanTitle = cleanLatexText(rawTitle);
+    const upper = cleanTitle.toUpperCase();
+
+    // If it's a known standard section, record custom title if changed
+    if (upper.includes("SUMMARY")) {
+      model.sectionTitles.summary = cleanTitle;
+      continue;
+    } else if (upper.includes("EXPERIENCE")) {
+      model.sectionTitles.experience = cleanTitle;
+      continue;
+    } else if (upper.includes("EDUCATION")) {
+      model.sectionTitles.education = cleanTitle;
+      continue;
+    } else if (upper.includes("SKILL") || upper.includes("COMPETENC")) {
+      model.sectionTitles.skills = cleanTitle;
+      continue;
+    } else if (upper.includes("PROJECT")) {
+      model.sectionTitles.projects = cleanTitle;
+      continue;
+    } else if (upper.includes("ACHIEVE") || upper.includes("HONOR") || upper.includes("ACTIVIT")) {
+      model.sectionTitles.achievements = cleanTitle;
+      continue;
+    }
+
+    // It is a custom section!
+    const body = secMatch[2] || "";
+    const items: CustomSectionItem[] = [];
+
+    // Check for \resumeSubheading or items
+    const subHeadingRegex = /\\resumeSubheading\s*\{([^}]+)\}\s*\{([^}]*)\}\s*\{([^}]*)\}\s*\{([^}]*)\}([\s\S]*?)(?=\\resumeSubheading|\\resumeSubHeadingListEnd|\\section|$)/g;
+    let itemMatch: RegExpExecArray | null;
+
+    while ((itemMatch = subHeadingRegex.exec(body)) !== null) {
+      const title = cleanLatexText(itemMatch[1]);
+      const date = cleanLatexText(itemMatch[2]);
+      const subtitle = cleanLatexText(itemMatch[3]);
+      const itemBody = itemMatch[5] || "";
+
+      const bullets: string[] = [];
+      const itemBulletRegex = /\\resumeItem\{([\s\S]*?)\}(?=\s*\\resumeItem|\s*\\resumeItemListEnd|$)/g;
+      let bMatch: RegExpExecArray | null;
+      while ((bMatch = itemBulletRegex.exec(itemBody)) !== null) {
+        const bulletText = cleanLatexText(bMatch[1]);
+        if (bulletText) bullets.push(bulletText);
+      }
+
+      items.push({
+        id: `item-${items.length + 1}`,
+        title,
+        subtitle,
+        date,
+        bullets,
+      });
+    }
+
+    // Also check for \begin{rSubsection} in template 2
+    if (items.length === 0) {
+      const rSubsectionRegex = /\\begin\{rSubsection\}\{([^}]+)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}([\s\S]*?)\\end\{rSubsection\}/g;
+      let rMatch: RegExpExecArray | null;
+      while ((rMatch = rSubsectionRegex.exec(body)) !== null) {
+        const title = cleanLatexText(rMatch[1]);
+        const date = cleanLatexText(rMatch[2]);
+        const subtitle = cleanLatexText(rMatch[3]);
+        const rawItems = (rMatch[5] || "").split(/\\item\s+/).filter(Boolean);
+        const bullets = rawItems.map((b) => cleanLatexText(b)).filter((b) => b.length > 2);
+
+        items.push({
+          id: `item-${items.length + 1}`,
+          title,
+          subtitle,
+          date,
+          bullets,
+        });
+      }
+    }
+
+    // Direct bullets fallback
+    const directBullets: string[] = [];
+    if (items.length === 0) {
+      const directItemRegex = /\\resumeItem\{([\s\S]*?)\}/g;
+      let dMatch: RegExpExecArray | null;
+      while ((dMatch = directItemRegex.exec(body)) !== null) {
+        const bText = cleanLatexText(dMatch[1]);
+        if (bText) directBullets.push(bText);
+      }
+    }
+
+    if (cleanTitle) {
+      customSections.push({
+        id: `custom-${customSections.length + 1}`,
+        title: cleanTitle,
+        items,
+        bullets: directBullets,
+      });
+    }
+  }
+
+  if (customSections.length > 0) {
+    model.customSections = customSections;
   }
 }
 

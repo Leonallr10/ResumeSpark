@@ -117,7 +117,6 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
     }, [pdfData, onPageCount]);
 
     // Full-quality render at a specific zoom level
-    // Full-quality render at a specific zoom level
     const renderSharp = useCallback((targetZoom: number) => {
       if (!pdfDocRef.current || pages.length === 0) return;
       if (renderedZoomRef.current === targetZoom) return;
@@ -137,7 +136,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
 
         for (let i = 1; i <= doc.numPages; i++) {
           if (taskId !== renderTaskRef.current) return;
-          
+
           const page = await doc.getPage(i);
           const viewport = page.getViewport({ scale: scale * dpr });
           viewports[i] = viewport;
@@ -149,7 +148,16 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
           const ctx = offscreen.getContext("2d");
           if (!ctx) continue;
 
-          await page.render({ canvasContext: ctx, viewport }).promise;
+          try {
+            await page.render({ canvasContext: ctx, viewport }).promise;
+          } catch (err: unknown) {
+            // RenderingCancelledException is expected when a newer render supersedes this one
+            const name = (err as { name?: string })?.name ?? "";
+            if (name === "RenderingCancelledException") return;
+            throw err;
+          }
+
+          if (taskId !== renderTaskRef.current) return;
           offscreenCanvases[i] = offscreen;
         }
 
@@ -159,7 +167,7 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
           // Flush layout zoom synchronously so pages resize BEFORE we
           // remove the CSS transform — avoids a flash at the old size.
           flushSync(() => setLayoutZoom(targetZoom));
-          
+
           for (let i = 1; i <= doc.numPages; i++) {
              const canvas = canvasRefs.current.get(i);
              const offscreen = offscreenCanvases[i];
@@ -173,13 +181,19 @@ export const PdfCanvasViewer = forwardRef<PdfCanvasViewerHandle, PdfCanvasViewer
                 ctx?.drawImage(offscreen, 0, 0);
              }
           }
-          
+
           applyLiveTransform(targetZoom);
         }
       }
 
-      render();
+      render().catch((err: unknown) => {
+        const name = (err as { name?: string })?.name ?? "";
+        if (name !== "RenderingCancelledException") {
+          console.error("[PdfCanvasViewer] Render error:", err);
+        }
+      });
     }, [pages]);
+
 
     // Apply CSS transform for instant visual zoom (no re-render)
     function applyLiveTransform(currentZoom: number, origin = "top center") {

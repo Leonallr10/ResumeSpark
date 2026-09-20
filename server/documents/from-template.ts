@@ -489,6 +489,91 @@ export function documentModelToSections(model: ResumeDocumentModel): ResumeSecti
     });
   }
 
+  // 7. Custom Sections
+  if (model.customSections && model.customSections.length > 0) {
+    model.customSections.forEach((sec, sIdx) => {
+      const secId = sec.id || `custom-${sIdx + 1}`;
+      const lines: ResumeLine[] = [
+        {
+          id: createId(`line-${secId}-title`),
+          page: 1,
+          sectionId: secId,
+          text: sec.title || "Custom Section",
+          kind: "subheading",
+          layout: {
+            pageWidth: 595.28,
+            pageHeight: 841.89,
+            x: 40,
+            y: 780,
+            width: 515,
+            height: 16,
+            fontSize: 11,
+            fontFamily: "Times New Roman, serif",
+            fontWeight: 700,
+            lineHeight: 15,
+            textAlign: "left",
+            variant: "sectionHeading",
+          },
+        },
+      ];
+
+      (sec.items || []).forEach((item) => {
+        lines.push({
+          id: item.id || createId(`line-${secId}-item`),
+          page: 1,
+          sectionId: secId,
+          text: item.subtitle ? `${item.title} -- ${item.subtitle}` : item.title,
+          rightText: item.date,
+          kind: "subheading",
+          layout: {
+            pageWidth: 595.28,
+            pageHeight: 841.89,
+            x: 40,
+            y: 795,
+            width: 515,
+            height: 14,
+            fontSize: 10,
+            fontFamily: "Times New Roman, serif",
+            fontWeight: 700,
+            lineHeight: 13,
+            textAlign: "left",
+            variant: "headerSub",
+          },
+        });
+
+        (item.bullets || []).forEach((bullet, bIdx) => {
+          lines.push({
+            id: `${item.id}-bullet-${bIdx}`,
+            page: 1,
+            sectionId: secId,
+            text: bullet,
+            kind: "bullet",
+            layout: {
+              pageWidth: 595.28,
+              pageHeight: 841.89,
+              x: 52,
+              y: 810,
+              width: 503,
+              height: 14,
+              fontSize: 9.1,
+              fontFamily: "Times New Roman, serif",
+              fontWeight: 400,
+              lineHeight: 13,
+              textAlign: "left",
+              variant: "body",
+            },
+          });
+        });
+      });
+
+      sections.push({
+        id: secId,
+        title: sec.title || "Custom Section",
+        lines,
+      });
+    });
+  }
+
   return sections;
 }
 
