@@ -278,15 +278,7 @@ export default function ResumeGeneratorPage() {
           </motion.div>
         </div>
 
-        {/* Bottom hint */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.5 }}
-          className="text-center text-xs text-slate-600 mt-10"
-        >
-          Both editors share the same document model — start in one, switch to the other anytime.
-        </motion.p>
+
       </main>
 
       {/* Footer */}
