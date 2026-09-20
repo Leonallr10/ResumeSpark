@@ -146,16 +146,22 @@ export function PdfTemplateEditor() {
         body: JSON.stringify({ latex }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        throw new Error("LaTeX compilation failed.");
+        throw new Error(data.error || "LaTeX compilation failed.");
       }
 
-      const data = await res.json();
       const pdfBytes = Uint8Array.from(atob(data.pdf), (c) => c.charCodeAt(0));
       setPdfArrayBuffer(pdfBytes.buffer);
       localStorage.setItem("resume_compiled_pdf_base64", data.pdf);
       setPreviewMode("compiled");
-      toast.success("Compiled exact PDF preview!", { id: toastId });
+
+      if (data.overflow?.hasOverflow) {
+        toast.warning(data.overflow.message || "Page overflow detected.", { id: toastId, duration: 6000 });
+      } else {
+        toast.success("Compiled exact PDF preview!", { id: toastId });
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to compile LaTeX PDF.", { id: toastId });
     } finally {
@@ -312,8 +318,9 @@ export function PdfTemplateEditor() {
         margin: 0,
         filename: `${model.personalInfo.fullName.replace(/\s+/g, "_") || "Resume"}_Tailored.pdf`,
         image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
         jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
       };
 
       await html2pdf().set(opt).from(element).save();
@@ -1139,6 +1146,7 @@ export function PdfTemplateEditor() {
                         subtitle: "Details / Rank",
                         date: "2025",
                         description: "",
+                        bullets: [],
                       },
                     ];
                     saveModel({ ...model, achievements: nextAch });

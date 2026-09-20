@@ -6,7 +6,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { parseLatexLog } from "@/lib/latex-log-parser";
+import { parseLatexLog, formatReadableCompileError, detectPageOverflow } from "@/lib/latex-log-parser";
 import { generatePreviewId, storePdf } from "@/lib/pdf-cache";
 
 export const runtime = "nodejs";
@@ -74,13 +74,15 @@ export async function POST(request: Request) {
 
     if (!firstRun.ok) {
       const log = await readCompilerLog(logPath, firstRun.output);
+      const diagnostics = parseLatexLog(log, lineOffset);
+      const readableError = formatReadableCompileError(log, diagnostics);
 
       return NextResponse.json(
         {
-          error: "LaTeX compilation failed.",
+          error: readableError,
           compiler: engine,
           details: trimLog(log),
-          diagnostics: parseLatexLog(log, lineOffset),
+          diagnostics,
         },
         { status: 422 },
       );
@@ -89,6 +91,9 @@ export async function POST(request: Request) {
     if (engine !== "tectonic" && !engine.includes("tectonic")) {
       await runCompiler(engine, sourcePath, workdir);
     }
+
+    const log = await readCompilerLog(logPath, "");
+    const overflow = detectPageOverflow(log);
 
     const pdf = await readFile(pdfPath);
     const synctexPath = path.join(workdir, "resume.synctex.gz");
@@ -110,6 +115,7 @@ export async function POST(request: Request) {
         lineOffset,
         compiler: engine,
         synctexAvailable: !!synctexBuffer,
+        overflow,
       },
       {
         headers: {

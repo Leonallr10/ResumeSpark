@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const contactInfoSchema = z.object({
   fullName: z.string().default(""),
+  headline: z.string().default(""),
   email: z.string().default(""),
   phone: z.string().default(""),
   location: z.string().default(""),
@@ -61,15 +62,19 @@ export const skillCategorySchema = z.object({
 
 export type SkillCategory = z.infer<typeof skillCategorySchema>;
 
-export const achievementEntrySchema = z.object({
+export const resumeExtraEntrySchema = z.object({
   id: z.string(),
   title: z.string(),
   subtitle: z.string().default(""),
   date: z.string().default(""),
   description: z.string().default(""),
+  bullets: z.array(z.string()).default([]),
 });
 
-export type AchievementEntry = z.infer<typeof achievementEntrySchema>;
+export type ResumeExtraEntry = z.infer<typeof resumeExtraEntrySchema>;
+
+export const achievementEntrySchema = resumeExtraEntrySchema;
+export type AchievementEntry = ResumeExtraEntry;
 
 export const customSectionItemSchema = z.object({
   id: z.string(),
@@ -98,6 +103,7 @@ export const sectionTitlesSchema = z.object({
   skills: z.string().default("Skills"),
   projects: z.string().default("Projects"),
   achievements: z.string().default("Achievements and Activities"),
+  extras: z.string().default("Achievements and Activities"),
 });
 
 export type SectionTitles = z.infer<typeof sectionTitlesSchema>;
@@ -113,6 +119,7 @@ export const resumeDocumentModelSchema = z.object({
     skills: "Skills",
     projects: "Projects",
     achievements: "Achievements and Activities",
+    extras: "Achievements and Activities",
   }),
   summary: z.string().default(""),
   experience: z.array(experienceEntrySchema).default([]),
@@ -120,6 +127,8 @@ export const resumeDocumentModelSchema = z.object({
   projects: z.array(projectEntrySchema).default([]),
   skills: z.array(skillCategorySchema).default([]),
   achievements: z.array(achievementEntrySchema).default([]),
+  extras: z.array(resumeExtraEntrySchema).default([]),
+  extrasLabel: z.string().default("Achievements and Activities"),
   customSections: z.array(customSectionSchema).default([]),
   metadata: z
     .object({
@@ -137,6 +146,64 @@ export const resumeDocumentModelSchema = z.object({
 });
 
 export type ResumeDocumentModel = z.infer<typeof resumeDocumentModelSchema>;
+export const ResumeSchema = resumeDocumentModelSchema;
+export type ResumeSchema = ResumeDocumentModel;
+
+/**
+ * Normalizes any loaded resume document into a canonical ResumeDocumentModel
+ * guaranteeing compatibility between extras[], achievements[], and customSections[].
+ */
+export function normalizeResumeDocument(raw: any): ResumeDocumentModel {
+  if (!raw || typeof raw !== "object") {
+    return createEmptyResumeDocument();
+  }
+
+  const parsed = resumeDocumentModelSchema.safeParse(raw);
+  const doc: ResumeDocumentModel = parsed.success ? parsed.data : createEmptyResumeDocument();
+
+  // If raw has contact property instead of personalInfo
+  if (raw.contact && typeof raw.contact === "object") {
+    doc.personalInfo = {
+      ...doc.personalInfo,
+      ...raw.contact,
+    };
+  }
+
+  // Harmonize extras from achievements or customSections if extras is empty
+  if (doc.extras.length === 0) {
+    if (doc.achievements && doc.achievements.length > 0) {
+      doc.extras = doc.achievements.map((a, idx) => ({
+        id: a.id || `extra-${idx + 1}`,
+        title: a.title || "",
+        subtitle: a.subtitle || "",
+        date: a.date || "",
+        description: a.description || "",
+        bullets: a.bullets || [],
+      }));
+      doc.extrasLabel = doc.sectionTitles?.achievements || "Achievements and Activities";
+    } else if (doc.customSections && doc.customSections.length > 0) {
+      const firstSection = doc.customSections[0];
+      if (firstSection.items && firstSection.items.length > 0) {
+        doc.extras = firstSection.items.map((item, idx) => ({
+          id: item.id || `extra-${idx + 1}`,
+          title: item.title || "",
+          subtitle: item.subtitle || "",
+          date: item.date || "",
+          description: "",
+          bullets: item.bullets || [],
+        }));
+        doc.extrasLabel = firstSection.title || "Additional Information";
+      }
+    }
+  }
+
+  // Keep achievements in sync with extras for backwards compatibility
+  if (doc.achievements.length === 0 && doc.extras.length > 0) {
+    doc.achievements = [...doc.extras];
+  }
+
+  return doc;
+}
 
 export function createEmptyResumeDocument(): ResumeDocumentModel {
   const now = new Date().toISOString();
@@ -145,6 +212,7 @@ export function createEmptyResumeDocument(): ResumeDocumentModel {
     templateId: "template-1",
     personalInfo: {
       fullName: "Your Name",
+      headline: "",
       email: "your.email@example.com",
       phone: "+1 234 567 8900",
       location: "San Francisco, CA",
@@ -160,6 +228,7 @@ export function createEmptyResumeDocument(): ResumeDocumentModel {
       skills: "Skills",
       projects: "Projects",
       achievements: "Achievements and Activities",
+      extras: "Achievements and Activities",
     },
     summary: "Full-Stack and AI Engineer with expertise in building scalable, production-ready web applications, agentic workflows, and distributed backend systems.",
     experience: [
@@ -230,8 +299,20 @@ export function createEmptyResumeDocument(): ResumeDocumentModel {
         subtitle: "First Place amongst 250+ teams",
         date: "2024",
         description: "Built an AI-driven disaster response dispatch portal in 36 hours.",
+        bullets: [],
       },
     ],
+    extras: [
+      {
+        id: "ach-1",
+        title: "National Hackathon Winner",
+        subtitle: "First Place amongst 250+ teams",
+        date: "2024",
+        description: "Built an AI-driven disaster response dispatch portal in 36 hours.",
+        bullets: [],
+      },
+    ],
+    extrasLabel: "Achievements and Activities",
     customSections: [],
     metadata: {
       targetRole: "Full Stack Engineer",
@@ -249,6 +330,7 @@ export function createSampleResumeTemplate1(): ResumeDocumentModel {
     templateId: "template-1",
     personalInfo: {
       fullName: "LEONAL ROBIN",
+      headline: "Full-Stack and AI Engineer",
       email: "leonalrobinlr10@gmail.com",
       phone: "+91 8248731433",
       location: "Bengaluru, Karnataka, India",
@@ -264,6 +346,7 @@ export function createSampleResumeTemplate1(): ResumeDocumentModel {
       skills: "Skills",
       projects: "Projects",
       achievements: "Achievements and Activities",
+      extras: "Achievements and Activities",
     },
     summary: "Full-Stack and AI Engineer with 1.5+ years designing and deploying agent systems and interactive web applications. Expertise in Python, TypeScript, React/Next.js, LLM integration, and vector search to build multi-step reasoning workflows and production-ready scalable solutions.",
     experience: [
@@ -386,6 +469,7 @@ export function createSampleResumeTemplate1(): ResumeDocumentModel {
         subtitle: "Seismic Data from Apollo and Mars InSight Missions",
         date: "Oct 2024",
         description: "",
+        bullets: [],
       },
       {
         id: "ach-2",
@@ -393,6 +477,7 @@ export function createSampleResumeTemplate1(): ResumeDocumentModel {
         subtitle: "National Level Hackathon at NIT Trichy",
         date: "Mar 2023",
         description: "",
+        bullets: [],
       },
       {
         id: "ach-3",
@@ -400,8 +485,36 @@ export function createSampleResumeTemplate1(): ResumeDocumentModel {
         subtitle: "Full Stack Development Program",
         date: "Sep 2026",
         description: "",
+        bullets: [],
       },
     ],
+    extras: [
+      {
+        id: "ach-1",
+        title: "NASA Space App Challenge",
+        subtitle: "Seismic Data from Apollo and Mars InSight Missions",
+        date: "Oct 2024",
+        description: "",
+        bullets: [],
+      },
+      {
+        id: "ach-2",
+        title: "Pragyan '23 -- National Winner",
+        subtitle: "National Level Hackathon at NIT Trichy",
+        date: "Mar 2023",
+        description: "",
+        bullets: [],
+      },
+      {
+        id: "ach-3",
+        title: "Crio.Do Certificate",
+        subtitle: "Full Stack Development Program",
+        date: "Sep 2026",
+        description: "",
+        bullets: [],
+      },
+    ],
+    extrasLabel: "Achievements and Activities",
     customSections: [],
     metadata: {
       targetRole: "Full Stack & AI Engineer",

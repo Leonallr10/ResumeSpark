@@ -1,27 +1,17 @@
 import type { ResumeDocumentModel, CustomSection } from "./resume-document-model";
+import { renderLatexByTemplateId } from "@/lib/templates/latex-builders";
 
 /**
  * Generates compilable LaTeX source from ResumeDocumentModel.
- * Supports Template 1 (Ivy Academic), Template 2 (Classic CV),
- * Template 3 (Silicon Valley Tech), and Template 4 (Minimalist Executive).
+ * Supports Template 1 (Classic Traditional), Template 2 (Modern Minimal),
+ * Template 3 (Technical Developer), and Template 4 (Elegant Formal).
  */
 export function generateLatexFromDocumentModel(
   model: ResumeDocumentModel,
   templateVariant?: string,
 ): string {
   const variant = templateVariant || model.templateId || "template-1";
-
-  switch (variant) {
-    case "template-2":
-      return generateTemplate2Latex(model);
-    case "template-3":
-      return generateTemplate3Latex(model);
-    case "template-4":
-      return generateTemplate4Latex(model);
-    case "template-1":
-    default:
-      return generateTemplate1Latex(model);
-  }
+  return renderLatexByTemplateId(model, variant);
 }
 
 function escapeLatex(text: string): string {
@@ -420,6 +410,7 @@ ${achItems}
 \\usepackage{enumitem}
 \\usepackage{titlesec}
 \\usepackage{ifthen}
+\\usepackage{mathptmx}
 \\usepackage[hidelinks]{hyperref}
 
 \\pagestyle{empty}
@@ -428,8 +419,8 @@ ${achItems}
 % Section formatting
 \\newenvironment{rSection}[1]{
   \\vspace{4pt}
-  {\\bfseries\\MakeUppercase{#1}}
-  \\vspace{-4pt}
+  {\\bfseries\\MakeUppercase{#1}}\\par
+  \\vspace{2pt}
   \\hrule height 0.8pt
   \\vspace{4pt}
   \\begin{list}{}{
