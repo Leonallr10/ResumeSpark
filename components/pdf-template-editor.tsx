@@ -395,17 +395,15 @@ export function PdfTemplateEditor() {
           <div className="bg-slate-800/80 p-0.5 rounded-lg border border-slate-700 flex items-center text-xs">
             <button
               onClick={() => setActiveTab("editor")}
-              className={`px-3 py-1 rounded-md transition-all ${
-                activeTab === "editor" ? "bg-emerald-600 text-white font-medium" : "text-slate-400 hover:text-slate-200"
-              }`}
+              className={`px-3 py-1 rounded-md transition-all ${activeTab === "editor" ? "bg-emerald-600 text-white font-medium" : "text-slate-400 hover:text-slate-200"
+                }`}
             >
               <Edit3 className="w-3.5 h-3.5 inline mr-1" /> Editor
             </button>
             <button
               onClick={() => setActiveTab("gallery")}
-              className={`px-3 py-1 rounded-md transition-all ${
-                activeTab === "gallery" ? "bg-emerald-600 text-white font-medium" : "text-slate-400 hover:text-slate-200"
-              }`}
+              className={`px-3 py-1 rounded-md transition-all ${activeTab === "gallery" ? "bg-emerald-600 text-white font-medium" : "text-slate-400 hover:text-slate-200"
+                }`}
             >
               <Layout className="w-3.5 h-3.5 inline mr-1" /> Templates
             </button>
@@ -1445,11 +1443,10 @@ export function PdfTemplateEditor() {
               <div className="flex items-center bg-slate-800/90 p-0.5 rounded-md border border-slate-700 text-xs">
                 <button
                   onClick={() => setPreviewMode("html")}
-                  className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${
-                    previewMode === "html"
+                  className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${previewMode === "html"
                       ? "bg-emerald-600 text-white shadow-sm"
                       : "text-slate-400 hover:text-slate-200"
-                  }`}
+                    }`}
                   title="Interactive pure HTML/CSS live preview"
                 >
                   HTML Live
@@ -1463,11 +1460,10 @@ export function PdfTemplateEditor() {
                     }
                   }}
                   disabled={isCompilingPdf}
-                  className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${
-                    previewMode === "compiled"
+                  className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${previewMode === "compiled"
                       ? "bg-emerald-600 text-white shadow-sm"
                       : "text-slate-400 hover:text-slate-200"
-                  }`}
+                    }`}
                   title="Exact compiled vector PDF from LaTeX engine"
                 >
                   {isCompilingPdf ? (
@@ -1478,6 +1474,17 @@ export function PdfTemplateEditor() {
                   Compiled PDF
                 </button>
               </div>
+
+              {/* Dedicated Recompile button in preview toolbar */}
+              <button
+                onClick={() => void handleCompileLatexPdf()}
+                disabled={isCompilingPdf}
+                title="Recompile LaTeX template to fresh vector PDF"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800/90 border border-slate-700 hover:bg-slate-700 text-slate-300 hover:text-emerald-400 text-[11px] font-medium transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 text-emerald-400 ${isCompilingPdf ? "animate-spin" : ""}`} />
+                <span>{isCompilingPdf ? "Compiling..." : "Recompile"}</span>
+              </button>
 
               <span className="text-[10px] text-slate-600 hidden xl:inline">
                 Ctrl + Scroll to zoom
@@ -1504,8 +1511,8 @@ export function PdfTemplateEditor() {
                     synctexMapping={null}
                     lineOffset={0}
                     highlightRect={null}
-                    onPdfClick={() => {}}
-                    onHighlightFade={() => {}}
+                    onPdfClick={() => { }}
+                    onHighlightFade={() => { }}
                   />
                 </div>
               ) : (

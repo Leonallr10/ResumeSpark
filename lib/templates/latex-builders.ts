@@ -141,7 +141,21 @@ ${extraItems}
 \\listEnd`
     : "";
 
-  const bodySections = [summaryBlock, experienceBlock, educationBlock, skillsBlock, projectsBlock, extrasBlock]
+  const customSections = model.customSections || [];
+  const customSectionsBlock = customSections.map((sec) => {
+    if (!sec) return "";
+    const items = (sec.items || []).map((item) => {
+      const heading = item.subtitle
+        ? `\\textbf{${escapeLatex(item.title)}} -- ${escapeLatex(item.subtitle)}`
+        : `\\textbf{${escapeLatex(item.title)}}`;
+      const bullets = (item.bullets || []).filter(Boolean).map((b) => `    \\resumeItem{${escapeLatex(b)}}`).join("\n");
+      const bulletsBlock = bullets ? `  \\itemListStart\n${bullets}\n  \\itemListEnd` : "";
+      return `  \\resumeProjectHeading{${heading}}{${escapeLatex(item.date)}}\n${bulletsBlock}`;
+    }).join("\n");
+    return `\\section{${escapeLatex(sec.title || "Additional Section")}}\n\\listStart\n${items}\n\\listEnd`;
+  }).filter(Boolean).join("\n\n");
+
+  const bodySections = [summaryBlock, experienceBlock, educationBlock, skillsBlock, projectsBlock, extrasBlock, customSectionsBlock]
     .filter(Boolean)
     .join("\n\n");
 
@@ -309,7 +323,21 @@ ${extraItems}
 \\listEnd`
     : "";
 
-  const bodySections = [summaryBlock, experienceBlock, educationBlock, skillsBlock, projectsBlock, extrasBlock]
+  const customSections = model.customSections || [];
+  const customSectionsBlock = customSections.map((sec) => {
+    if (!sec) return "";
+    const items = (sec.items || []).map((item) => {
+      const heading = item.subtitle
+        ? `\\textbf{${escapeLatex(item.title)}} -- ${escapeLatex(item.subtitle)}`
+        : `\\textbf{${escapeLatex(item.title)}}`;
+      const bullets = (item.bullets || []).filter(Boolean).map((b) => `    \\resumeItem{${escapeLatex(b)}}`).join("\n");
+      const bulletsBlock = bullets ? `  \\itemListStart\n${bullets}\n  \\itemListEnd` : "";
+      return `  \\resumeProjectHeading{${heading}}{${escapeLatex(item.date)}}\n${bulletsBlock}`;
+    }).join("\n");
+    return `\\section{${escapeLatex(sec.title || "Additional Section")}}\n\\listStart\n${items}\n\\listEnd`;
+  }).filter(Boolean).join("\n\n");
+
+  const bodySections = [summaryBlock, experienceBlock, educationBlock, skillsBlock, projectsBlock, extrasBlock, customSectionsBlock]
     .filter(Boolean)
     .join("\n\n");
 
@@ -477,7 +505,22 @@ ${extraItems}
 \\listEnd`
     : "";
 
-  const bodySections = [summaryBlock, experienceBlock, educationBlock, skillsBlock, projectsBlock, extrasBlock]
+  const customSections = model.customSections || [];
+  const customSectionsBlock = customSections.map((sec) => {
+    if (!sec) return "";
+    const items = (sec.items || []).map((item) => {
+      const heading = item.subtitle
+        ? `\\textbf{${escapeLatex(item.title)}} -- ${escapeLatex(item.subtitle)}`
+        : `\\textbf{${escapeLatex(item.title)}}`;
+      const bullets = (item.bullets || []).filter(Boolean).map((b) => `    \\resumeItem{${escapeLatex(b)}}`).join("\n");
+      const bulletsBlock = bullets ? `  \\itemListStart\n${bullets}\n  \\itemListEnd` : "";
+      return `  \\resumeProjectHeading{${heading}}{${escapeLatex(item.date)}}\n${bulletsBlock}`;
+    }).join("\n");
+    const secTitle = escapeLatex((sec.title || "ADDITIONAL_SECTION").toUpperCase().replace(/\s+/g, "_"));
+    return `\\section{${secTitle}}\n\\listStart\n${items}\n\\listEnd`;
+  }).filter(Boolean).join("\n\n");
+
+  const bodySections = [summaryBlock, experienceBlock, educationBlock, skillsBlock, projectsBlock, extrasBlock, customSectionsBlock]
     .filter(Boolean)
     .join("\n\n");
 
@@ -642,7 +685,21 @@ ${extraItems}
 \\listEnd`
     : "";
 
-  const bodySections = [summaryBlock, experienceBlock, educationBlock, skillsBlock, projectsBlock, extrasBlock]
+  const customSections = model.customSections || [];
+  const customSectionsBlock = customSections.map((sec) => {
+    if (!sec) return "";
+    const items = (sec.items || []).map((item) => {
+      const heading = item.subtitle
+        ? `\\textbf{${escapeLatex(item.title)}} -- ${escapeLatex(item.subtitle)}`
+        : `\\textbf{${escapeLatex(item.title)}}`;
+      const bullets = (item.bullets || []).filter(Boolean).map((b) => `    \\resumeItem{${escapeLatex(b)}}`).join("\n");
+      const bulletsBlock = bullets ? `  \\itemListStart\n${bullets}\n  \\itemListEnd` : "";
+      return `  \\resumeProjectHeading{${heading}}{${escapeLatex(item.date)}}\n${bulletsBlock}`;
+    }).join("\n");
+    return `\\section{${escapeLatex(sec.title || "Additional Section")}}\n\\listStart\n${items}\n\\listEnd`;
+  }).filter(Boolean).join("\n\n");
+
+  const bodySections = [summaryBlock, experienceBlock, educationBlock, skillsBlock, projectsBlock, extrasBlock, customSectionsBlock]
     .filter(Boolean)
     .join("\n\n");
 

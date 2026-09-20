@@ -162,6 +162,49 @@ export function renderTemplate1Html(
     </section>
   ` : "";
 
+  const customSections = model.customSections || [];
+  const customSectionsHtml = customSections.map((sec) => {
+    if (!sec) return "";
+    const items = sec.items || [];
+    const bullets = sec.bullets || [];
+    const secTitle = escapeHtml((sec.title || "Additional Section").toUpperCase());
+
+    return `
+    <section class="sec">
+      <div class="sec-title">${secTitle}</div>
+      <hr class="sec-rule" />
+      <div class="items-list">
+        ${items.map((item) => `
+          <div class="subheading-block">
+            <div class="row-between">
+              <span class="item-head">
+                <strong contenteditable="true" data-field="custom-${sec.id}-${item.id}-title">${escapeHtml(item.title)}</strong>
+                ${item.subtitle ? `<span class="proj-sub" contenteditable="true" data-field="custom-${sec.id}-${item.id}-sub"> -- ${escapeHtml(item.subtitle)}</span>` : ""}
+              </span>
+              <span class="subtext" contenteditable="true" data-field="custom-${sec.id}-${item.id}-date">${escapeHtml(item.date)}</span>
+            </div>
+            ${item.bullets && item.bullets.length > 0 ? `
+              <ul class="bullet-list">
+                ${item.bullets.map((b, bIdx) => `
+                  <li contenteditable="true" data-field="custom-${sec.id}-${item.id}-bullet-${bIdx}">${escapeHtml(b)}</li>
+                `).join("")}
+              </ul>
+            ` : ""}
+          </div>
+        `).join("")}
+        ${bullets.length > 0 ? `
+          <ul class="bullet-list">
+            ${bullets.map((b, bIdx) => `
+              <li contenteditable="true" data-field="custom-${sec.id}-bullet-${bIdx}">${escapeHtml(b)}</li>
+            `).join("")}
+          </ul>
+        ` : ""}
+        ${sec.content ? `<div class="summary-text" contenteditable="true" data-field="custom-${sec.id}-content">${escapeHtml(sec.content)}</div>` : ""}
+      </div>
+    </section>
+    `;
+  }).join("\n");
+
   return `
   <div class="resume-sheet template-classic-traditional">
     <style>
@@ -211,6 +254,7 @@ export function renderTemplate1Html(
     ${skillsHtml}
     ${projectsHtml}
     ${extrasHtml}
+    ${customSectionsHtml}
   </div>
   `;
 }
@@ -357,6 +401,48 @@ export function renderTemplate2Html(
     </section>
   ` : "";
 
+  const customSections = model.customSections || [];
+  const customSectionsHtml = customSections.map((sec) => {
+    if (!sec) return "";
+    const items = sec.items || [];
+    const bullets = sec.bullets || [];
+    const secTitle = escapeHtml(sec.title || "Additional Section");
+
+    return `
+    <section class="sec">
+      <div class="sec-title">${secTitle}</div>
+      <div class="items-list">
+        ${items.map((item) => `
+          <div class="subheading-block">
+            <div class="row-between">
+              <span class="item-head">
+                <strong contenteditable="true" data-field="custom-${sec.id}-${item.id}-title">${escapeHtml(item.title)}</strong>
+                ${item.subtitle ? `<span class="proj-sub" contenteditable="true" data-field="custom-${sec.id}-${item.id}-sub"> -- ${escapeHtml(item.subtitle)}</span>` : ""}
+              </span>
+              <span class="subtext accent" contenteditable="true" data-field="custom-${sec.id}-${item.id}-date">${escapeHtml(item.date)}</span>
+            </div>
+            ${item.bullets && item.bullets.length > 0 ? `
+              <ul class="bullet-list">
+                ${item.bullets.map((b, bIdx) => `
+                  <li contenteditable="true" data-field="custom-${sec.id}-${item.id}-bullet-${bIdx}">${escapeHtml(b)}</li>
+                `).join("")}
+              </ul>
+            ` : ""}
+          </div>
+        `).join("")}
+        ${bullets.length > 0 ? `
+          <ul class="bullet-list">
+            ${bullets.map((b, bIdx) => `
+              <li contenteditable="true" data-field="custom-${sec.id}-bullet-${bIdx}">${escapeHtml(b)}</li>
+            `).join("")}
+          </ul>
+        ` : ""}
+        ${sec.content ? `<div class="summary-text" contenteditable="true" data-field="custom-${sec.id}-content">${escapeHtml(sec.content)}</div>` : ""}
+      </div>
+    </section>
+    `;
+  }).join("\n");
+
   return `
   <div class="resume-sheet template-modern-minimal">
     <style>
@@ -411,6 +497,7 @@ export function renderTemplate2Html(
     ${skillsHtml}
     ${projectsHtml}
     ${extrasHtml}
+    ${customSectionsHtml}
   </div>
   `;
 }
@@ -557,6 +644,49 @@ export function renderTemplate3Html(
     </section>
   ` : "";
 
+  const customSections = model.customSections || [];
+  const customSectionsHtml = customSections.map((sec) => {
+    if (!sec) return "";
+    const items = sec.items || [];
+    const bullets = sec.bullets || [];
+    const secTitle = escapeHtml((sec.title || "ADDITIONAL_SECTION").toUpperCase().replace(/\s+/g, "_"));
+
+    return `
+    <section class="sec">
+      <div class="sec-title"><span class="prefix">//</span> ${secTitle}</div>
+      <div class="items-list">
+        ${items.map((item) => `
+          <div class="subheading-block">
+            <div class="dot-row">
+              <span class="item-head">
+                <strong contenteditable="true" data-field="custom-${sec.id}-${item.id}-title">${escapeHtml(item.title)}</strong>
+                ${item.subtitle ? `<span class="proj-sub" contenteditable="true" data-field="custom-${sec.id}-${item.id}-sub"> -- ${escapeHtml(item.subtitle)}</span>` : ""}
+              </span>
+              <span class="dots"></span>
+              <span class="subtext mono" contenteditable="true" data-field="custom-${sec.id}-${item.id}-date">${escapeHtml(item.date)}</span>
+            </div>
+            ${item.bullets && item.bullets.length > 0 ? `
+              <ul class="bullet-list">
+                ${item.bullets.map((b, bIdx) => `
+                  <li contenteditable="true" data-field="custom-${sec.id}-${item.id}-bullet-${bIdx}">${escapeHtml(b)}</li>
+                `).join("")}
+              </ul>
+            ` : ""}
+          </div>
+        `).join("")}
+        ${bullets.length > 0 ? `
+          <ul class="bullet-list">
+            ${bullets.map((b, bIdx) => `
+              <li contenteditable="true" data-field="custom-${sec.id}-bullet-${bIdx}">${escapeHtml(b)}</li>
+            `).join("")}
+          </ul>
+        ` : ""}
+        ${sec.content ? `<div class="summary-text" contenteditable="true" data-field="custom-${sec.id}-content">${escapeHtml(sec.content)}</div>` : ""}
+      </div>
+    </section>
+    `;
+  }).join("\n");
+
   return `
   <div class="resume-sheet template-technical-developer">
     <style>
@@ -609,6 +739,7 @@ export function renderTemplate3Html(
     ${skillsHtml}
     ${projectsHtml}
     ${extrasHtml}
+    ${customSectionsHtml}
   </div>
   `;
 }
@@ -757,6 +888,48 @@ export function renderTemplate4Html(
     </section>
   ` : "";
 
+  const customSections = model.customSections || [];
+  const customSectionsHtml = customSections.map((sec) => {
+    if (!sec) return "";
+    const items = sec.items || [];
+    const bullets = sec.bullets || [];
+    const secTitle = escapeHtml(sec.title || "Additional Section");
+
+    return `
+    <section class="sec">
+      <div class="sec-title">${secTitle}</div>
+      <div class="double-rule"></div>
+      <div class="items-list">
+        ${items.map((item) => `
+          <div class="subheading-block">
+            <div class="centered-head">
+              <strong contenteditable="true" data-field="custom-${sec.id}-${item.id}-title">${escapeHtml(item.title)}</strong>
+              ${item.subtitle ? `<span class="proj-sub" contenteditable="true" data-field="custom-${sec.id}-${item.id}-sub"> -- ${escapeHtml(item.subtitle)}</span>` : ""}
+              <span class="dash"> — </span>
+              <span class="subtext" contenteditable="true" data-field="custom-${sec.id}-${item.id}-date">${escapeHtml(item.date)}</span>
+            </div>
+            ${item.bullets && item.bullets.length > 0 ? `
+              <ul class="bullet-list">
+                ${item.bullets.map((b, bIdx) => `
+                  <li contenteditable="true" data-field="custom-${sec.id}-${item.id}-bullet-${bIdx}">${escapeHtml(b)}</li>
+                `).join("")}
+              </ul>
+            ` : ""}
+          </div>
+        `).join("")}
+        ${bullets.length > 0 ? `
+          <ul class="bullet-list">
+            ${bullets.map((b, bIdx) => `
+              <li contenteditable="true" data-field="custom-${sec.id}-bullet-${bIdx}">${escapeHtml(b)}</li>
+            `).join("")}
+          </ul>
+        ` : ""}
+        ${sec.content ? `<div class="summary-text" contenteditable="true" data-field="custom-${sec.id}-content">${escapeHtml(sec.content)}</div>` : ""}
+      </div>
+    </section>
+    `;
+  }).join("\n");
+
   return `
   <div class="resume-sheet template-elegant-formal">
     <style>
@@ -810,6 +983,7 @@ export function renderTemplate4Html(
     ${skillsHtml}
     ${projectsHtml}
     ${extrasHtml}
+    ${customSectionsHtml}
   </div>
   `;
 }
