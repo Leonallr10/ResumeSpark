@@ -5,10 +5,13 @@ import { Check, X, Sparkles, ArrowRight, ShieldCheck, AlertCircle } from "lucide
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { AiSuggestion } from "@/types/resume";
+import type { ProjectRankingItem } from "@/lib/schemas";
+import { ProjectRankingPanel } from "@/components/project-ranking-panel";
 
 interface PdfSuggestionDiffModalProps {
   isOpen: boolean;
   suggestions: AiSuggestion[];
+  rankedProjects?: ProjectRankingItem[];
   onClose: () => void;
   onApplySuggestion: (suggestion: AiSuggestion) => void;
   onApplyAll: (suggestions: AiSuggestion[]) => void;
@@ -17,6 +20,7 @@ interface PdfSuggestionDiffModalProps {
 export function PdfSuggestionDiffModal({
   isOpen,
   suggestions,
+  rankedProjects = [],
   onClose,
   onApplySuggestion,
   onApplyAll,
@@ -61,6 +65,13 @@ export function PdfSuggestionDiffModal({
               </Button>
             </div>
           </div>
+
+          {/* Project Ranking summary (shown when available) */}
+          {rankedProjects.length > 0 && (
+            <div className="px-5 pt-4 pb-2 border-b border-border bg-muted/10">
+              <ProjectRankingPanel rankedProjects={rankedProjects} />
+            </div>
+          )}
 
           {/* Body List of Diffs */}
           <div className="p-5 overflow-y-auto space-y-4 flex-1 divide-y divide-border">
@@ -128,3 +139,4 @@ export function PdfSuggestionDiffModal({
     </AnimatePresence>
   );
 }
+

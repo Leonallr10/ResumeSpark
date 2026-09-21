@@ -18,9 +18,13 @@ export async function generateWithClaude(
   apiKey: string,
   prompt: string,
   model?: string,
+  systemInstruction?: string,
 ): Promise<string> {
   const anthropic = new Anthropic({ apiKey });
   const resolvedModel = model || "claude-sonnet-4-20250514";
+  const systemPrompt =
+    systemInstruction ||
+    "You are an expert technical resume tailoring assistant. Return valid JSON only. Do not wrap in markdown.";
 
   let response: Anthropic.Message;
 
@@ -34,16 +38,14 @@ export async function generateWithClaude(
       temperature: 1,
       thinking: { type: "enabled", budget_tokens: 8000 },
       betas: ["interleaved-thinking-2025-05-14"],
-      system:
-        "You are an expert technical resume tailoring assistant. Return valid JSON only. Do not wrap in markdown.",
+      system: systemPrompt,
       messages: [{ role: "user", content: prompt }],
     });
   } else {
     response = await anthropic.messages.create({
       model: resolvedModel,
       max_tokens: 8192,
-      system:
-        "You are an expert technical resume tailoring assistant. Return valid JSON only. Do not wrap in markdown.",
+      system: systemPrompt,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.25,
     });

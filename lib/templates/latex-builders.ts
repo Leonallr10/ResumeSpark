@@ -580,7 +580,7 @@ export function renderTemplate4Latex(
 
   const contactLines: string[] = [];
   if (personalInfo.location) contactLines.push(escapeLatex(personalInfo.location));
-  
+
   const links: string[] = [];
   if (personalInfo.email) links.push(`\\href{mailto:${escapeLatex(personalInfo.email)}}{${escapeLatex(personalInfo.email)}}`);
   if (personalInfo.phone) links.push(escapeLatex(personalInfo.phone));

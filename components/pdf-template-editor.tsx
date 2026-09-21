@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   type ResumeDocumentModel,
   type CustomSection,
+  type ProjectEntry,
   createSampleResumeTemplate1,
 } from "@/server/documents/resume-document-model";
 import { parseLatexToDocumentModel } from "@/server/documents/from-latex";
@@ -38,7 +39,15 @@ import { TEMPLATE_REGISTRY, getTemplateRenderer } from "@/lib/templates/registry
 import { PdfTemplateGallery } from "./pdf-template-gallery";
 import { PdfSuggestionDiffModal } from "./pdf-suggestion-diff-modal";
 import { PdfCanvasViewer } from "./pdf-canvas-viewer";
+import { ProjectRankingPanel } from "./project-ranking-panel";
+import { JdInputPanel } from "./jd-input-panel";
+import { JobMatchModal } from "./job-match-modal";
+import { analyzeJobMatch } from "@/lib/job-match";
+import type { JobMatchResult } from "@/types/job-match";
+import { emptyProjectDraft } from "@/components/latex-project-fields";
+import { canInsertProject, type ProjectDraft } from "@/lib/latex-resume";
 import type { AiSuggestion, SuggestionResponse, LlmProvider } from "@/types/resume";
+import type { ProjectRankingItem } from "@/lib/schemas";
 
 const PDF_STORAGE_KEY = "resume_pdf_document_model_v1";
 const LATEX_STORAGE_KEY = "resume_latex_source_v1";
@@ -55,13 +64,117 @@ export function PdfTemplateEditor() {
   const [isCompilingPdf, setIsCompilingPdf] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiDrawer, setShowAiDrawer] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [role, setRole] = useState("Software Engineer / AI Engineer");
   const [targetCompanyRole, setTargetCompanyRole] = useState("Software Engineer / AI Engineer");
   const [jobDescription, setJobDescription] = useState("");
-  const [extraProject, setExtraProject] = useState("");
+  const [projectDraft, setProjectDraft] = useState<ProjectDraft>(emptyProjectDraft);
+  const [projectDrafts, setProjectDrafts] = useState<ProjectDraft[]>([]);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("gemini");
   const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
+  const [rankedProjects, setRankedProjects] = useState<ProjectRankingItem[]>([]);
+  const [jobMatchOpen, setJobMatchOpen] = useState(false);
+  const [jobMatchResult, setJobMatchResult] = useState<JobMatchResult | null>(null);
+  const [isJobMatchAnalyzing, setIsJobMatchAnalyzing] = useState(false);
   const [isDiffModalOpen, setIsDiffModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+
+  const handleCompanyNameChange = useCallback((c: string) => {
+    setCompanyName(c);
+    setTargetCompanyRole([c, role].filter(Boolean).join(" - "));
+  }, [role]);
+
+  const handleRoleChange = useCallback((r: string) => {
+    setRole(r);
+    setTargetCompanyRole([companyName, r].filter(Boolean).join(" - "));
+  }, [companyName]);
+
+  // Sync projects from loaded model to project drafts if empty
+  useEffect(() => {
+    if (model.projects && model.projects.length > 0 && projectDrafts.length === 0) {
+      const drafts: ProjectDraft[] = model.projects.map((p) => ({
+        heading: p.title || "",
+        explanation: Array.isArray(p.bullets) ? p.bullets.join("\n") : "",
+        techStack: Array.isArray(p.technologies) ? p.technologies.join(", ") : "",
+        link: p.link || "",
+        fromDate: p.startDate || "",
+        toDate: p.endDate || "",
+      }));
+      setProjectDrafts(drafts);
+    }
+  }, [model.projects, projectDrafts.length]);
+
+  const handleInsertAllProjectsToModel = useCallback(() => {
+    const drafts = projectDrafts.length > 0 ? projectDrafts : [projectDraft];
+    const valid = drafts.filter(canInsertProject);
+    if (valid.length === 0) {
+      toast.error("Please fill in project details first.");
+      return;
+    }
+    const newEntries: ProjectEntry[] = valid.map((draft) => {
+      const bullets = draft.explanation
+        .split(/\r?\n/)
+        .map((b) => b.trim().replace(/^[-•*]\s*/, ""))
+        .filter(Boolean);
+      return {
+        id: `proj_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        title: draft.heading.trim(),
+        subtitle: "",
+        startDate: draft.fromDate.trim(),
+        endDate: draft.toDate.trim(),
+        link: draft.link.trim(),
+        technologies: draft.techStack ? draft.techStack.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        bullets: bullets.length > 0 ? bullets : [draft.explanation.trim()],
+      };
+    });
+    saveModel({
+      ...model,
+      projects: [...model.projects, ...newEntries],
+    });
+    toast.success(`Inserted ${newEntries.length} project(s) into resume!`);
+  }, [projectDrafts, projectDraft, model]);
+
+  const handleInsertSingleProjectToModel = useCallback((idx: number) => {
+    const drafts = projectDrafts.length > 0 ? projectDrafts : [projectDraft];
+    const draft = drafts[idx];
+    if (!draft || !canInsertProject(draft)) {
+      toast.error("Project heading is required.");
+      return;
+    }
+    const bullets = draft.explanation
+      .split(/\r?\n/)
+      .map((b) => b.trim().replace(/^[-•*]\s*/, ""))
+      .filter(Boolean);
+    const newEntry: ProjectEntry = {
+      id: `proj_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      title: draft.heading.trim(),
+      subtitle: "",
+      startDate: draft.fromDate.trim(),
+      endDate: draft.toDate.trim(),
+      link: draft.link.trim(),
+      technologies: draft.techStack ? draft.techStack.split(",").map((s) => s.trim()).filter(Boolean) : [],
+      bullets: bullets.length > 0 ? bullets : [draft.explanation.trim()],
+    };
+    saveModel({
+      ...model,
+      projects: [...model.projects, newEntry],
+    });
+    toast.success(`Inserted "${draft.heading}" into resume!`);
+  }, [projectDrafts, projectDraft, model]);
+
+  const runJobMatch = useCallback(() => {
+    if (!jobDescription.trim()) {
+      toast.error("Please paste a Job Description first to check ATS score.");
+      return;
+    }
+    setIsJobMatchAnalyzing(true);
+    setJobMatchOpen(true);
+    const sections = documentModelToSections(model);
+    const latexCode = generateLatexFromDocumentModel(model, model.templateId);
+    const result = analyzeJobMatch(sections, jobDescription, latexCode);
+    setJobMatchResult(result);
+    setIsJobMatchAnalyzing(false);
+  }, [jobDescription, model]);
 
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const previewPanelRef = useRef<HTMLDivElement>(null);
@@ -206,6 +319,12 @@ export function PdfTemplateEditor() {
     setIsAiLoading(true);
     try {
       const sections = documentModelToSections(model);
+      const activeDrafts = projectDrafts.length > 0 ? projectDrafts : [projectDraft];
+      const projectParam = activeDrafts
+        .filter(canInsertProject)
+        .map((p) => `${p.heading} (${p.techStack}): ${p.explanation}`)
+        .join("\n\n");
+
       const res = await fetch("/api/resume/suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -213,7 +332,7 @@ export function PdfTemplateEditor() {
           resumeSections: sections,
           companyRole: targetCompanyRole,
           jd: jobDescription,
-          project: extraProject,
+          project: projectParam,
           provider: llmProvider,
         }),
       });
@@ -224,6 +343,7 @@ export function PdfTemplateEditor() {
       }
 
       setSuggestions(data.suggestions || []);
+      setRankedProjects(data.rankedProjects || []);
       setIsDiffModalOpen(true);
       setShowAiDrawer(false);
       toast.success(`Generated ${data.suggestions?.length || 0} guardrail-verified suggestions!`);
@@ -1444,8 +1564,8 @@ export function PdfTemplateEditor() {
                 <button
                   onClick={() => setPreviewMode("html")}
                   className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${previewMode === "html"
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-200"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
                     }`}
                   title="Interactive pure HTML/CSS live preview"
                 >
@@ -1461,8 +1581,8 @@ export function PdfTemplateEditor() {
                   }}
                   disabled={isCompilingPdf}
                   className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${previewMode === "compiled"
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-200"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
                     }`}
                   title="Exact compiled vector PDF from LaTeX engine"
                 >
@@ -1535,50 +1655,24 @@ export function PdfTemplateEditor() {
 
       {/* AI Tailoring Drawer / Modal */}
       {showAiDrawer && (
-        <div className="no-print print:hidden fixed inset-y-0 right-0 w-full sm:w-[440px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 p-5 flex flex-col justify-between overflow-y-auto">
+        <div className="no-print print:hidden fixed inset-y-0 right-0 w-full sm:w-[480px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 p-5 flex flex-col justify-between overflow-y-auto space-y-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded bg-emerald-500/20 text-emerald-400">
+                <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-sm text-white">AI Resume Tailoring</h3>
+                <div>
+                  <h3 className="font-bold text-sm text-white">AI Resume Tailoring</h3>
+                  <p className="text-[11px] text-slate-400">Target role analysis &amp; guardrail tailoring</p>
+                </div>
               </div>
-              <button onClick={() => setShowAiDrawer(false)} className="text-slate-400 hover:text-white text-xs">
+              <button
+                onClick={() => setShowAiDrawer(false)}
+                className="text-slate-400 hover:text-white text-xs p-1 rounded hover:bg-slate-800 transition-colors"
+              >
                 ✕
               </button>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs text-slate-300">Target Role & Company</Label>
-              <Input
-                value={targetCompanyRole}
-                onChange={(e) => setTargetCompanyRole(e.target.value)}
-                className="h-8 text-xs bg-slate-950 border-slate-800"
-                placeholder="e.g. Senior Backend Engineer at Stripe"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs text-slate-300">Paste Job Description (JD)</Label>
-              <Textarea
-                rows={7}
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-                className="text-xs bg-slate-950 border-slate-800 leading-relaxed font-mono"
-                placeholder="Paste requirements, tech stack, and responsibilities..."
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs text-slate-300">Extra Project / Achievements (Optional)</Label>
-              <Textarea
-                rows={3}
-                value={extraProject}
-                onChange={(e) => setExtraProject(e.target.value)}
-                className="text-xs bg-slate-950 border-slate-800 font-mono"
-                placeholder="Project title, stack, and results to insert if relevant..."
-              />
             </div>
 
             <div className="space-y-1.5">
@@ -1586,7 +1680,7 @@ export function PdfTemplateEditor() {
               <select
                 value={llmProvider}
                 onChange={(e) => setLlmProvider(e.target.value as LlmProvider)}
-                className="w-full bg-slate-950 border border-slate-800 rounded text-xs px-2.5 py-1.5 text-slate-200"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500"
               >
                 <option value="gemini">Google Gemini 2.5</option>
                 <option value="groq">Groq (Llama 3.3 70B Fast)</option>
@@ -1594,32 +1688,39 @@ export function PdfTemplateEditor() {
               </select>
             </div>
 
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-[11px] text-emerald-400 space-y-1">
-              <div className="font-semibold flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" /> Guardrails Enabled
-              </div>
-              <p className="text-slate-400">
-                Input sanitization, injection rejection, and hallucination fact-checking are strictly enforced.
-              </p>
-            </div>
-          </div>
 
-          <div className="pt-4 border-t border-slate-800">
-            <Button
-              disabled={isAiLoading}
-              onClick={handleGenerateAiSuggestions}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-9 gap-2"
-            >
-              {isAiLoading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" /> Tailoring with Guardrails...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" /> Generate STAR Suggestions
-                </>
-              )}
-            </Button>
+
+            {/* Unified JdInputPanel with JD form, ATS score, and Project Analysis with JD Prioritization */}
+            <JdInputPanel
+              companyName={companyName}
+              role={role}
+              jd={jobDescription}
+              onCompanyNameChange={handleCompanyNameChange}
+              onRoleChange={handleRoleChange}
+              onJdChange={setJobDescription}
+              project={projectDraft}
+              projects={projectDrafts}
+              onProjectChange={setProjectDraft}
+              onProjectsChange={setProjectDrafts}
+              onDeleteProject={(idx) => setProjectDrafts((ps) => ps.filter((_, i) => i !== idx))}
+              onInsertProject={handleInsertAllProjectsToModel}
+              onInsertSingleProject={handleInsertSingleProjectToModel}
+              onAtsScore={runJobMatch}
+              onAiTailor={handleGenerateAiSuggestions}
+              isAiTailorLoading={isAiLoading}
+              rankedProjects={rankedProjects}
+              onRankedProjectsChange={setRankedProjects}
+              llmProvider={llmProvider}
+              insertLabel="INSERT TO RESUME"
+              hideHeader={true}
+            />
+
+            {/* Project Ranking results from Call #1 */}
+            {rankedProjects.length > 0 && (
+              <div className="pt-2">
+                <ProjectRankingPanel rankedProjects={rankedProjects} />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1628,9 +1729,23 @@ export function PdfTemplateEditor() {
       <PdfSuggestionDiffModal
         isOpen={isDiffModalOpen}
         suggestions={suggestions}
+        rankedProjects={rankedProjects}
         onClose={() => setIsDiffModalOpen(false)}
         onApplySuggestion={handleApplySuggestion}
         onApplyAll={handleApplyAllSuggestions}
+      />
+
+      {/* ATS Score & Job Matching Modal */}
+      <JobMatchModal
+        isOpen={jobMatchOpen}
+        result={jobMatchResult}
+        sections={documentModelToSections(model)}
+        latexCode={generateLatexFromDocumentModel(model, model.templateId)}
+        jd={jobDescription}
+        companyRole={targetCompanyRole}
+        isAnalyzing={isJobMatchAnalyzing}
+        onClose={() => setJobMatchOpen(false)}
+        onReanalyze={runJobMatch}
       />
     </div>
   );

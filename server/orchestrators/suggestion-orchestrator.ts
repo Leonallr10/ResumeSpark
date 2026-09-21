@@ -1,11 +1,15 @@
 import { Guardrails } from "@/server/guardrails";
 import { executeLlmGeneration } from "@/server/llm/provider-router";
-import { suggestionResponseSchema } from "@/lib/schemas";
+import { suggestionResponseSchema, type ProjectRankingItem } from "@/lib/schemas";
 import { getResumeText } from "@/lib/resume";
 import type { ResumeSection, SuggestionResponse, LlmProvider } from "@/types/resume";
 import type { ResumeDocumentModel } from "@/server/documents/resume-document-model";
 import { documentModelToSections } from "@/server/documents/from-template";
-import { extractJdKeywords, scoreAndRankProjects, type ProjectScoreBreakdown } from "@/server/scoring/project-scorer";
+import {
+  rankProjectsWithLlm,
+  toLightweightProjects,
+  type RawCandidateProject,
+} from "./project-ranker";
 import { extractGroundTruthFacts, formatFactsWhitelist } from "@/server/guardrails/facts-extractor";
 
 export interface SuggestionOrchestratorInput {
@@ -55,31 +59,39 @@ export async function orchestrateResumeSuggestions(
 
   const { companyRole, jd, project } = inputCheck.sanitizedInput;
 
-  // 3. DETERMINISTIC PRE-FLIGHT ANALYSIS (OUTSIDE LLM)
-  // 3a. Extract JD Keywords & Requirements
-  const jdAnalysis = extractJdKeywords(jd);
+  // 3. CALL #1: PROJECT RANKING CALL (Separation of Concerns)
+  // Input: JD (full text) + Projects list (lightweight: title, techStack, 1-line summary only — NO bullets)
+  // Output: ranked projectIds with relevance scores (0-100), matchedSkills, and reasons
+  const candidateProjects =
+    input.documentModel?.projects || extractProjectsFromSections(sections, project);
 
-  // 3b. Extract Projects and Score/Rank Deterministically
-  const candidateProjects = input.documentModel?.projects || extractProjectsFromSections(sections, project);
-  const rankedProjects = scoreAndRankProjects(candidateProjects, jdAnalysis);
+  let rankedProjects: ProjectRankingItem[] = [];
+  if (candidateProjects.length > 0) {
+    const lightweightProjects = toLightweightProjects(candidateProjects);
+    rankedProjects = await rankProjectsWithLlm({
+      jd,
+      projects: lightweightProjects,
+      provider: input.provider,
+      model: input.model,
+      apiKey: input.apiKey,
+    });
+  }
 
-  // 3c. Extract Ground-Truth Facts Whitelist
-  const groundTruthFacts = extractGroundTruthFacts(sections, project, input.documentModel);
+  // 4. EXTRACT GROUND-TRUTH FACTS WHITELIST (Restricted to Resume Data)
+  const groundTruthFacts = extractGroundTruthFacts(sections, "", input.documentModel);
   const factsWhitelistText = formatFactsWhitelist(groundTruthFacts);
 
-  // 4. BUILD PROMPT WITH PRE-RANKED PROJECTS AND FACTS WHITELIST
-  const prompt = buildDeterministicTailorPrompt({
+  // 5. CALL #2: RESUME TAILORING CALL
+  // Input: ONLY Job Description (full text) + Candidate Resume data (sections, lines, stable IDs)
+  // Note: Extra project full bullet data is strictly omitted.
+  const prompt = buildResumeTailorPrompt({
     sections,
     companyRole,
     jd,
-    project,
-    resumeText,
-    jdAnalysis,
-    rankedProjects,
     factsWhitelistText,
   });
 
-  // 5. PROVIDER ROUTER -> LLM
+  // 6. PROVIDER ROUTER -> LLM (Call #2 Execution)
   const rawResponse = await executeLlmGeneration({
     provider: input.provider,
     prompt,
@@ -88,7 +100,7 @@ export async function orchestrateResumeSuggestions(
     jsonSchema: suggestionResponseJsonSchema,
   });
 
-  // 6. OUTPUT GUARD (Zod Schema & Structure Recovery)
+  // 7. OUTPUT GUARD (Zod Schema & Structure Recovery)
   const outputCheck = Guardrails.runOutputGuard(
     rawResponse,
     suggestionResponseSchema,
@@ -99,11 +111,11 @@ export async function orchestrateResumeSuggestions(
     throw new Error(outputCheck.error || "Output guardrail validation failed.");
   }
 
-  // 7. FACT GUARD (Outright Rejection of Hallucinations with Audit Logging)
+  // 8. FACT GUARD (Outright Rejection of Hallucinations with Audit Logging)
   const factCheck = Guardrails.runFactGuard(
     outputCheck.data.suggestions,
     resumeText,
-    project || "",
+    "",
     ip,
   );
 
@@ -111,15 +123,16 @@ export async function orchestrateResumeSuggestions(
     companyTone: outputCheck.data.companyTone,
     suggestions: factCheck.filteredSuggestions,
     sectionReviews: outputCheck.data.sectionReviews,
+    rankedProjects,
   };
 }
 
-function extractProjectsFromSections(sections: ResumeSection[], extraProjectText: string) {
-  const list: { id: string; title: string; bullets: string[]; techStack: string[] }[] = [];
+function extractProjectsFromSections(sections: ResumeSection[], extraProjectText: string): RawCandidateProject[] {
+  const list: RawCandidateProject[] = [];
   const projSection = sections.find((s) => s.title.toLowerCase().includes("project"));
 
   if (projSection) {
-    let currentProj: { id: string; title: string; bullets: string[]; techStack: string[] } | null = null;
+    let currentProj: RawCandidateProject | null = null;
     for (const line of projSection.lines) {
       if (line.kind === "projectHeading" || line.kind === "subheading") {
         if (currentProj) list.push(currentProj);
@@ -130,16 +143,45 @@ function extractProjectsFromSections(sections: ResumeSection[], extraProjectText
           techStack: line.secondaryText ? [line.secondaryText] : [],
         };
       } else if (line.kind === "bullet" && currentProj) {
+        currentProj.bullets = currentProj.bullets || [];
         currentProj.bullets.push(line.text);
       }
     }
     if (currentProj) list.push(currentProj);
   }
 
-  if (extraProjectText) {
+  if (extraProjectText && extraProjectText.trim()) {
+    // Check if extraProjectText is valid JSON array or object
+    try {
+      const parsed = JSON.parse(extraProjectText);
+      const rawList = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed.projects)
+          ? parsed.projects
+          : Array.isArray(parsed.resume_projects)
+            ? parsed.resume_projects
+            : null;
+
+      if (rawList) {
+        (rawList as Record<string, unknown>[]).forEach((item, i) => {
+          list.push({
+            id: (item.id as string) || `extra-proj-${i + 1}`,
+            title: (item.title as string) || (item.heading as string) || (item.name as string) || `Project ${i + 1}`,
+            techStack: (item.techStack as string | string[]) || (item.technologies as string[]) || [],
+            explanation: (item.explanation as string) || (item.description as string) || "",
+            bullets: Array.isArray(item.bullets) ? (item.bullets as string[]) : [],
+          });
+        });
+        return list;
+      }
+    } catch {
+      // Not JSON, continue with line parsing
+    }
+
     list.push({
       id: "extra-proj-1",
-      title: "Extra Project Input",
+      title: "Candidate Project",
+      explanation: extraProjectText,
       bullets: extraProjectText.split(/\n|;;/).filter(Boolean),
       techStack: [],
     });
@@ -148,14 +190,10 @@ function extractProjectsFromSections(sections: ResumeSection[], extraProjectText
   return list;
 }
 
-function buildDeterministicTailorPrompt(params: {
+function buildResumeTailorPrompt(params: {
   sections: ResumeSection[];
   companyRole: string;
   jd: string;
-  project: string;
-  resumeText: string;
-  jdAnalysis: ReturnType<typeof extractJdKeywords>;
-  rankedProjects: ProjectScoreBreakdown[];
   factsWhitelistText: string;
 }) {
   const sectionIndex = params.sections
@@ -178,38 +216,21 @@ function buildDeterministicTailorPrompt(params: {
     })
     .join("\n\n");
 
-  const rankedProjectsSummary = params.rankedProjects
-    .map((p, i) => {
-      return `Rank #${i + 1}: "${p.title}" (Score: ${p.score})
-- Matched Must-Haves: [${p.matchedMustHaves.join(", ") || "none"}]
-- Matched Good-To-Haves: [${p.matchedGoodToHaves.join(", ") || "none"}]
-- Matched Domain: [${p.matchedDomainKeywords.join(", ") || "none"}]
-- Proven Metrics: [${p.provenMetrics.join(", ") || "none"}]`;
-    })
-    .join("\n\n");
-
   return `
-You are an expert Technical Recruiter, Senior Software Engineer, and Resume Strategist. Tailor the resume for the target company, role, and job description using the PRE-COMPUTED keyword matches and PRE-RANKED projects below.
+You are an expert Technical Recruiter, Senior Software Engineer, and Resume Strategist. Tailor the candidate's resume for the target company, role, and job description.
 
 ${params.factsWhitelistText}
-
-=== DETERMINISTIC PRE-RANKED PROJECTS (DO NOT RE-SCORE) ===
-The backend code has already scored and ranked the candidate's projects against the JD keywords:
-${rankedProjectsSummary}
-
-TASK INSTRUCTIONS FOR PROJECTS:
-- Write or improve STAR bullets for the Top Ranked projects above.
-- Do NOT recalculate scores or alter the ranking.
-- Keep the highest scoring project FIRST.
-- Confine each project to 2-3 focused STAR bullets.
 
 === CRITICAL FACT-GUARD VS LINE-DENSITY RULE ===
 - Target line density: aim for 1 full line (~90-100 chars) or 2 full lines (~185-200 chars).
 - **STRICT RESOLUTION RULE:** If a bullet cannot reach target length without adding unstated facts, KEEP IT SHORT rather than pad it with fluff or fabricated numbers. Truthfulness strictly overrides line density.
+- Do NOT invent companies, dates, degrees, titles, metrics, or technologies not grounded in the resume.
 
-=== SKILLS PRUNING & REORDERING (NO SILENT OMISSIONS) ===
-- Reorder skills to lead with JD must-have skills in each category row.
-- If removing or replacing an obsolete skill, output an explicit "replace" suggestion for that skill line so the user can review and accept/decline it in the Diff UI. Never omit content silently.
+=== TAILORING INSTRUCTIONS ===
+- Tailor existing resume bullets and sections directly against the provided Job Description.
+- Confine project and experience entries to 2-3 focused STAR bullets (Situation, Task, Action, Result).
+- Reorder and prioritize skills and bullets to lead with JD must-have skills and technologies.
+- If removing or replacing an obsolete skill or bullet, output an explicit "replace" suggestion for that line so the user can review and accept/decline it in the Diff UI. Never omit content silently.
 
 === CLASSIFICATION ENUMS ===
 - companyTone MUST be one of: "startup" | "faang" | "ai_lab" | "enterprise" | "unknown"

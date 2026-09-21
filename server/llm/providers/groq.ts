@@ -4,12 +4,18 @@ export async function generateWithGroq(
   apiKey: string,
   prompt: string,
   model?: string,
+  systemInstruction?: string,
 ): Promise<string> {
   const groq = new Groq({ apiKey });
   const response = await groq.chat.completions.create({
     model: model || "llama-3.3-70b-versatile",
     messages: [
-      { role: "system", content: "You are an expert technical resume tailoring assistant. Return valid JSON only." },
+      {
+        role: "system",
+        content:
+          systemInstruction ||
+          "You are an expert technical resume tailoring assistant. Return valid JSON only.",
+      },
       { role: "user", content: prompt },
     ],
     response_format: { type: "json_object" },

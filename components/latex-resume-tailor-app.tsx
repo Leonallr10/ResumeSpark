@@ -75,6 +75,7 @@ import {
   emptyProjectDraft,
   LatexProjectFields,
 } from "@/components/latex-project-fields";
+import { JdInputPanel } from "@/components/jd-input-panel";
 import {
   clampPdfZoom,
 } from "@/components/latex-pdf-preview";
@@ -117,6 +118,8 @@ import type {
 import { analyzeJobMatch } from "@/lib/job-match";
 import type { JobMatchResult } from "@/types/job-match";
 import { JobMatchModal } from "@/components/job-match-modal";
+import { ProjectRankingPanel } from "@/components/project-ranking-panel";
+import type { ProjectRankingItem } from "@/lib/schemas";
 
 const COMPANY_ROLE_LIMIT = 300;
 const JD_LIMIT = 20000;
@@ -201,10 +204,23 @@ export function LatexResumeTailorApp() {
   const [latexCode, setLatexCode] = useState(DEFAULT_LATEX_RESUME);
   const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
   const [sectionReviews, setSectionReviews] = useState<SectionReview[]>([]);
+  const [rankedProjects, setRankedProjects] = useState<ProjectRankingItem[]>([]);
   const [projectDraft, setProjectDraft] = useState<ProjectDraft>(emptyProjectDraft);
   const [projectDrafts, setProjectDrafts] = useState<ProjectDraft[]>([]);
   const [companyRole, setCompanyRole] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [role, setRole] = useState("");
   const [jd, setJd] = useState("");
+
+  const handleCompanyNameChange = useCallback((c: string) => {
+    setCompanyName(c);
+    setCompanyRole([c, role].filter(Boolean).join(" - "));
+  }, [role]);
+
+  const handleRoleChange = useCallback((r: string) => {
+    setRole(r);
+    setCompanyRole([companyName, r].filter(Boolean).join(" - "));
+  }, [companyName]);
   const [loadingFile, setLoadingFile] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [auditing, setAuditing] = useState(false);
@@ -421,9 +437,9 @@ export function LatexResumeTailorApp() {
         setSupabaseProjects(existingProjects);
         loadProjectIntoEditor(targetProj, savedPdfLatex);
 
-        // Auto compile the synchronized template
+        // Auto compile the synchronized template silently
         setTimeout(() => {
-          recompileLatex(savedPdfLatex);
+          recompileLatex(savedPdfLatex, true);
         }, 200);
         return;
       }
@@ -431,10 +447,10 @@ export function LatexResumeTailorApp() {
       if (existingProjects.length > 0) {
         setSupabaseProjects(existingProjects);
         loadProjectIntoEditor(existingProjects[0]);
-        // Trigger initial compilation if needed
+        // Trigger initial compilation silently
         setTimeout(() => {
           const firstTex = window.localStorage.getItem(`resume-tex-${existingProjects[0].id}`) || existingProjects[0].latex_code;
-          if (firstTex) recompileLatex(firstTex);
+          if (firstTex) recompileLatex(firstTex, true);
         }, 400);
         return;
       }
@@ -1138,6 +1154,7 @@ export function LatexResumeTailorApp() {
 
       setSuggestions(payload.suggestions);
       setSectionReviews(payload.sectionReviews);
+      setRankedProjects(payload.rankedProjects ?? []);
       setViewMode("preview");
     } catch (requestError) {
       if (requestError instanceof DOMException && requestError.name === "AbortError") {
@@ -1490,7 +1507,7 @@ export function LatexResumeTailorApp() {
   }
 
 
-  async function recompileLatex(codeOverride?: string) {
+  async function recompileLatex(codeOverride?: string, isSilent = false) {
     setIsRecompiling(true);
     setError(null);
     const targetCode = codeOverride ?? latexCode;
@@ -1522,7 +1539,7 @@ export function LatexResumeTailorApp() {
 
         toast.error(
           parts ? `Compilation failed: ${parts}` : (payload.error ?? "Compilation failed."),
-          { duration: 5000 },
+          { id: "compile-status", duration: 5000 },
         );
         return;
       }
@@ -1557,17 +1574,15 @@ export function LatexResumeTailorApp() {
       } else {
         setSynctexMapping(null);
         setSynctexLineOffset(0);
-        toast.info(
-          "PDF compiled without SyncTeX. Install pdflatex or tectonic locally for PDF ↔ editor navigation.",
-          { duration: 6000 },
-        );
       }
 
-      toast.success("Compiled successfully.", { duration: 3000 });
+      if (!isSilent) {
+        toast.success("Compiled successfully.", { id: "compile-status", duration: 3000 });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Compilation failed.");
       setLastCompileSuccess(false);
-      toast.error("Compilation failed — check your connection.", { duration: 5000 });
+      toast.error("Compilation failed — check your connection.", { id: "compile-status", duration: 5000 });
     } finally {
       setIsRecompiling(false);
     }
@@ -2842,319 +2857,56 @@ export function LatexResumeTailorApp() {
             <AnimatePresence mode="wait">
               {isInputPanelOpen && (
                 <motion.aside
+                  key="input-panel"
                   initial={{ opacity: 0, x: 20, width: 0 }}
                   animate={{ opacity: 1, x: 0, width: "100%" }}
                   exit={{ opacity: 0, x: 20, width: 0 }}
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="flex w-full min-h-0 flex-col xl:w-[450px] xl:max-w-[450px] xl:self-stretch overflow-hidden"
+                  className="flex w-full min-h-0 flex-col xl:w-[440px] xl:max-w-[440px] xl:self-stretch overflow-hidden"
                 >
-                  <Card className="sticky top-5 min-h-0 flex-1 xl:flex xl:h-full xl:min-h-0 xl:flex-col bg-gradient-to-br from-slate-800 via-slate-900 to-emerald-950/85 border-slate-700/60 shadow-2xl rounded-2xl text-slate-100 backdrop-blur-lg">
-                    <CardContent className="space-y-5 pt-5 xl:flex xl:flex-1 xl:flex-col xl:overflow-y-auto bg-transparent border-0">
-                      <div
-                        className="grid grid-cols-2 rounded-xl border border-slate-700/80 bg-slate-950/60 p-1 backdrop-blur-md"
-                        role="tablist"
-                        aria-label="Input panel tabs"
-                      >
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 border ${inputSidebarTab === "project"
-                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 border-emerald-400/20"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent"
-                            }`}
-                          onClick={() => setInputSidebarTab("project")}
-                          role="tab"
-                          aria-selected={inputSidebarTab === "project"}
-                        >
-                          Project Drafts
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className={`h-8 text-xs font-semibold rounded-lg transition-all duration-200 border ${inputSidebarTab === "jd"
-                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-950/40 hover:from-emerald-400 hover:to-teal-400 border-emerald-400/20"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent"
-                            }`}
-                          onClick={() => setInputSidebarTab("jd")}
-                          role="tab"
-                          aria-selected={inputSidebarTab === "jd"}
-                        >
-                          Job Description
-                        </Button>
+                  <div className="h-full flex flex-col min-h-0 bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 border border-slate-750 shadow-2xl rounded-2xl p-4 overflow-y-auto space-y-3.5 backdrop-blur-md">
+                    <JdInputPanel
+                      companyName={companyName}
+                      role={role}
+                      jd={jd}
+                      onCompanyNameChange={handleCompanyNameChange}
+                      onRoleChange={handleRoleChange}
+                      onJdChange={setJd}
+                      project={projectDraft}
+                      projects={projectDrafts}
+                      onProjectChange={updateProjectDraft}
+                      onProjectsChange={applyProjectDrafts}
+                      onSaveProjects={saveProjectDrafts}
+                      onDeleteProject={deleteProjectDraft}
+                      onInsertProject={insertProject}
+                      onInsertSingleProject={insertSingleProject}
+                      onAtsScore={runJobMatch}
+                      onAiTailor={requestSuggestions}
+                      isAiTailorLoading={suggesting}
+                      rankedProjects={rankedProjects}
+                      onRankedProjectsChange={setRankedProjects}
+                      llmProvider={llmProvider}
+                      llmModel={llmModel}
+                      apiKey={
+                        llmProvider === "gemini"
+                          ? geminiApiKey
+                          : llmProvider === "groq"
+                          ? groqApiKey
+                          : claudeApiKey
+                      }
+                      insertLabel="INSERT PROJECT"
+                    />
+
+                    {/* Compact Project Ranking summary shown after AI tailoring */}
+                    {rankedProjects.length > 0 && (
+                      <div className="pt-2 border-t border-slate-800">
+                        <ProjectRankingPanel
+                          rankedProjects={rankedProjects}
+                          compact
+                        />
                       </div>
-
-                      <AnimatePresence mode="wait">
-                        {inputSidebarTab === "project" ? (
-                          <motion.div
-                            key="project"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            transition={{ duration: 0.2, ease: "easeInOut" }}
-                            className="w-full"
-                          >
-                            <LatexProjectFields
-                              project={projectDraft}
-                              projects={projectDrafts}
-                              onProjectChange={updateProjectDraft}
-                              onProjectsChange={applyProjectDrafts}
-                              onSaveProjects={saveProjectDrafts}
-                              onDeleteProject={deleteProjectDraft}
-                              onInsertProject={insertProject}
-                              onInsertSingleProject={insertSingleProject}
-                            />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            key="jd"
-                            initial={{ opacity: 0, x: 10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -10 }}
-                            transition={{ duration: 0.2, ease: "easeInOut" }}
-                            className="w-full"
-                          >
-                            <div className="w-full space-y-4 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4 shadow-xl backdrop-blur-md">
-                              <div className="space-y-2">
-                                <Label htmlFor="companyRole" className="text-xs font-bold uppercase tracking-wider text-emerald-400">Company name & role</Label>
-                                <Input
-                                  id="companyRole"
-                                  value={companyRole}
-                                  onChange={(event) => setCompanyRole(event.target.value)}
-                                  placeholder="e.g. Google - Senior Frontend Engineer"
-                                  maxLength={COMPANY_ROLE_LIMIT}
-                                  className="h-10 bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs"
-                                />
-                                <FieldCounter value={companyRole.length} max={COMPANY_ROLE_LIMIT} />
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="jd" className="text-xs font-bold uppercase tracking-wider text-emerald-400">Job Description (JD)</Label>
-                                <Textarea
-                                  id="jd"
-                                  value={jd}
-                                  onChange={(event) => setJd(event.target.value)}
-                                  placeholder="Paste the job description here to tailor your resume perfectly..."
-                                  className="min-h-[160px] bg-slate-950/60 border-slate-700/60 text-slate-100 placeholder-slate-500 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 focus:border-emerald-500 rounded-lg shadow-inner transition-all duration-200 text-xs leading-relaxed"
-                                  maxLength={JD_LIMIT}
-                                />
-                                <FieldCounter value={jd.length} max={JD_LIMIT} />
-                              </div>
-
-                              <div className="btn-wrapper group relative flex w-full items-center justify-center py-4">
-                                <style>{`
-                              .btn-wrapper {
-                                --dot-size: 8px;
-                                --line-weight: 1px;
-                                --line-distance: 0.8rem 1rem;
-                                --animation-speed: 2s;
-                                --dot-color: #10b981;
-                                --line-color: #34d399;
-                                --grid-color: rgba(16, 185, 129, 0.05);
-                              }
-
-                              .btn-wrapper::after {
-                                content: "";
-                                position: absolute;
-                                inset: 0.5rem;
-                                border-radius: 8px;
-                                pointer-events: none;
-                                background-image: repeating-linear-gradient(45deg, var(--grid-color) 0 1px, transparent 2px 5px);
-                                z-index: -1;
-                                animation: grid-opacity 4s ease-in-out infinite;
-                              }
-
-                              @keyframes grid-opacity {
-                                0%, 100% { opacity: 0.2; }
-                                50% { opacity: 0.6; }
-                              }
-
-                              .btn-wrapper .btn {
-                                position: relative;
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                width: 100%;
-                                padding: 0.9rem 1.5rem;
-                                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                                border: 1px solid rgba(52, 211, 153, 0.2);
-                                color: #fff;
-                                font-family: inherit;
-                                font-size: 0.875rem;
-                                font-weight: 600;
-                                border-radius: 8px;
-                                cursor: pointer;
-                                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                                z-index: 10;
-                                box-shadow: 0 4px 20px 0 rgba(16, 185, 129, 0.3);
-                                text-transform: uppercase;
-                                letter-spacing: 0.05em;
-                              }
-
-                              .btn-wrapper .btn:hover:not(:disabled) {
-                                transform: translateY(-2px);
-                                background: linear-gradient(135deg, #059669 0%, #047857 100%);
-                                box-shadow: 0 8px 25px rgba(5, 150, 105, 0.4);
-                                border-color: rgba(52, 211, 153, 0.4);
-                              }
-
-                              .btn-wrapper .btn:active:not(:disabled) {
-                                transform: scale(0.98);
-                              }
-
-                              .btn-wrapper .btn:disabled {
-                                background: #334155;
-                                color: #64748b;
-                                border-color: #1e293b;
-                                box-shadow: none;
-                                cursor: not-allowed;
-                              }
-
-                              .btn-wrapper .btn-svg {
-                                margin-left: 0.5rem;
-                                height: 18px;
-                                width: 18px;
-                                stroke-width: 1.5;
-                                stroke: currentColor;
-                                fill: rgba(255, 255, 255, 0.2);
-                              }
-
-                              .btn-wrapper .dot {
-                                position: absolute;
-                                width: var(--dot-size);
-                                height: var(--dot-size);
-                                border-radius: 2px;
-                                background-color: var(--dot-color);
-                                opacity: 0;
-                                z-index: 5;
-                              }
-
-                              .btn-wrapper .dot.top.left { animation: move-top-left var(--animation-speed) ease-in-out infinite; }
-                              .btn-wrapper .dot.top.right { animation: move-top-right var(--animation-speed) ease-in-out infinite; animation-delay: 0.5s; }
-                              .btn-wrapper .dot.bottom.right { animation: move-bottom-right var(--animation-speed) ease-in-out infinite; animation-delay: 1s; }
-                              .btn-wrapper .dot.bottom.left { animation: move-bottom-left var(--animation-speed) ease-in-out infinite; animation-delay: 1.5s; }
-
-                              @keyframes move-top-left {
-                                0% { top: 50%; left: 50%; opacity: 0; transform: scale(0); }
-                                20% { opacity: 0.8; }
-                                100% { top: 0; left: 0; opacity: 0; transform: scale(1); }
-                              }
-                              @keyframes move-top-right {
-                                0% { top: 50%; right: 50%; opacity: 0; transform: scale(0); }
-                                20% { opacity: 0.8; }
-                                100% { top: 0; right: 0; opacity: 0; transform: scale(1); }
-                              }
-                              @keyframes move-bottom-right {
-                                0% { bottom: 50%; right: 50%; opacity: 0; transform: scale(0); }
-                                20% { opacity: 0.8; }
-                                100% { bottom: 0; right: 0; opacity: 0; transform: scale(1); }
-                              }
-                              @keyframes move-bottom-left {
-                                0% { bottom: 50%; left: 50%; opacity: 0; transform: scale(0); }
-                                20% { opacity: 0.8; }
-                                100% { bottom: 0; left: 0; opacity: 0; transform: scale(1); }
-                              }
-
-                              .btn-wrapper .line {
-                                position: absolute;
-                                background-color: var(--line-color);
-                                opacity: 0;
-                                z-index: 5;
-                              }
-
-                              .btn-wrapper .line.horizontal {
-                                height: var(--line-weight);
-                                width: 100%;
-                                background-image: repeating-linear-gradient(90deg, transparent 0 4px, var(--line-color) 4px 8px);
-                              }
-
-                              .btn-wrapper .line.vertical {
-                                width: var(--line-weight);
-                                height: 100%;
-                                background-image: repeating-linear-gradient(0deg, transparent 0 4px, var(--line-color) 4px 8px);
-                              }
-
-                              .btn-wrapper .line.top { top: 0.5rem; animation: draw-h var(--animation-speed) linear infinite; }
-                              .btn-wrapper .line.bottom { bottom: 0.5rem; animation: draw-h var(--animation-speed) linear infinite; animation-delay: 1s; }
-                              .btn-wrapper .line.left { left: 0.5rem; animation: draw-v var(--animation-speed) linear infinite; animation-delay: 1.5s; }
-                              .btn-wrapper .line.right { right: 0.5rem; animation: draw-v var(--animation-speed) linear infinite; animation-delay: 0.5s; }
-
-                              @keyframes draw-h {
-                                0%, 100% { transform: scaleX(0); opacity: 0; }
-                                50% { transform: scaleX(1); opacity: 0.5; }
-                              }
-                              @keyframes draw-v {
-                                0%, 100% { transform: scaleY(0); opacity: 0; }
-                                50% { transform: scaleY(1); opacity: 0.5; }
-                              }
-
-                              .btn:disabled ~ .dot,
-                              .btn:disabled ~ .line {
-                                display: none;
-                              }
-                            `}</style>
-
-                                <div className="line horizontal top"></div>
-                                <div className="line vertical right"></div>
-                                <div className="line horizontal bottom"></div>
-                                <div className="line vertical left"></div>
-
-                                <div className="dot top left"></div>
-                                <div className="dot top right"></div>
-                                <div className="dot bottom right"></div>
-                                <div className="dot bottom left"></div>
-
-                                {suggesting ? (
-                                  <button
-                                    type="button"
-                                    className="btn"
-                                    onClick={cancelSuggestions}
-                                  >
-                                    <X className="mr-2 h-4 w-4" />
-                                    Cancel
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="btn"
-                                    disabled={!canSubmit}
-                                    onClick={requestSuggestions}
-                                  >
-                                    <svg className="btn-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M17.6744 11.4075L15.7691 17.1233C15.7072 17.309 15.5586 17.4529 15.3709 17.5087L3.69348 20.9803C3.22819 21.1186 2.79978 20.676 2.95328 20.2155L6.74467 8.84131C6.79981 8.67588 6.92419 8.54263 7.08543 8.47624L12.472 6.25822C12.696 6.166 12.9535 6.21749 13.1248 6.38876L17.5294 10.7935C17.6901 10.9542 17.7463 11.1919 17.6744 11.4075Z" />
-                                      <path d="M3.2959 20.6016L9.65986 14.2376" />
-                                      <path d="M17.7917 11.0557L20.6202 8.22724C21.4012 7.44619 21.4012 6.17986 20.6202 5.39881L18.4989 3.27749C17.7178 2.49645 16.4515 2.49645 15.6704 3.27749L12.842 6.10592" />
-                                      <path d="M11.7814 12.1163C11.1956 11.5305 10.2458 11.5305 9.66004 12.1163C9.07426 12.7021 9.07426 13.6519 9.66004 14.2376C10.2458 14.8234 11.1956 14.8234 11.7814 14.2376C12.3671 13.6519 12.3671 12.7021 11.7814 12.1163Z" />
-                                    </svg>
-                                    Suggest resume changes
-                                  </button>
-                                )}
-                              </div>
-
-                              {/* Job Matching & ATS Score button */}
-                              <div className="pt-1">
-                                <button
-                                  id="job-match-btn"
-                                  type="button"
-                                  disabled={!canJobMatch}
-                                  onClick={runJobMatch}
-                                  className="group relative flex w-full items-center justify-center gap-2 rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 px-4 py-3 text-xs font-bold uppercase tracking-widest text-blue-300 shadow-lg shadow-blue-900/20 transition-all duration-300 hover:from-blue-600/35 hover:to-indigo-600/35 hover:border-blue-400/50 hover:text-blue-200 hover:shadow-blue-700/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:from-blue-600/20 disabled:hover:to-indigo-600/20"
-                                >
-                                  <svg className="h-4 w-4 transition-transform group-hover:rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                                    <circle cx="11" cy="11" r="8" />
-                                    <circle cx="11" cy="11" r="4" />
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                  </svg>
-                                  Job Matching &amp; ATS Score
-                                </button>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
                 </motion.aside>
               )}
             </AnimatePresence>

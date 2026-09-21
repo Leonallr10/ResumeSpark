@@ -11,6 +11,7 @@ export async function generateWithGemini(
   prompt: string,
   preferredModel?: string,
   jsonSchema?: Record<string, unknown>,
+  systemInstruction?: string,
 ): Promise<string> {
   const ai = new GoogleGenAI({ apiKey });
   const delaysMs = [1000, 2000];
@@ -27,6 +28,7 @@ export async function generateWithGemini(
           model,
           contents: prompt,
           config: {
+            systemInstruction: systemInstruction || undefined,
             responseMimeType: "application/json",
             responseJsonSchema: jsonSchema,
             temperature: 0.25,

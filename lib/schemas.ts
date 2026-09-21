@@ -81,10 +81,26 @@ export const sectionReviewSchema = z.object({
   summary: z.string().min(1),
 });
 
+export const projectRankingItemSchema = z.object({
+  projectId: z.string(),
+  relevanceScore: z.coerce.number().min(0).max(100),
+  matchedSkills: z.array(z.string()).default([]),
+  reason: z.string().default(""),
+});
+
+export type ProjectRankingItem = z.infer<typeof projectRankingItemSchema>;
+
+export const projectRankingResponseSchema = z.object({
+  rankedProjects: z.array(projectRankingItemSchema),
+});
+
+export type ProjectRankingResponse = z.infer<typeof projectRankingResponseSchema>;
+
 export const suggestionResponseSchema = z.object({
   companyTone: companyToneSchema.optional().default("startup"),
   suggestions: z.array(aiSuggestionSchema),
   sectionReviews: z.array(sectionReviewSchema),
+  rankedProjects: z.array(projectRankingItemSchema).optional(),
 });
 
 export const polishRequestSchema = z.object({
@@ -94,3 +110,21 @@ export const polishRequestSchema = z.object({
   model: z.string().min(1).max(120).optional(),
   apiKey: z.string().min(1).max(500).optional(),
 });
+
+export const projectRankingRequestSchema = z.object({
+  jd: z.string().min(1),
+  projects: z.array(
+    z.object({
+      projectId: z.string(),
+      title: z.string(),
+      techStack: z.union([z.string(), z.array(z.string())]),
+      summary: z.string(),
+    }),
+  ).min(1),
+  provider: llmProviderSchema.default("gemini"),
+  model: z.string().optional(),
+  apiKey: z.string().optional(),
+});
+
+export type ProjectRankingRequest = z.infer<typeof projectRankingRequestSchema>;
+

@@ -76,10 +76,13 @@ export type SectionReview = {
 
 export type CompanyTone = "startup" | "faang" | "ai_lab" | "enterprise" | "unknown";
 
+import type { ProjectRankingItem } from "@/lib/schemas";
+
 export type SuggestionResponse = {
   companyTone?: CompanyTone;
   suggestions: AiSuggestion[];
   sectionReviews: SectionReview[];
+  rankedProjects?: ProjectRankingItem[];
 };
 
 export type LlmProvider = "gemini" | "groq" | "claude";

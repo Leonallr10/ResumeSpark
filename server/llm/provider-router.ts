@@ -16,8 +16,9 @@ export async function executeLlmGeneration(params: {
   apiKey?: string;
   model?: string;
   jsonSchema?: Record<string, unknown>;
+  systemInstruction?: string;
 }): Promise<string> {
-  const { provider, prompt, apiKey, model, jsonSchema } = params;
+  const { provider, prompt, apiKey, model, jsonSchema, systemInstruction } = params;
 
   if (provider === "ollama") {
     return generateWithOllama(prompt, model);
@@ -29,12 +30,12 @@ export async function executeLlmGeneration(params: {
   }
 
   if (provider === "groq") {
-    return generateWithGroq(resolvedApiKey, prompt, model);
+    return generateWithGroq(resolvedApiKey, prompt, model, systemInstruction);
   }
 
   if (provider === "claude") {
-    return generateWithClaude(resolvedApiKey, prompt, model);
+    return generateWithClaude(resolvedApiKey, prompt, model, systemInstruction);
   }
 
-  return generateWithGemini(resolvedApiKey, prompt, model, jsonSchema);
+  return generateWithGemini(resolvedApiKey, prompt, model, jsonSchema, systemInstruction);
 }
