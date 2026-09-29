@@ -1,7 +1,8 @@
 "use client";
 
+import { useRef, useState, type DragEvent } from "react";
 import { motion } from "framer-motion";
-import { Check, Sparkles, Star, ShieldCheck, ArrowRight, FileText } from "lucide-react";
+import { Check, Sparkles, Star, ShieldCheck, ArrowRight, FileText, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,17 +11,44 @@ import { TEMPLATE_REGISTRY } from "@/lib/templates/registry";
 interface PdfTemplateGalleryProps {
   selectedTemplateId: string;
   onSelectTemplate: (templateId: string) => void;
+  onUploadClick?: () => void;
+  onUploadFile?: (file: File) => void;
 }
 
 export function PdfTemplateGallery({
   selectedTemplateId,
   onSelectTemplate,
+  onUploadClick,
+  onUploadFile,
 }: PdfTemplateGalleryProps) {
   const templates = Object.values(TEMPLATE_REGISTRY);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleFilePicked = (file: File) => {
+    if (onUploadFile) {
+      onUploadFile(file);
+    } else if (onUploadClick) {
+      onUploadClick();
+    }
+  };
 
   return (
     <div className="w-full max-w-6xl mx-auto py-8 px-4">
-      <div className="text-center mb-8">
+      {/* Hidden file input for direct upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFilePicked(file);
+          e.target.value = "";
+        }}
+      />
+
+      <div className="text-center mb-6">
         <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 mb-3 px-3 py-1 font-medium">
           <Sparkles className="w-3.5 h-3.5 mr-1.5 inline" /> Pure HTML/CSS PDF Templates
         </Badge>
@@ -30,6 +58,52 @@ export function PdfTemplateGallery({
         <p className="text-muted-foreground mt-2 max-w-xl mx-auto text-sm">
           Select from ATS-optimized templates modeled directly after academic LaTeX standards and modern tech formats. Instant re-rendering with zero compile latency.
         </p>
+
+        {/* Upload Existing Resume Banner / Option */}
+        {(onUploadClick || onUploadFile) && (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e: DragEvent<HTMLDivElement>) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) handleFilePicked(file);
+            }}
+            className={`mt-6 max-w-2xl mx-auto p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg ${
+              isDragging
+                ? "border-violet-400 bg-violet-500/20 scale-[1.01] shadow-violet-500/30"
+                : "border-violet-500/30 bg-gradient-to-r from-violet-950/40 via-slate-900/60 to-violet-950/40 shadow-violet-950/20 hover:border-violet-500/50"
+            }`}
+          >
+            <div className="flex items-center gap-3 text-left">
+              <div className="p-2.5 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 shrink-0">
+                <Upload className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                  Already have a resume?
+                  <Badge variant="outline" className="text-[10px] text-violet-300 border-violet-500/30 bg-violet-500/10 py-0">
+                    Any Format
+                  </Badge>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Upload your existing PDF, Word DOCX, or image to extract and auto-fill into Classic Traditional or any curated template.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              size="sm"
+              className="bg-violet-600 hover:bg-violet-500 text-white font-medium shrink-0 gap-1.5 shadow-md shadow-violet-600/20 cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" /> Upload Resume PDF
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

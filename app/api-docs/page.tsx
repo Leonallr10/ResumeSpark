@@ -4,7 +4,6 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-  ArrowLeft,
   CheckCircle,
   ChevronDown,
   ChevronRight,
@@ -16,6 +15,9 @@ import {
   Server,
   Zap,
 } from "lucide-react";
+
+import { ThemeToggle } from "@/components/theme-toggle";
+import { StudioBackButton } from "@/components/studio-back-button";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -321,24 +323,21 @@ export default function ApiDocsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 border-b border-emerald-500/10 bg-black/90 backdrop-blur-xl">
+      <nav className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-xl font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">
-                AURABIO
-              </span>
+            <Link href="/" className="text-xl font-bold tracking-tight text-primary">
+              AURABIO
             </Link>
-            <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
+            <span className="rounded-md border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               API Docs
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-400">
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to Home
-            </Link>
+            <ThemeToggle />
+            <StudioBackButton href="/" label="Home" title="Back to Home" />
           </div>
         </div>
       </nav>
@@ -346,17 +345,17 @@ export default function ApiDocsPage() {
       <div className="mx-auto max-w-7xl px-6 py-12">
         {/* Header */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" className="mb-12">
-          <h1 className="mb-4 text-4xl font-bold">
-            API <span className="text-emerald-400">Reference</span>
+          <h1 className="mb-4 text-4xl font-bold text-foreground">
+            API <span className="text-primary">Reference</span>
           </h1>
-          <p className="max-w-2xl text-gray-400">
+          <p className="max-w-2xl text-muted-foreground">
             Complete documentation for the AURABIO REST API. Integrate resume tailoring, portfolio generation, and deployment into your workflow.
           </p>
           <div className="mt-6 flex flex-wrap gap-4">
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-500/15 bg-emerald-500/5 px-4 py-2 text-sm">
-              <Server className="h-4 w-4 text-emerald-400" />
-              <span className="text-gray-400">Base URL:</span>
-              <code className="text-emerald-300">https://resume-spark-lake.vercel.app</code>
+            <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2 text-sm">
+              <Server className="h-4 w-4 text-primary" />
+              <span className="text-muted-foreground">Base URL:</span>
+              <code className="text-primary">https://resume-spark-lake.vercel.app</code>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/15 bg-emerald-500/5 px-4 py-2 text-sm">
               <Key className="h-4 w-4 text-emerald-400" />

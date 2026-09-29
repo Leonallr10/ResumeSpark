@@ -1582,36 +1582,62 @@ CodeMirror 6 extension for inline text polishing via tooltip menu.
 
 ---
 
-## PDF Pipeline
+## Resume Upload Pipeline ("Any Resume In, My Template Out")
 
-### Extraction (Upload)
+The app allows uploading any resume in any format or layout (**PDF**, **DOCX**, or **scanned image**), converts its contents into structured JSON (`ResumeDocumentModel`), provides an editable section-by-section review form, and renders it directly into the Classic Traditional LaTeX template (`template1-classic-traditional.tex`) for live preview and PDF export.
 
-Uses `pdfjs-dist` to extract text and positioning from uploaded PDF resumes:
+### Pipeline Architecture (In Order)
 
-1. Load PDF document via `pdfjsLib.getDocument()`
-2. For each page, get text content items with transforms
-3. Group items into lines by vertical position (Y-coordinate tolerance)
-4. Sort lines top-to-bottom, items within lines left-to-right
-5. Detect section boundaries (large/bold text, ALL CAPS headings)
-6. Map PDF fonts to web font families (e.g., "TimesNewRoman-Bold" → "Times New Roman", weight 700)
-7. Calculate layout metadata: x, y, width, height, fontSize, fontWeight, textAlign
-
-### Compilation (Download)
-
-1. **Normalization** — Before compilation, LaTeX is adjusted per engine:
-   - For XeTeX/Tectonic: strips `\usepackage[T1]{fontenc}`, adjusts font commands
-   - For all: wraps bare URLs in `\url{}` commands
-
-2. **Execution** — Spawns compiler as child process with:
-   - Working directory: `tmp/latex-compile/<uuid>/`
-   - Timeout: 60s (tectonic) to 120s (pdflatex/xelatex)
-   - Two passes for pdflatex (cross-reference resolution)
-
-3. **Caching** — Compiled PDFs stored in-memory with 30-minute TTL for preview access
-
-4. **Cloud Fallback** — When no local compiler exists:
-   - Sends LaTeX source to texlive.net API
-   - Returns compiled PDF directly
+```
+Upload (PDF / DOCX / Image ≤ 5 MB)
+       │
+       ▼
+SHA-256 Buffer Hash ───▶ [Match in Cache?] ──(YES)──▶ Instant Model Return (0ms)
+       │ (NO)
+       ▼
+Step 1: Text & Content Extraction
+  ├── PDF: pdfjs-dist with multi-column gutter scanning (prevents horizontal column interleaving)
+  ├── DOCX: mammoth extractRawText
+  └── Image: base64 payload to Gemini Vision OCR
+       │
+       ▼
+Step 2: Clean Text
+  ├── Strip standalone page numbers ("Page 1 of 3", "12")
+  ├── Collapse runs of multiple blank lines & horizontal whitespace
+  └── Detect garbled / scanned text (<200 chars or >20% non-ASCII) → OCR fallback
+       │
+       ▼
+Step 3: Regex Contact Pass
+  ├── Direct regex extraction: email, phone, LinkedIn, GitHub
+  └── Stored separately to guarantee zero LLM hallucination for contacts
+       │
+       ▼
+Step 4: Structured LLM Extraction
+  ├── Endpoint: POST /api/resume/upload-parse (or /api/resume/parse)
+  ├── Model: Gemini 2.0 Flash Lite (temperature 0.1, responseMimeType: application/json)
+  └── Schema: ResumeDocumentModel JSON specification
+       │
+       ▼
+Step 5: Zod Validation with Single Retry
+  ├── Validated via resumeDocumentModelSchema.safeParse()
+  └── On validation failure: passes error back to Gemini with one retry prompt to fix exact schema errors
+       │
+       ▼
+Step 6: Regex Override & Grounding
+  ├── Overwrites personalInfo email, phone, linkedin, github with non-empty regex values
+  └── Validates text entries against original source
+       │
+       ▼
+Step 7: Cache & Return
+  ├── Stores result in memory keyed by SHA-256 hash (30-minute TTL)
+  └── Returns { model, cached, confidence, hash }
+       │
+       ▼
+Step 8: Review & Render UI
+  ├── Editable form in Left Panel (Full Name, Contact, Experience, Education, Skills, Projects, Achievements)
+  ├── Live compilation to LaTeX via renderTemplate1Latex()
+  └── Instant PDF recompile & download via /api/resume/compile-latex
+```
 
 ---
 
@@ -1619,6 +1645,7 @@ Uses `pdfjs-dist` to extract text and positioning from uploaded PDF resumes:
 
 | Cache | Location | TTL | Purpose |
 |-------|----------|-----|---------|
+| Resume Parse Cache | In-memory (server) | 30 minutes | Keyed by SHA-256 file hash to prevent double parsing of identical uploads |
 | PDF Preview | In-memory (server) | 30 minutes | Serve compiled PDFs via `/preview/[id]` without recompilation |
 | SyncTeX Data | In-memory (server) | 30 minutes | Co-located with PDF cache entry, served via `/synctex/[id]` |
 | SyncTeX Mapping | In-memory (client) | Session | Parsed `SynctexMapping` struct for forward/inverse sync lookups |

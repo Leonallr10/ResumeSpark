@@ -18,6 +18,9 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Upload,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { StudioBackButton } from "@/components/studio-back-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 import {
   type ResumeDocumentModel,
@@ -48,6 +53,7 @@ import { emptyProjectDraft } from "@/components/latex-project-fields";
 import { canInsertProject, type ProjectDraft } from "@/lib/latex-resume";
 import type { AiSuggestion, SuggestionResponse, LlmProvider } from "@/types/resume";
 import type { ProjectRankingItem } from "@/lib/schemas";
+import { ResumeUploadPanel } from "./resume-upload-panel";
 
 const PDF_STORAGE_KEY = "resume_pdf_document_model_v1";
 const LATEX_STORAGE_KEY = "resume_latex_source_v1";
@@ -64,6 +70,8 @@ export function PdfTemplateEditor() {
   const [isCompilingPdf, setIsCompilingPdf] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiDrawer, setShowAiDrawer] = useState(false);
+  const [showUploadPanel, setShowUploadPanel] = useState(false);
+  const [uploadInitialFile, setUploadInitialFile] = useState<File | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [role, setRole] = useState("Software Engineer / AI Engineer");
   const [targetCompanyRole, setTargetCompanyRole] = useState("Software Engineer / AI Engineer");
@@ -483,11 +491,17 @@ export function PdfTemplateEditor() {
       {/* Top Header */}
       <header className="no-print print:hidden h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 flex items-center justify-between z-30 sticky top-0">
         <div className="flex items-center gap-3">
+          <StudioBackButton
+            href="/resume-generator"
+            label="Back"
+            title="Back to Resume Studio"
+            className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+          />
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
               <FileText className="w-4 h-4" />
             </div>
-            <span className="font-bold text-sm tracking-tight text-white">ResumeSpark</span>
+            <span className="font-bold text-sm tracking-tight text-white">AURABIO</span>
           </div>
 
           <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
@@ -511,6 +525,7 @@ export function PdfTemplateEditor() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
+          <ThemeToggle className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white" />
           {/* Mode Switch Tabs */}
           <div className="bg-slate-800/80 p-0.5 rounded-lg border border-slate-700 flex items-center text-xs">
             <button
@@ -539,6 +554,26 @@ export function PdfTemplateEditor() {
           >
             <Code2 className="w-3.5 h-3.5 text-indigo-200" /> Switch to LaTeX
           </Button>
+          {/*
+          Upload Resume Button
+          <Button
+            size="sm"
+            onClick={() => {
+              if (activeTab === "gallery") {
+                setActiveTab("editor");
+                setShowUploadPanel(true);
+              } else {
+                setShowUploadPanel((v) => !v);
+              }
+            }}
+            className={`h-8 text-xs gap-1.5 shadow-sm border ${
+              showUploadPanel && activeTab === "editor"
+                ? "bg-violet-600 hover:bg-violet-500 text-white border-violet-500/40"
+                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
+            }`}
+          >
+            <Upload className="w-3.5 h-3.5 text-violet-400" /> Upload Resume
+          </Button> */}
 
           {/* AI Tailor Button */}
           <Button
@@ -570,6 +605,15 @@ export function PdfTemplateEditor() {
               setActiveTab("editor");
               toast.success(`Switched to ${TEMPLATE_REGISTRY[tplId]?.name || "template"}`);
             }}
+            onUploadClick={() => {
+              setActiveTab("editor");
+              setShowUploadPanel(true);
+            }}
+            onUploadFile={(file) => {
+              setUploadInitialFile(file);
+              setActiveTab("editor");
+              setShowUploadPanel(true);
+            }}
           />
         </div>
       ) : (
@@ -584,6 +628,43 @@ export function PdfTemplateEditor() {
               <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/20">
                 <ShieldCheck className="w-3 h-3 mr-1 inline" /> Auto-Saved
               </Badge>
+            </div>
+
+            {/* ─── Upload Resume Panel ──────────────────────────── */}
+            <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 overflow-hidden">
+              <button
+                onClick={() => setShowUploadPanel((v) => !v)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold text-violet-300 hover:bg-violet-500/10 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Upload className="w-3.5 h-3.5" />
+                  Upload Resume (PDF, DOCX, Image)
+                  <span className="text-[10px] text-violet-400/60 font-normal">— fill from any template</span>
+                </span>
+                {showUploadPanel ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-violet-400" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-violet-400" />
+                )}
+              </button>
+
+              {showUploadPanel && (
+                <div className="px-3.5 pb-4 pt-1">
+                  <ResumeUploadPanel
+                    initialFile={uploadInitialFile}
+                    onModelLoaded={(uploaded) => {
+                      saveModel({ ...uploaded, templateId: "template-1" });
+                      setShowUploadPanel(false);
+                      setUploadInitialFile(null);
+                      toast.success("Resume loaded into Classic Traditional template!");
+                    }}
+                    onClose={() => {
+                      setShowUploadPanel(false);
+                      setUploadInitialFile(null);
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 1. Personal Info */}
@@ -1571,7 +1652,7 @@ export function PdfTemplateEditor() {
                 >
                   HTML Live
                 </button>
-                <button
+                {/* <button
                   onClick={() => {
                     if (!pdfArrayBuffer) {
                       void handleCompileLatexPdf();
@@ -1592,7 +1673,7 @@ export function PdfTemplateEditor() {
                     <FileText className="w-3 h-3 inline mr-1 text-emerald-400" />
                   )}
                   Compiled PDF
-                </button>
+                </button> */}
               </div>
 
               {/* Dedicated Recompile button in preview toolbar */}

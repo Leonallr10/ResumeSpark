@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-  ArrowLeft,
   Copy,
   Mail,
   Loader2,
@@ -13,6 +12,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { LlmProvider } from "@/types/resume";
+import { StudioBackButton } from "@/components/studio-back-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -126,56 +127,49 @@ export default function ColdMailGenerator() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col overflow-hidden">
-      <nav className="sticky top-0 z-40 border-b border-emerald-500/10 bg-black/80 backdrop-blur-xl shrink-0">
+    <div className="flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
+      <nav className="sticky top-0 z-40 shrink-0 border-b border-border bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">
-              AURABIO
-            </span>
+          <Link href="/" className="text-xl font-bold tracking-tight text-primary">
+            AURABIO
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {!llmConfig ? (
-               <Link
-               href="/api-key"
-               className="flex items-center gap-1.5 rounded-lg bg-red-500/20 border border-red-500/50 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/30"
-             >
-               <AlertTriangle className="h-3.5 w-3.5" />
-               Missing API Key
-             </Link>
+              <Link
+                href="/api-key"
+                className="flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Missing API Key
+              </Link>
             ) : (
               <Link
                 href="/api-key"
-                className="flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
               >
                 <KeyRound className="h-3.5 w-3.5" />
                 {llmConfig.provider.toUpperCase()} Ready
               </Link>
             )}
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-400"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back Home
-            </Link>
+            <ThemeToggle />
+            <StudioBackButton href="/" label="Home" title="Back to Home" />
           </div>
         </div>
       </nav>
 
       <main className="flex-1 overflow-hidden flex flex-col md:flex-row relative">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -left-40 top-1/4 h-[600px] w-[600px] rounded-full bg-emerald-500/5 blur-[150px]" />
-          <div className="absolute -right-40 bottom-1/4 h-[500px] w-[500px] rounded-full bg-emerald-400/5 blur-[120px]" />
+          <div className="absolute -left-40 top-1/4 h-[600px] w-[600px] rounded-full bg-primary/5 blur-[150px]" />
+          <div className="absolute -right-40 bottom-1/4 h-[500px] w-[500px] rounded-full bg-primary/5 blur-[120px]" />
         </div>
 
-        <div className="w-full md:w-1/2 lg:w-[45%] h-full overflow-y-auto border-r border-emerald-500/10 p-6 lg:p-8 z-10 custom-scrollbar pb-24 md:pb-8">
+        <div className="w-full md:w-1/2 lg:w-[45%] h-full overflow-y-auto border-r border-border p-6 lg:p-8 z-10 custom-scrollbar pb-24 md:pb-8">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
             <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-              <Mail className="h-6 w-6 text-emerald-400" />
+              <Mail className="h-6 w-6 text-primary" />
               Cold Mail Generator
             </h1>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Fill in your details and the job description to generate a highly effective cold email.
             </p>
           </motion.div>
@@ -190,63 +184,63 @@ export default function ColdMailGenerator() {
           <div className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Receiver Name (Optional)</label>
-                <input type="text" name="receiverName" value={formData.receiverName} onChange={handleChange} placeholder="e.g. John Doe" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Receiver Name (Optional)</label>
+                <input type="text" name="receiverName" value={formData.receiverName} onChange={handleChange} placeholder="e.g. John Doe" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Company Name *</label>
-                <input type="text" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="e.g. Acme Corp" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Company Name *</label>
+                <input type="text" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="e.g. Acme Corp" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Target Role *</label>
-              <input type="text" name="role" value={formData.role} onChange={handleChange} placeholder="e.g. Frontend Engineer" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Target Role *</label>
+              <input type="text" name="role" value={formData.role} onChange={handleChange} placeholder="e.g. Frontend Engineer" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Key Skill (Optional)</label>
-              <input type="text" name="skill" value={formData.skill} onChange={handleChange} placeholder="e.g. React, Node.js" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Key Skill (Optional)</label>
+              <input type="text" name="skill" value={formData.skill} onChange={handleChange} placeholder="e.g. React, Node.js" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Experience (Optional)</label>
-              <input type="text" name="experience" value={formData.experience} onChange={handleChange} placeholder="e.g. 2 years of full-stack dev" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Experience (Optional)</label>
+              <input type="text" name="experience" value={formData.experience} onChange={handleChange} placeholder="e.g. 2 years of full-stack dev" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Key Achievement (Optional)</label>
-              <textarea name="achievement" value={formData.achievement} onChange={handleChange} placeholder="e.g. Increased conversion rate by 20%" rows={2} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30 resize-none" />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Key Achievement (Optional)</label>
+              <textarea name="achievement" value={formData.achievement} onChange={handleChange} placeholder="e.g. Increased conversion rate by 20%" rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Portfolio Link (Optional)</label>
-                <input type="url" name="portfolioLink" value={formData.portfolioLink} onChange={handleChange} placeholder="https://..." className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Portfolio Link (Optional)</label>
+                <input type="url" name="portfolioLink" value={formData.portfolioLink} onChange={handleChange} placeholder="https://..." className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Resume Link (Optional)</label>
-                <input type="url" name="resumeLink" value={formData.resumeLink} onChange={handleChange} placeholder="https://..." className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Resume Link (Optional)</label>
+                <input type="url" name="resumeLink" value={formData.resumeLink} onChange={handleChange} placeholder="https://..." className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">LinkedIn Link (Optional)</label>
-                <input type="url" name="linkedinLink" value={formData.linkedinLink} onChange={handleChange} placeholder="https://..." className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">LinkedIn Link (Optional)</label>
+                <input type="url" name="linkedinLink" value={formData.linkedinLink} onChange={handleChange} placeholder="https://..." className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">GitHub Link (Optional)</label>
-                <input type="url" name="githubLink" value={formData.githubLink} onChange={handleChange} placeholder="https://..." className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30" />
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">GitHub Link (Optional)</label>
+                <input type="url" name="githubLink" value={formData.githubLink} onChange={handleChange} placeholder="https://..." className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Job Description (Optional, but recommended)</label>
-              <textarea value={jd} onChange={(e) => setJd(e.target.value)} placeholder="Paste the JD here..." rows={4} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-400/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/30 resize-none" />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Job Description (Optional, but recommended)</label>
+              <textarea value={jd} onChange={(e) => setJd(e.target.value)} placeholder="Paste the JD here..." rows={4} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
             </div>
 
             <button
               onClick={handleGenerate}
               disabled={isGenerating || !llmConfig}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-6 py-3.5 text-sm font-semibold text-black transition-all hover:shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
             >
               {isGenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5" />}
               {isGenerating ? "Generating..." : "Generate Cold Email"}
@@ -254,19 +248,19 @@ export default function ColdMailGenerator() {
           </div>
         </div>
         {/* Right Panel: Editor */}
-        <div className="w-full md:w-1/2 lg:w-[55%] h-full flex flex-col p-6 lg:p-8 z-10 bg-[#1e1e1e]">
+        <div className="w-full md:w-1/2 lg:w-[55%] h-full flex flex-col p-6 lg:p-8 z-10 bg-muted/40">
           
-          <div className="flex-1 relative rounded-xl border border-white/10 bg-[#282a2d] flex flex-col overflow-hidden shadow-2xl">
+          <div className="flex-1 relative rounded-xl border border-border bg-card flex flex-col overflow-hidden shadow-2xl">
              
              {/* Header / Subject */}
-             <div className="flex items-center px-5 py-4 border-b border-white/5 shrink-0">
-               <span className="text-gray-400 text-sm mr-2 font-medium">Subject:</span>
+             <div className="flex items-center px-5 py-4 border-b border-border shrink-0">
+               <span className="mr-2 text-sm font-medium text-muted-foreground">Subject:</span>
                <input 
                  type="text" 
                  value={subject} 
                  onChange={(e) => setSubject(e.target.value)}
                  placeholder="Email subject will appear here..."
-                 className="bg-transparent text-white text-sm font-medium focus:outline-none flex-1"
+                 className="flex-1 bg-transparent text-sm font-medium text-foreground focus:outline-none"
                />
              </div>
              
@@ -276,7 +270,7 @@ export default function ColdMailGenerator() {
                  value={body}
                  onChange={(e) => setBody(e.target.value)}
                  placeholder="Your generated email body will appear here. You can edit it before sending."
-                 className="w-full h-full bg-transparent p-5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none resize-none leading-relaxed custom-scrollbar pb-20"
+                 className="w-full h-full bg-transparent p-5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none resize-none leading-relaxed custom-scrollbar pb-20"
                />
              </div>
              
@@ -285,16 +279,16 @@ export default function ColdMailGenerator() {
                <button
                  onClick={copyToClipboard}
                  disabled={!body && !subject}
-                 className="flex items-center justify-center w-10 h-10 rounded-md bg-[#3c4043] text-gray-300 hover:bg-[#4a4d51] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                 className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                  title="Copy to clipboard"
                >
-                 {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                 {copied ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
                </button>
                <a
                  href={`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
                  target="_blank"
                  rel="noopener noreferrer"
-                 className={`flex items-center gap-2 px-4 h-10 rounded-md bg-[#3c4043] text-gray-200 hover:bg-[#4a4d51] transition-colors text-sm font-medium ${(!body && !subject) ? 'opacity-50 pointer-events-none' : ''}`}
+                 className={`flex h-10 items-center gap-2 rounded-md border border-border bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${(!body && !subject) ? "pointer-events-none opacity-50" : ""}`}
                >
                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M2.25 7.02758V18.15C2.25 19.3926 3.25736 20.4 4.5 20.4H19.5C20.7426 20.4 21.75 19.3926 21.75 18.15V7.02758C21.75 6.43821 21.3533 5.92984 20.7937 5.76811L12.7937 3.457L12 3.22754L11.2063 3.457L3.20632 5.76811C2.6467 5.92984 2.25 6.43821 2.25 7.02758Z" fill="#EA4335"/>

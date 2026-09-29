@@ -60,7 +60,8 @@ ${bullets}
   \\itemListEnd`
       : "";
 
-    return `  \\resumeSubheading{${escapeLatex(exp.company)}}{${escapeLatex(exp.startDate)} -- ${escapeLatex(exp.endDate)}}{${escapeLatex(exp.role)}}{${escapeLatex(exp.location)}}
+    const dateRange = [exp.startDate, exp.endDate].filter(Boolean).join(" -- ");
+    return `  \\resumeSubheading{${escapeLatex(exp.company)}}{${escapeLatex(dateRange)}}{${escapeLatex(exp.role)}}{${escapeLatex(exp.location)}}
 ${bulletsBlock}`;
   }).join("\n");
 
@@ -73,7 +74,8 @@ ${experienceItems}
 
   const educationItems = education.map((edu) => {
     const degreeLine = [edu.degree, edu.field].filter(Boolean).join(", ");
-    return `  \\resumeSubheading{${escapeLatex(edu.institution)}}{${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}}{${escapeLatex(degreeLine)}}{${escapeLatex(edu.location)}}`;
+    const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(" -- ");
+    return `  \\resumeSubheading{${escapeLatex(edu.institution)}}{${escapeLatex(dateRange)}}{${escapeLatex(degreeLine)}}{${escapeLatex(edu.location)}}`;
   }).join("\n");
 
   const educationBlock = education.length > 0

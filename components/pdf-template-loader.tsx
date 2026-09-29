@@ -7,7 +7,7 @@ const PdfTemplateEditor = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
         Loading PDF Template Studio…
       </div>
     ),

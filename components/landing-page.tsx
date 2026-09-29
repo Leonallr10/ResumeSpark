@@ -1,504 +1,649 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  BarChart3,
-  Brain,
-  CheckCircle,
-  Code2,
-  Copy,
-  ExternalLink,
+  Check,
   FileText,
-  GitBranch,
   Globe,
   KeyRound,
-  Layers,
-  Lightbulb,
-  Rocket,
-  SearchCheck,
-  Sparkles,
-  Target,
-  TrendingUp,
-  Users,
-  Zap,
   Mail,
+  Menu,
+  SearchCheck,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  X,
 } from "lucide-react";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6 } },
-};
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { cn } from "@/lib/utils";
 
-const staggerContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.12 } },
-};
+const NAV_LINKS = [
+  { href: "#tools", label: "Tools" },
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#capabilities", label: "Features" },
+  { href: "/api-docs", label: "API Docs" },
+] as const;
 
-const FEATURES = [
+const TOOLS = [
   {
-    icon: Sparkles,
-    title: "AI-Powered Suggestions",
-    description: "Get intelligent, JD-aligned resume improvements powered by Claude, Gemini, and Groq LLMs with streaming responses.",
+    id: "resume",
+    name: "Resume Tailor Studio",
+    href: "/resume-generator",
+    icon: FileText,
+    badge: "Core",
+    summary:
+      "Edit LaTeX in CodeMirror 6, tailor bullets to a job description with Gemini, Claude, or Groq, polish inline, run an ATS audit, and compile with SyncTeX bidirectional PDF sync.",
+    points: [
+      "Local or cloud LaTeX compile (pdflatex, xelatex, tectonic)",
+      "PDF upload & parse into structured resume data",
+      "Fact-grounded suggestions — no fabricated metrics",
+    ],
   },
   {
-    icon: Code2,
-    title: "LaTeX Editor with SyncTeX",
-    description: "Professional-grade CodeMirror 6 editor with bidirectional PDF sync — click source to highlight PDF and vice versa.",
-  },
-  {
-    icon: Brain,
-    title: "Multi-LLM Support",
-    description: "Choose your preferred AI provider — Gemini, Claude, or Groq — for maximum flexibility and cost control.",
-  },
-  {
+    id: "portfolio",
+    name: "Portfolio Generator",
+    href: "/portfolio-generator",
     icon: Globe,
-    title: "One-Click Deploy",
-    description: "Deploy your generated portfolio directly to Netlify or Vercel with a single click. Supports redeployment.",
+    badge: "Deploy",
+    summary:
+      "Turn resume data into a single-page HTML portfolio with GitHub and LeetCode enrichments, then deploy to Vercel or Netlify in one click.",
+    points: [
+      "Live preview with committed/uncommitted recompile",
+      "GitHub contribution calendar & LeetCode stats",
+      "Personal access token deploy to Vercel or Netlify",
+    ],
   },
   {
+    id: "cold-mail",
+    name: "Cold Email Studio",
+    href: "/cold-mail-generator",
     icon: Mail,
-    title: "Cold Email Generator",
-    description: "Generate highly effective, tailored cold emails using our proven 5-part formula and multi-LLM support.",
+    badge: "Outreach",
+    summary:
+      "Generate recruiter outreach tailored to the company and role, grounded in your resume facts.",
+    points: [
+      "Role-aligned subject and body drafts",
+      "Tone options for technical outreach",
+      "Copy-ready output for your inbox",
+    ],
   },
   {
-    icon: GitBranch,
-    title: "GitHub & LeetCode Integration",
-    description: "Automatically fetch contribution stats, repos, stars, coding achievements, and streaks.",
+    id: "pdf",
+    name: "PDF Template Editor",
+    href: "/pdf-editor",
+    icon: SlidersHorizontal,
+    badge: "Visual",
+    summary:
+      "Visually edit resume templates — fonts, margins, and sections — with live PDF canvas preview.",
+    points: [
+      "Curated LaTeX templates",
+      "PDF.js high-DPI canvas rendering",
+      "Export publication-ready PDF",
+    ],
   },
-  {
-    icon: SearchCheck,
-    title: "ATS Audit & Scoring",
-    description: "Score your resume against job descriptions with section-by-section feedback and keyword matching.",
-  },
-  {
-    icon: Target,
-    title: "Text Polish Actions",
-    description: "Five polish modes — improve, elaborate, professional, concise, quantify — with real-time streaming.",
-  },
-
-];
+] as const;
 
 const STEPS = [
   {
-    step: "01",
-    title: "Sign Up & Configure",
-    description: "Create an account and add your preferred AI provider key (Gemini, Claude, or Groq).",
+    n: "01",
+    title: "Add your API key",
+    body: "Bring Gemini, Claude, or Groq keys — stored client-side in your browser.",
+    href: "/api-key",
   },
   {
-    step: "02",
-    title: "Upload or Write Resume",
-    description: "Upload an existing .tex file or start from scratch using our professional LaTeX template.",
+    n: "02",
+    title: "Load a resume or template",
+    body: "Paste LaTeX, pick a template, or upload a PDF to parse into the editor.",
+    href: "/resume-generator",
   },
   {
-    step: "03",
-    title: "AI-Powered Tailoring",
-    description: "Paste a job description and get intelligent suggestions, polishing, and ATS audit feedback.",
+    n: "03",
+    title: "Tailor to the job description",
+    body: "Paste the JD, review grounded AI suggestions, polish bullets, and audit for ATS.",
+    href: "/resume-generator",
   },
   {
-    step: "04",
-    title: "Generate Portfolio",
-    description: "Auto-extract your data into a portfolio with GitHub/LeetCode stats, then deploy with one click.",
+    n: "04",
+    title: "Export or deploy",
+    body: "Download PDF / .tex, or generate a portfolio and deploy to Vercel or Netlify.",
+    href: "/portfolio-generator",
   },
-];
+] as const;
 
-const USE_CASES = [
+const CAPABILITIES = [
   {
-    icon: Users,
-    title: "Job Seekers",
-    description: "Tailor resumes to each JD, improve bullet points, and generate personalized cold emails for recruiters.",
+    icon: FileText,
+    title: "LaTeX + SyncTeX",
+    body: "CodeMirror 6 editor with bidirectional source ↔ PDF navigation — Overleaf-style click-to-sync.",
   },
   {
-    icon: Rocket,
-    title: "Developers",
-    description: "Showcase projects with auto-generated portfolios, GitHub stats, and LeetCode achievements.",
+    icon: Sparkles,
+    title: "Multi-LLM suggestions",
+    body: "JD-aligned resume improvements via Gemini, Claude, or Groq — switch providers anytime.",
   },
   {
-    icon: BarChart3,
-    title: "Career Coaches",
-    description: "Audit client resumes, suggest improvements, and generate professional portfolios at scale.",
+    icon: ShieldCheck,
+    title: "Fact guardrails",
+    body: "Suggestions stay grounded in your experience. Polish never invents metrics or skills.",
   },
   {
-    icon: Lightbulb,
-    title: "Students & Graduates",
-    description: "Build professional presence from scratch with AI guidance and one-click portfolio deployment.",
+    icon: SearchCheck,
+    title: "ATS audit",
+    body: "Automated checks for quantified impact, repetition, and spelling — without needing a JD.",
   },
-];
+  {
+    icon: Globe,
+    title: "Portfolio deploy",
+    body: "HTML portfolio from resume data with GitHub/LeetCode stats and one-click cloud deploy.",
+  },
+  {
+    icon: Mail,
+    title: "Cold email studio",
+    body: "Recruiter outreach drafts aligned to the role and your real background.",
+  },
+] as const;
 
-const TECH_SPECS = [
-  { label: "Frontend", value: "Next.js 15, React 19, TypeScript" },
-  { label: "Editor", value: "CodeMirror 6 with LaTeX syntax" },
-  { label: "PDF Engine", value: "PDF.js with SyncTeX mapping" },
-  { label: "AI Providers", value: "Gemini, Claude (Anthropic), Groq" },
-  { label: "Auth & DB", value: "Supabase (PostgreSQL + Auth + RLS)" },
-  { label: "Styling", value: "Tailwind CSS, Framer Motion, Radix UI" },
-  { label: "Deployment", value: "Netlify & Vercel API integration" },
-  { label: "LaTeX Engines", value: "pdflatex, xelatex, tectonic, cloud" },
-];
-
-const METRICS = [
-  { value: "40%", label: "Faster resume tailoring vs manual editing" },
-  { value: "5+", label: "AI polish modes for text refinement" },
-  { value: "3", label: "LLM providers supported simultaneously" },
-  { value: "4", label: "LaTeX compilers with auto-fallback" },
-  { value: "< 2s", label: "Average PDF compilation time" },
-  { value: "1-Click", label: "Portfolio deployment to Vercel/Netlify" },
-];
+function ProductMock() {
+  return (
+    <div
+      className="relative w-full min-h-[320px] overflow-hidden rounded-lg border border-border bg-card shadow-resume lg:min-h-[420px]"
+      aria-hidden
+    >
+      <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="ml-2 font-mono text-[11px] text-muted-foreground">
+          resume.tex · SyncTeX live
+        </span>
+        <Badge variant="muted" className="ml-auto hidden font-mono sm:inline-flex">
+          Fact-guarded · Gemini
+        </Badge>
+      </div>
+      <div className="grid h-full md:grid-cols-2">
+        <div className="border-b border-border bg-[hsl(220_23%_13%)] p-5 font-mono text-[11px] leading-relaxed text-[hsl(210_20%_78%)] md:border-b-0 md:border-r lg:p-6 lg:text-[12px]">
+          <div className="mb-3 text-[10px] uppercase tracking-wider text-[hsl(173_40%_55%)]">
+            Editor · line 38
+          </div>
+          <p>
+            <span className="text-[hsl(48_70%_65%)]">\resumeSubheading</span>
+            {"{Backend Eng}"}
+            {"{2022–Present}"}
+          </p>
+          <p className="mt-3 rounded bg-[hsl(0_50%_20%/0.45)] px-2 py-1.5 text-[hsl(0_70%_78%)] line-through decoration-[hsl(0_60%_50%)]">
+            Built Redis caching that cut p99 latency by 42%.
+          </p>
+          <p className="mt-2 rounded border-l-2 border-primary bg-[hsl(173_40%_20%/0.35)] px-2 py-1.5 text-[hsl(173_45%_78%)]">
+            Engineered Redis caching for peak traffic, cutting p99 latency by{" "}
+            <span className="text-white">42%</span> — metric sourced from your resume.
+          </p>
+          <p className="mt-4 text-[10px] text-[hsl(173_40%_55%)]">
+            ✓ Ground-truth whitelist matched
+          </p>
+        </div>
+        <div className="flex flex-col bg-white p-5 text-[hsl(220_23%_13%)] lg:p-6">
+          <div className="border-b border-[hsl(210_18%_81%)] pb-2 text-center">
+            <p className="font-display text-base font-semibold tracking-wide lg:text-lg">
+              Alex Rivera
+            </p>
+            <p className="mt-0.5 text-[9px] text-[hsl(219_12%_39%)] lg:text-[10px]">
+              alex@tech.dev · github.com/alexrivera
+            </p>
+          </div>
+          <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-[hsl(173_80%_28%)]">
+            Experience
+          </p>
+          <div className="mt-1.5 flex justify-between text-[10px] font-semibold lg:text-[11px]">
+            <span>Backend Engineer</span>
+            <span className="font-normal text-[hsl(219_12%_39%)]">2022–Present</span>
+          </div>
+          <p className="mt-2 rounded-sm border-l-2 border-primary bg-[hsl(173_40%_94%)] px-2 py-1.5 text-[9px] leading-snug lg:text-[10px]">
+            Engineered Redis caching for peak traffic, cutting p99 latency by 42% — metric sourced
+            from your resume.
+          </p>
+          <div className="mt-auto flex items-center justify-between border-t border-[hsl(210_18%_88%)] pt-3 text-[9px] text-[hsl(219_12%_39%)]">
+            <span className="inline-flex items-center gap-1 text-primary">
+              <Check className="h-3 w-3" /> SyncTeX mapped
+            </span>
+            <span className="font-mono">pdflatex</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function LandingPage() {
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [activeTool, setActiveTool] = useState<(typeof TOOLS)[number]["id"]>("resume");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const current = TOOLS.find((t) => t.id === activeTool) ?? TOOLS[0];
+  const CurrentIcon = current.icon;
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-x-hidden">
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-emerald-500/10 bg-black/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">
+    <div className="landing-paper relative min-h-screen overflow-x-clip text-foreground selection:bg-primary/20">
+      <div className="landing-grain" aria-hidden />
+
+      <nav className="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 sm:px-6">
+          <Link href="/" className="flex items-center gap-2.5">
+            <Image
+              src="/aurabio-refined-logo.png"
+              alt=""
+              width={32}
+              height={32}
+              className="h-8 w-8 object-contain"
+            />
+            <span className="font-display text-xl font-semibold tracking-tight text-foreground">
               AURABIO
             </span>
           </Link>
-          <div className="hidden items-center gap-6 md:flex">
-            <a href="#features" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">Features</a>
-            <a href="#how-it-works" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">How It Works</a>
-            <a href="#tech" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">Tech</a>
-            <Link href="/api-docs" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">API Docs</Link>
+
+          <div className="hidden items-center gap-7 md:flex">
+            {NAV_LINKS.map((link) =>
+              link.href.startsWith("/") ? (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {link.label}
+                </a>
+              ),
+            )}
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/api-key"
-              className="flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
+
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="hidden sm:inline-flex" />
+            <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex">
+              <Link href="/api-key">
+                <KeyRound className="h-3.5 w-3.5" />
+                API Key
+              </Link>
+            </Button>
+            <Button size="sm" asChild className="hidden sm:inline-flex">
+              <Link href="/resume-generator">
+                Launch Studio
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+            <ThemeToggle className="sm:hidden" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              onClick={() => setMobileOpen((o) => !o)}
             >
-              <KeyRound className="h-4 w-4" />
-              API Key
-            </Link>
-            <Link href="/resume-generator" className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-emerald-400">
-              Go to App
-            </Link>
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
+
+        {mobileOpen && (
+          <div className="border-t border-border bg-background px-5 py-4 md:hidden">
+            <div className="flex flex-col gap-3">
+              {NAV_LINKS.map((link) =>
+                link.href.startsWith("/") ? (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="text-sm text-foreground"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="text-sm text-foreground"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {link.label}
+                  </a>
+                ),
+              )}
+              <Separator className="my-1" />
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/api-key" onClick={() => setMobileOpen(false)}>
+                  API Key
+                </Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href="/resume-generator" onClick={() => setMobileOpen(false)}>
+                  Launch Studio
+                </Link>
+              </Button>
+            </div>
+          </div>
+        )}
       </nav>
 
-      {/* 1. Hero / Cover Section */}
-      <section className="relative flex min-h-screen items-center justify-center px-6 pt-20">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -left-40 top-1/4 h-[600px] w-[600px] rounded-full bg-emerald-500/10 blur-[150px]" />
-          <div className="absolute -right-40 bottom-1/4 h-[500px] w-[500px] rounded-full bg-green-500/8 blur-[120px]" />
-          <div className="absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400/5 blur-[80px]" />
-        </div>
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="relative z-10 mx-auto max-w-4xl text-center"
-        >
+      {/* Hero — one composition */}
+      <section className="relative">
+        <div className="landing-ink-wash absolute inset-0" aria-hidden />
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-5 pb-16 pt-14 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)] lg:items-center lg:gap-10 lg:pb-24 lg:pt-16">
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-sm text-emerald-400"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-xl"
           >
-            <Zap className="h-3.5 w-3.5" /> AI-Powered Resume & Portfolio Platform
-          </motion.div>
-          <h1 className="mb-6 text-5xl font-bold leading-tight tracking-tight sm:text-7xl lg:text-8xl">
-            <span className="bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500 bg-clip-text text-transparent">
+            <p className="font-display text-[clamp(3.25rem,9vw,5.75rem)] font-semibold leading-[0.92] tracking-tight text-foreground">
               AURABIO
-            </span>
-          </h1>
-          <p className="mx-auto mb-4 max-w-2xl text-lg text-gray-300 sm:text-xl">
-            Tailor resumes with multi-LLM intelligence, generate stunning portfolios, and deploy — all with LaTeX-grade precision.
-          </p>
-          <p className="mx-auto mb-10 max-w-xl text-sm text-gray-500">
-            One platform to polish, audit, and present your professional story with AI that understands job descriptions.
-          </p>
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap">
-            <Link
-              href="/resume-generator"
-              className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-8 py-3.5 text-base font-semibold text-black transition-all hover:shadow-[0_0_40px_rgba(16,185,129,0.3)]"
-            >
-              <FileText className="h-5 w-5" />
-              Resume Generator
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/portfolio-generator"
-              className="group flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-8 py-3.5 text-base font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]"
-            >
-              <Globe className="h-5 w-5" />
-              Portfolio Generator
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/cold-mail-generator"
-              className="group flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-8 py-3.5 text-base font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]"
-            >
-              <Mail className="h-5 w-5" />
-              Cold Mail Generator
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* 2. Overview / About the Product */}
-      <section className="relative px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center">
-            <h2 className="mb-6 text-3xl font-bold sm:text-4xl">
-              What is <span className="text-emerald-400">AURABIO</span>?
-            </h2>
-            <p className="mx-auto max-w-3xl text-lg leading-relaxed text-gray-400">
-              AURABIO is an AI-powered platform that transforms how professionals create resumes and portfolios.
-              It combines a professional LaTeX editor with multi-LLM intelligence (Gemini, Claude, Groq) to provide
-              real-time suggestions, text polishing, and ATS auditing — all tailored to specific job descriptions.
             </p>
-            <div className="mt-10 grid gap-6 sm:grid-cols-3">
-              <div className="rounded-xl border border-emerald-500/10 bg-gradient-to-b from-emerald-500/5 to-transparent p-6">
-                <div className="mb-3 text-3xl font-bold text-emerald-400">Resume</div>
-                <p className="text-sm text-gray-400">AI-tailored LaTeX resumes with live PDF preview and multi-compiler support</p>
-              </div>
-              <div className="rounded-xl border border-emerald-500/10 bg-gradient-to-b from-emerald-500/5 to-transparent p-6">
-                <div className="mb-3 text-3xl font-bold text-emerald-400">Portfolio</div>
-                <p className="text-sm text-gray-400">Auto-generated portfolios with GitHub/LeetCode stats and one-click deploy</p>
-              </div>
-              <div className="rounded-xl border border-emerald-500/10 bg-gradient-to-b from-emerald-500/5 to-transparent p-6">
-                <div className="mb-3 text-3xl font-bold text-emerald-400">AI Audit</div>
-                <p className="text-sm text-gray-400">ATS scoring with section-by-section feedback and keyword optimization</p>
-              </div>
+            <h1 className="mt-5 font-display text-2xl font-medium leading-snug tracking-tight text-foreground sm:text-3xl">
+              Tailor LaTeX resumes to the job — with AI that stays on your facts.
+            </h1>
+            <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
+              Precision editing, JD-aligned suggestions, SyncTeX PDF sync, and portfolios you can
+              deploy in one click.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button size="lg" asChild>
+                <Link href="/resume-generator">
+                  Open Resume Studio
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link href="/portfolio-generator">Build Portfolio</Link>
+              </Button>
             </div>
           </motion.div>
-        </div>
-      </section>
 
-      {/* 3. Features & Capabilities */}
-      <section id="features" className="relative px-6 py-24">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-emerald-500/5 blur-[150px]" />
-        </div>
-        <div className="relative mx-auto max-w-6xl">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-16 text-center">
-            <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
-              Features & <span className="text-emerald-400">Capabilities</span>
-            </h2>
-            <p className="mx-auto max-w-xl text-gray-400">Everything you need to create, tailor, and deploy professional resumes and portfolios.</p>
-          </motion.div>
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURES.map((f) => (
-              <motion.div key={f.title} variants={fadeUp} className="landing-card rounded-xl p-6 transition-all hover:border-emerald-500/30 hover:shadow-[0_0_30px_rgba(16,185,129,0.08)]">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500/10">
-                  <f.icon className="h-5 w-5 text-emerald-400" />
-                </div>
-                <h3 className="mb-2 text-sm font-semibold">{f.title}</h3>
-                <p className="text-xs leading-relaxed text-gray-400">{f.description}</p>
-              </motion.div>
-            ))}
+          <motion.div
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            className="relative lg:-mr-6 xl:-mr-10"
+          >
+            <ProductMock />
           </motion.div>
         </div>
       </section>
 
-      {/* 4. How It Works */}
-      <section id="how-it-works" className="relative px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-16 text-center">
-            <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
-              How It <span className="text-emerald-400">Works</span>
+      <Separator />
+
+      {/* Tools */}
+      <section id="tools" className="scroll-mt-20 px-5 py-20 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.45 }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Tools</p>
+            <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              Four studios. One workspace.
             </h2>
-            <p className="mx-auto max-w-xl text-gray-400">Four simple steps from sign-up to deployed portfolio.</p>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              Jump into the surface you need — each link opens a real product route.
+            </p>
           </motion.div>
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }} className="relative">
-            <div className="absolute left-8 top-0 hidden h-full w-px bg-gradient-to-b from-emerald-500/50 via-emerald-500/20 to-transparent sm:block" />
-            <div className="space-y-12">
-              {STEPS.map((s, i) => (
-                <motion.div key={s.step} variants={fadeUp} className="flex gap-6">
-                  <div className="relative flex-shrink-0">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-lg font-bold text-emerald-400">
-                      {s.step}
+
+          <div className="mt-10 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {TOOLS.map((tool) => {
+              const Icon = tool.icon;
+              const active = activeTool === tool.id;
+              const shortLabel =
+                tool.id === "cold-mail"
+                  ? "Cold Email"
+                  : tool.id === "pdf"
+                    ? "PDF Editor"
+                    : tool.id === "resume"
+                      ? "Resume Studio"
+                      : "Portfolio";
+              return (
+                <button
+                  key={tool.id}
+                  type="button"
+                  onClick={() => setActiveTool(tool.id)}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-2 rounded-md border px-3.5 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="hidden lg:inline">{tool.name}</span>
+                  <span className="lg:hidden">{shortLabel}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={current.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.28 }}
+              className="mt-6 rounded-lg border border-border bg-card p-6 shadow-sm sm:p-8"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <CurrentIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-display text-xl font-semibold tracking-tight">
+                        {current.name}
+                      </h3>
+                      <Badge variant="secondary">{current.badge}</Badge>
                     </div>
-                    {i < STEPS.length - 1 && (
-                      <div className="absolute left-1/2 top-16 h-12 w-px -translate-x-1/2 bg-gradient-to-b from-emerald-500/30 to-transparent sm:hidden" />
-                    )}
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                      {current.summary}
+                    </p>
                   </div>
-                  <div className="pt-3">
-                    <h3 className="mb-2 text-lg font-semibold">{s.title}</h3>
-                    <p className="text-sm text-gray-400">{s.description}</p>
-                  </div>
+                </div>
+                <Button asChild>
+                  <Link href={current.href}>
+                    Open
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+              <Separator className="my-6" />
+              <ul className="grid gap-3 sm:grid-cols-3">
+                {current.points.map((point) => (
+                  <li key={point} className="flex gap-2 text-sm text-foreground/90">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* How it works */}
+      <section id="how-it-works" className="scroll-mt-20 px-5 py-20 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.45 }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+              How it works
+            </p>
+            <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              From key to PDF in four steps
+            </h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              No agent jargon — a straight path from setup to a tailored resume or live portfolio.
+            </p>
+          </motion.div>
+
+          <ol className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((step, i) => (
+              <motion.li
+                key={step.n}
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.4, delay: i * 0.06 }}
+                className="relative"
+              >
+                <span className="font-display text-4xl font-semibold tabular-nums text-primary/25">
+                  {step.n}
+                </span>
+                <h3 className="mt-2 font-display text-lg font-semibold tracking-tight">
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+                <Link
+                  href={step.href}
+                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                  Continue
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </motion.li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Capabilities */}
+      <section id="capabilities" className="scroll-mt-20 px-5 py-20 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.45 }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+              Features
+            </p>
+            <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              Built for technical job seekers
+            </h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              Capabilities that match the product — LaTeX precision, grounded AI, and deployable
+              portfolios.
+            </p>
+          </motion.div>
+
+          <div className="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            {CAPABILITIES.map((cap, i) => {
+              const Icon = cap.icon;
+              return (
+                <motion.div
+                  key={cap.title}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.4, delay: i * 0.04 }}
+                >
+                  <Icon className="h-5 w-5 text-primary" strokeWidth={1.75} />
+                  <h3 className="mt-3 font-display text-lg font-semibold tracking-tight">
+                    {cap.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{cap.body}</p>
                 </motion.div>
-              ))}
-            </div>
-          </motion.div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* 5. Use Cases / Applications */}
-      <section className="relative px-6 py-24">
-        <div className="mx-auto max-w-6xl">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-16 text-center">
-            <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
-              Use <span className="text-emerald-400">Cases</span>
-            </h2>
-            <p className="mx-auto max-w-xl text-gray-400">Real-world scenarios where AURABIO makes a difference.</p>
-          </motion.div>
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {USE_CASES.map((uc) => (
-              <motion.div key={uc.title} variants={fadeUp} className="landing-card rounded-xl p-6 text-center transition-all hover:border-emerald-500/30">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10">
-                  <uc.icon className="h-7 w-7 text-emerald-400" />
-                </div>
-                <h3 className="mb-2 text-base font-semibold">{uc.title}</h3>
-                <p className="text-xs leading-relaxed text-gray-400">{uc.description}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
+      <Separator />
 
-      {/* 6. Technical Specifications */}
-      <section id="tech" className="relative px-6 py-24">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute right-0 top-1/2 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-emerald-500/5 blur-[120px]" />
-        </div>
-        <div className="relative mx-auto max-w-4xl">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-16 text-center">
-            <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
-              Technical <span className="text-emerald-400">Specifications</span>
-            </h2>
-            <p className="mx-auto max-w-xl text-gray-400">Built with modern, production-grade technologies.</p>
-          </motion.div>
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-3 sm:grid-cols-2">
-            {TECH_SPECS.map((spec) => (
-              <motion.div key={spec.label} variants={fadeUp} className="flex items-center gap-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.02] px-5 py-4">
-                <span className="text-xs font-medium uppercase tracking-wider text-emerald-400 w-28 shrink-0">{spec.label}</span>
-                <span className="text-sm text-gray-300">{spec.value}</span>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* 7. Results / Impact */}
-      {/* <section className="relative px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-16 text-center">
-            <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
-              Results & <span className="text-emerald-400">Impact</span>
-            </h2>
-            <p className="mx-auto max-w-xl text-gray-400">Measurable outcomes from using the platform.</p>
-          </motion.div>
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {METRICS.map((m) => (
-              <motion.div key={m.label} variants={fadeUp} className="landing-card rounded-xl p-6 text-center">
-                <div className="mb-2 text-4xl font-bold bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">
-                  {m.value}
-                </div>
-                <p className="text-sm text-gray-400">{m.label}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section> */}
-
-
-
-      {/* 9. Testimonials / Social Proof */}
-      {/* <section className="relative px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-16 text-center">
-            <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
-              What People <span className="text-emerald-400">Say</span>
-            </h2>
-          </motion.div>
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-6 sm:grid-cols-3">
-            <motion.div variants={fadeUp} className="landing-card rounded-xl p-6">
-              <div className="mb-4 flex gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} className="h-4 w-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <p className="mb-4 text-sm leading-relaxed text-gray-300 italic">
-                &ldquo;AURABIO cut my resume tailoring time from 2 hours to 15 minutes. The ATS audit caught issues I never noticed.&rdquo;
-              </p>
-              <div className="text-xs text-gray-500">— Software Engineer, FAANG applicant</div>
-            </motion.div>
-            <motion.div variants={fadeUp} className="landing-card rounded-xl p-6">
-              <div className="mb-4 flex gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} className="h-4 w-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <p className="mb-4 text-sm leading-relaxed text-gray-300 italic">
-                &ldquo;The portfolio generator pulled my GitHub stats automatically. Deployed to Vercel in one click — my portfolio was live in seconds.&rdquo;
-              </p>
-              <div className="text-xs text-gray-500">— Full-Stack Developer, Open Source Contributor</div>
-            </motion.div>
-            <motion.div variants={fadeUp} className="landing-card rounded-xl p-6">
-              <div className="mb-4 flex gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} className="h-4 w-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <p className="mb-4 text-sm leading-relaxed text-gray-300 italic">
-                &ldquo;The multi-LLM support is brilliant. I use Gemini for quick edits and Claude for deep rewrites. Best resume tool I&apos;ve used.&rdquo;
-              </p>
-              <div className="text-xs text-gray-500">— Product Manager, Career Transition</div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section> */}
-
-      {/* CTA */}
-      {/* <section className="relative px-6 py-24">
-        <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mx-auto max-w-3xl text-center">
-          <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
-            Ready to <span className="text-emerald-400">get started</span>?
+      {/* Final CTA */}
+      <section className="px-5 py-20 sm:px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.45 }}
+          className="mx-auto max-w-3xl text-center"
+        >
+          <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            Start with the Resume Studio
           </h2>
-          <p className="mb-8 text-gray-400">Create your account and build your professional presence in minutes.</p>
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap">
-            <Link
-              href="/resume-generator"
-              className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-8 py-3.5 text-base font-semibold text-black transition-all hover:shadow-[0_0_40px_rgba(16,185,129,0.3)]"
-            >
-              <FileText className="h-5 w-5" />
-              Resume Generator
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/portfolio-generator"
-              className="group flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-8 py-3.5 text-base font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]"
-            >
-              <Globe className="h-5 w-5" />
-              Portfolio Generator
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/cold-mail-generator"
-              className="group flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-8 py-3.5 text-base font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]"
-            >
-              <Mail className="h-5 w-5" />
-              Cold Mail Generator
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
+          <p className="mx-auto mt-4 max-w-lg text-muted-foreground">
+            Load your LaTeX, paste a job description, and export a tailored PDF — or spin up a
+            portfolio from the same workspace.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Button size="lg" asChild>
+              <Link href="/resume-generator">
+                Launch Studio
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/portfolio-generator">Portfolio Generator</Link>
+            </Button>
           </div>
         </motion.div>
-      </section> */}
+      </section>
 
-      {/* Footer */}
-      <footer className="border-t border-emerald-500/10 px-6 py-12">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <span className="bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-lg font-bold text-transparent">AURABIO</span>
-            <span className="text-xs text-gray-600">AI-Powered Resume & Portfolio Platform</span>
+      <footer className="border-t border-border bg-muted/40 px-5 py-12 sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/aurabio-refined-logo.png"
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7 object-contain"
+            />
+            <div>
+              <p className="font-display text-lg font-semibold tracking-tight">AURABIO</p>
+              <p className="text-xs text-muted-foreground">
+                LaTeX resume tailor · portfolios · outreach
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
-            <Link href="/resume-generator" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">Resume Generator</Link>
-            <Link href="/portfolio-generator" className="text-sm text-gray-400 transition-colors hover:text-emerald-400">Portfolio Generator</Link>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <Link href="/resume-generator" className="hover:text-foreground">
+              Resume Tailor
+            </Link>
+            <Link href="/portfolio-generator" className="hover:text-foreground">
+              Portfolio
+            </Link>
+            <Link href="/cold-mail-generator" className="hover:text-foreground">
+              Cold Email
+            </Link>
+            <Link href="/pdf-editor" className="hover:text-foreground">
+              PDF Editor
+            </Link>
+            <Link href="/api-key" className="hover:text-foreground">
+              API Keys
+            </Link>
+            <Link href="/api-docs" className="hover:text-foreground">
+              API Docs
+            </Link>
           </div>
         </div>
       </footer>

@@ -111,8 +111,9 @@ ${escapeLatex(summary)}
         .map((b) => `      \\resumeItem{${escapeLatex(b)}}`)
         .join("\n");
 
+      const dateRange = [exp.startDate, exp.endDate].filter(Boolean).join(" -- ");
       return `  \\resumeSubheading
-    {${escapeLatex(exp.company)}}{${escapeLatex(exp.startDate)} -- ${escapeLatex(exp.endDate)}}
+    {${escapeLatex(exp.company)}}{${escapeLatex(dateRange)}}
     {${escapeLatex(exp.role)}}{${escapeLatex(exp.location)}}
     \\resumeItemListStart
 ${bulletItems}
@@ -132,8 +133,9 @@ ${expItems}
   // Education Section
   const eduItems = education
     .map((edu) => {
+      const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(" -- ");
       return `  \\resumeSubheading
-    {${escapeLatex(edu.institution)}}{${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}}
+    {${escapeLatex(edu.institution)}}{${escapeLatex(dateRange)}}
     {${escapeLatex(edu.degree)}${edu.field ? `, ${escapeLatex(edu.field)}` : ""}}{${escapeLatex(edu.location)}}`;
     })
     .join("\n\n");

@@ -1,7 +1,7 @@
 "use client";
 
 import { createId, detectSectionTitle } from "@/lib/resume";
-import type { ResumeLineLayout, ResumeSection } from "@/types/resume";
+import type { ResumeLine, ResumeLineLayout, ResumeSection } from "@/types/resume";
 
 type PdfTextStyle = {
   fontFamily?: string;
@@ -36,8 +36,79 @@ type PositionedTextItem = {
 type RawLine = {
   page: number;
   text: string;
+  kind?: ResumeLine["kind"];
+  secondaryText?: string;
   layout: ResumeLineLayout;
 };
+
+const SECTION_SYNONYM_MAP: Record<string, string> = {
+  // summary
+  summary: "Summary",
+  "professional summary": "Summary",
+  "career summary": "Summary",
+  profile: "Summary",
+  "career objective": "Summary",
+  objective: "Summary",
+  "about me": "Summary",
+  overview: "Summary",
+  "personal statement": "Summary",
+  // experience
+  experience: "Experience",
+  "work experience": "Experience",
+  "professional experience": "Experience",
+  "employment history": "Experience",
+  "work history": "Experience",
+  career: "Experience",
+  "job history": "Experience",
+  internships: "Experience",
+  internship: "Experience",
+  // education
+  education: "Education",
+  "educational background": "Education",
+  "academic background": "Education",
+  qualifications: "Education",
+  academics: "Education",
+  "academic history": "Education",
+  // skills
+  skills: "Skills",
+  "technical skills": "Skills",
+  "core competencies": "Skills",
+  competencies: "Skills",
+  technologies: "Skills",
+  "key skills": "Skills",
+  expertise: "Skills",
+  "skills & technologies": "Skills",
+  "tools & technologies": "Skills",
+  "languages & frameworks": "Skills",
+  // projects
+  projects: "Projects",
+  "personal projects": "Projects",
+  "open source": "Projects",
+  "open-source projects": "Projects",
+  "side projects": "Projects",
+  portfolio: "Projects",
+  "notable projects": "Projects",
+  // certifications
+  certifications: "Certifications",
+  certificates: "Certifications",
+  "licenses & certifications": "Certifications",
+  "professional certifications": "Certifications",
+  "licenses and certifications": "Certifications",
+  // achievements
+  achievements: "Achievements",
+  "achievements & activities": "Achievements",
+  "honors & awards": "Achievements",
+  "awards & recognition": "Achievements",
+  awards: "Achievements",
+  honors: "Achievements",
+  recognition: "Achievements",
+  activities: "Achievements",
+  "volunteer experience": "Achievements",
+  publications: "Achievements",
+  "extracurricular activities": "Achievements",
+};
+
+const BULLET_PATTERN = /^[\u2022\u2023\u25E6\u2043\u2219\u25CF\u25CB\u2013•\-*>●▸▷•]\s*/;
 
 export async function extractResumeSectionsFromPdf(file: File) {
   const pdfjs = await import("pdfjs-dist");
@@ -58,26 +129,87 @@ export async function extractResumeSectionsFromPdf(file: File) {
     const styles = content.styles as Record<string, PdfTextStyle>;
     await resolvePageFonts(page);
     const fontMetadata = getPageFontMetadata(page, Object.keys(styles));
+
+    // 1. Extract link annotations via page.getAnnotations()
+    type LinkAnnotation = { rect: number[]; url: string };
+    const linkAnnotations: LinkAnnotation[] = [];
+    try {
+      if (typeof (page as unknown as { getAnnotations: () => Promise<unknown[]> }).getAnnotations === "function") {
+        const rawAnnotations = await (page as unknown as { getAnnotations: () => Promise<Array<{
+          annotationType?: number;
+          subtype?: string;
+          url?: string;
+          unsafeUrl?: string;
+          rect?: number[];
+        }>> }).getAnnotations();
+
+        for (const ann of rawAnnotations) {
+          const url = ann.url || ann.unsafeUrl;
+          if (url && Array.isArray(ann.rect) && ann.rect.length === 4) {
+            linkAnnotations.push({ rect: ann.rect, url });
+          }
+        }
+      }
+    } catch {
+      // annotations optional
+    }
+
     const positionedItems = (content.items as unknown[])
       .filter(isPdfTextItem)
       .filter((item) => item.str.trim().length > 0)
       .map((item) => toPositionedTextItem(item, styles, fontMetadata));
 
+    // 2. Handle multi-column layout detection and line grouping
     const pageLines = groupItemsIntoPositionedLines(positionedItems, {
       page: pageNumber,
       pageWidth: viewport.width,
       pageHeight: viewport.height,
     });
 
-    rawLines.push(
-      ...pageLines.map((line, index) => ({
+    // 3. Match annotations and detect bullets for each line
+    const enrichedLines = pageLines.map((line, index) => {
+      let secondaryText = line.secondaryText;
+      let variant = line.layout.variant;
+
+      // Check if line falls within any link annotation rectangle
+      // In PDF coordinates: rect = [x1, y1, x2, y2] where y is from bottom
+      const linePdfY = viewport.height - line.layout.y;
+      for (const ann of linkAnnotations) {
+        const [x1, y1, x2, y2] = ann.rect;
+        const minX = Math.min(x1, x2) - 4;
+        const maxX = Math.max(x1, x2) + 4;
+        const minY = Math.min(y1, y2) - 4;
+        const maxY = Math.max(y1, y2) + 4;
+
+        if (
+          line.layout.x + line.layout.width >= minX &&
+          line.layout.x <= maxX &&
+          linePdfY >= minY &&
+          linePdfY <= maxY
+        ) {
+          secondaryText = ann.url;
+          variant = "link";
+          break;
+        }
+      }
+
+      // Detect bullets
+      const isBullet = BULLET_PATTERN.test(line.text.trim());
+      const kind = isBullet ? ("bullet" as const) : line.kind;
+
+      return {
         ...line,
+        kind,
+        secondaryText,
         layout: {
           ...line.layout,
+          variant: variant || line.layout.variant,
           pageBackground: index === 0 ? line.layout.pageBackground : undefined,
         },
-      })),
-    );
+      };
+    });
+
+    rawLines.push(...enrichedLines);
   }
 
   return applyResumeLineTheming(groupLinesIntoSections(rawLines));
@@ -214,6 +346,72 @@ function getPageFontMetadata(page: unknown, fontNames: string[]) {
   return metadata;
 }
 
+function detectPageColumnSplit(items: PositionedTextItem[], pageWidth: number): number | null {
+  if (items.length < 12) return null;
+
+  const maxBaselineY = Math.max(...items.map((it) => it.baselineY));
+  // Filter out any full-width header items in the top 80pt
+  const bodyBoxes = items.filter(
+    (b) => !(b.baselineY > maxBaselineY - 80 && b.width > pageWidth * 0.45),
+  );
+
+  if (bodyBoxes.length < 10) return null;
+
+  let bestSplitX: number | null = null;
+  let minCrossing = Infinity;
+  let maxSeparation = 0;
+
+  // Scan potential gutter X positions from 20% to 75% of pageWidth
+  const step = 4;
+  const startX = Math.round(pageWidth * 0.20);
+  const endX = Math.round(pageWidth * 0.75);
+
+  for (let candX = startX; candX <= endX; candX += step) {
+    let leftCount = 0;
+    let rightCount = 0;
+    let crossingCount = 0;
+    let maxLeftEdge = 0;
+    let minRightEdge = pageWidth;
+
+    for (const b of bodyBoxes) {
+      const right = b.x + Math.max(b.width, 1);
+      if (right <= candX + 4) {
+        leftCount++;
+        if (right > maxLeftEdge) maxLeftEdge = right;
+      } else if (b.x >= candX - 4) {
+        rightCount++;
+        if (b.x < minRightEdge) minRightEdge = b.x;
+      } else {
+        crossingCount++;
+      }
+    }
+
+    const total = bodyBoxes.length;
+    // Both columns must contain at least 15% of body items
+    if (leftCount / total >= 0.15 && rightCount / total >= 0.20) {
+      const separation = Math.max(0, minRightEdge - maxLeftEdge);
+      if (
+        crossingCount < minCrossing ||
+        (crossingCount === minCrossing && separation > maxSeparation)
+      ) {
+        minCrossing = crossingCount;
+        maxSeparation = separation;
+        bestSplitX = candX;
+      }
+    }
+  }
+
+  // A column split is valid if crossing is <= 2 or <= 3% of body items
+  if (
+    bestSplitX !== null &&
+    (minCrossing <= 2 || minCrossing / bodyBoxes.length <= 0.03)
+  ) {
+    return bestSplitX;
+  }
+
+  return null;
+}
+
 function groupItemsIntoPositionedLines(
   items: PositionedTextItem[],
   pageInfo: {
@@ -223,6 +421,49 @@ function groupItemsIntoPositionedLines(
     pageBackground?: string;
   },
 ): RawLine[] {
+  const splitX = detectPageColumnSplit(items, pageInfo.pageWidth);
+
+  // If multi-column detected, group header items first, then left column, then right column
+  if (splitX !== null) {
+    // Only items that genuinely span across the split gutter in the top portion
+    const maxY = Math.max(...items.map((it) => it.baselineY));
+    const headerThreshold = maxY - 75;
+    const headerItems = items.filter(
+      (it) =>
+        it.baselineY >= headerThreshold &&
+        it.x < splitX &&
+        it.x + it.width > splitX + 15,
+    );
+    const leftColItems = items.filter(
+      (it) => !headerItems.includes(it) && it.x + it.width * 0.5 <= splitX,
+    );
+    const rightColItems = items.filter(
+      (it) => !headerItems.includes(it) && it.x + it.width * 0.5 > splitX,
+    );
+
+    const groupItems = (subset: PositionedTextItem[]) => {
+      const grouped = new Map<number, PositionedTextItem[]>();
+      for (const item of subset) {
+        const existingY = [...grouped.keys()].find(
+          (baselineY) => Math.abs(baselineY - item.baselineY) <= 3,
+        );
+        const key = existingY ?? item.baselineY;
+        grouped.set(key, [...(grouped.get(key) ?? []), item]);
+      }
+      return [...grouped.entries()]
+        .sort(([a], [b]) => b - a)
+        .flatMap(([, lineItems]) => {
+          const sortedItems = lineItems.sort((a, b) => a.x - b.x);
+          return splitIntoPositionedLineSegments(sortedItems, pageInfo).map((segment) =>
+            toRawLine(segment, pageInfo),
+          );
+        })
+        .filter((line) => line.text.length > 0);
+    };
+
+    return [...groupItems(headerItems), ...groupItems(leftColItems), ...groupItems(rightColItems)];
+  }
+
   const grouped = new Map<number, PositionedTextItem[]>();
 
   for (const item of items) {
@@ -378,7 +619,9 @@ function groupLinesIntoSections(rawLines: RawLine[]): ResumeSection[] {
   sections.push(activeSection);
 
   for (const rawLine of rawLines) {
-    const sectionTitle = detectSectionTitle(rawLine.text);
+    const rawTrimmed = rawLine.text.trim().replace(/[:\-]+$/g, "").toLowerCase();
+    const synonymTitle = SECTION_SYNONYM_MAP[rawTrimmed];
+    const sectionTitle = synonymTitle || detectSectionTitle(rawLine.text);
 
     if (sectionTitle && activeSection.lines.length > 0) {
       activeSection = {
@@ -394,6 +637,8 @@ function groupLinesIntoSections(rawLines: RawLine[]): ResumeSection[] {
       page: rawLine.page,
       sectionId: activeSection.id,
       text: rawLine.text,
+      kind: rawLine.kind,
+      secondaryText: rawLine.secondaryText,
       layout: rawLine.layout,
     });
   }

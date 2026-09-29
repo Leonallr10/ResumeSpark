@@ -61,6 +61,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { StudioBackButton } from "@/components/studio-back-button";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -2048,7 +2050,7 @@ export function LatexResumeTailorApp() {
   }, [formattingMenuOpen]);
 
   return (
-    <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-[#f4f8f8]">
+    <main className="flex h-dvh max-h-dvh min-h-0 flex-col bg-background">
       <Toaster position="top-right" richColors />
       <div className="flex flex-1 min-h-0">
         <AnimatePresence>
@@ -2135,14 +2137,19 @@ export function LatexResumeTailorApp() {
         </AnimatePresence>
         <div className="flex flex-1 min-h-0 min-w-0 flex-col">
           <div className="mx-auto flex min-h-0 w-full flex-1 flex-col items-stretch gap-5 px-4 py-5 xl:flex-row xl:items-stretch">
-            <section className="flex w-full min-w-0 flex-1 min-h-0 flex-col rounded-md border bg-white xl:min-h-0">
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-700/60 bg-slate-800 px-3 py-2">
+            <section className="flex w-full min-w-0 flex-1 min-h-0 flex-col rounded-md border border-border bg-card xl:min-h-0">
+              <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted px-3 py-2 dark:border-slate-700/60 dark:bg-slate-800">
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <StudioBackButton
+                    href="/resume-generator"
+                    label="Back"
+                    title="Back to Resume Studio"
+                  />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 shrink-0 text-slate-300 hover:text-white hover:bg-slate-700"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-background hover:text-foreground dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
                     onClick={() => setSidebarOpen((prev) => !prev)}
                     aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
                   >
@@ -2156,6 +2163,7 @@ export function LatexResumeTailorApp() {
                     className="h-9 w-auto"
                     priority
                   />
+                  <ThemeToggle className="ml-1" />
                 </div>
 
                 <span className="mx-0.5 hidden h-5 w-px bg-slate-700/60 sm:block" />
@@ -2493,7 +2501,7 @@ export function LatexResumeTailorApp() {
               >
                 <div className="flex min-h-0 flex-col border-b lg:h-full lg:border-b-0 lg:border-r">
                   {orderedSuggestions.length > 0 ? (
-                    <div className="flex min-h-[57px] flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2">
+                    <div className="flex min-h-[57px] flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-3 py-2">
                       <div className="min-w-0">
                         <h2 className="truncate text-sm font-semibold">LaTeX source</h2>
                         <p className="truncate text-xs text-muted-foreground">

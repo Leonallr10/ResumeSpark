@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { StudioBackButton } from "@/components/studio-back-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   DialogContent,
   DialogHeader,
@@ -30,7 +32,6 @@ import {
   Trash2,
   Upload,
   RefreshCw,
-  ArrowLeft,
   Image as ImageIcon,
   Rocket,
   ExternalLink,
@@ -394,18 +395,11 @@ export function PortfolioGenerator() {
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Left Panel - Preview */}
       <div className="flex-[3] min-w-0 border-r flex flex-col">
-        <div className="flex items-center gap-2 border-b border-slate-700/60 px-4 py-2.5 bg-slate-800 text-slate-100 shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-slate-300 hover:text-white hover:bg-slate-700/50"
-            onClick={() => window.close()}
-            title="Back to Resume Editor"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <Separator orientation="vertical" className="h-5 bg-slate-700/60" />
-          <h1 className="text-sm font-bold text-slate-200 tracking-wide">Portfolio Preview</h1>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted px-4 py-2.5 text-foreground dark:border-slate-700/60 dark:bg-slate-800 dark:text-slate-100">
+          <StudioBackButton href="/" label="Home" title="Back to Home" />
+          <Separator orientation="vertical" className="h-5" />
+          <h1 className="text-sm font-bold tracking-wide text-foreground dark:text-slate-200">Portfolio Preview</h1>
+          <ThemeToggle />
           <Button
             variant="ghost"
             size="sm"
