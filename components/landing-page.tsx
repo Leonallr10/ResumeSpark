@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
   Check,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Globe,
   KeyRound,
   Mail,
   Menu,
+  Pause,
+  Play,
   SearchCheck,
   ShieldCheck,
   SlidersHorizontal,
@@ -151,70 +155,167 @@ const CAPABILITIES = [
   },
 ] as const;
 
-function ProductMock() {
+const HERO_SLIDES = [
+  {
+    id: "resume",
+    src: "/resume.png",
+    alt: "Resume Tailor studio with LaTeX editor, PDF preview, and JD match analysis",
+    label: "Resume Tailor",
+    caption: "JD-aligned LaTeX editing with live PDF preview",
+    href: "/resume-generator",
+  },
+  {
+    id: "portfolio",
+    src: "/portfolio.png",
+    alt: "Portfolio generator with content sidebar, JSON editor, and live site preview",
+    label: "Portfolio",
+    caption: "Build and preview a deployable portfolio from resume data",
+    href: "/portfolio-generator",
+  },
+  {
+    id: "cold-mail",
+    src: "/cold-mail.png",
+    alt: "Cold mail generator with AI improvements, diff editor, and email preview",
+    label: "Cold Email",
+    caption: "Personalized recruiter outreach with before/after polish",
+    href: "/cold-mail-generator",
+  },
+] as const;
+
+const SLIDE_INTERVAL_MS = 4500;
+
+function ProductShowcase() {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const slide = HERO_SLIDES[index];
+
+  useEffect(() => {
+    if (paused) return;
+    const timer = window.setInterval(() => {
+      setIndex((current) => (current + 1) % HERO_SLIDES.length);
+    }, SLIDE_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [paused, index]);
+
+  const goTo = (next: number) => {
+    setIndex((next + HERO_SLIDES.length) % HERO_SLIDES.length);
+  };
+
   return (
     <div
-      className="relative w-full min-h-[320px] overflow-hidden rounded-lg border border-border bg-card shadow-resume lg:min-h-[420px]"
-      aria-hidden
+      className="relative w-full"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
     >
-      <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-2.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-border" />
-        <span className="h-2.5 w-2.5 rounded-full bg-border" />
-        <span className="h-2.5 w-2.5 rounded-full bg-border" />
-        <span className="ml-2 font-mono text-[11px] text-muted-foreground">
-          resume.tex · SyncTeX live
-        </span>
-        <Badge variant="muted" className="ml-auto hidden font-mono sm:inline-flex">
-          Fact-guarded · Gemini
-        </Badge>
-      </div>
-      <div className="grid h-full md:grid-cols-2">
-        <div className="border-b border-border bg-[hsl(220_23%_13%)] p-5 font-mono text-[11px] leading-relaxed text-[hsl(210_20%_78%)] md:border-b-0 md:border-r lg:p-6 lg:text-[12px]">
-          <div className="mb-3 text-[10px] uppercase tracking-wider text-[hsl(173_40%_55%)]">
-            Editor · line 38
-          </div>
-          <p>
-            <span className="text-[hsl(48_70%_65%)]">\resumeSubheading</span>
-            {"{Backend Eng}"}
-            {"{2022–Present}"}
-          </p>
-          <p className="mt-3 rounded bg-[hsl(0_50%_20%/0.45)] px-2 py-1.5 text-[hsl(0_70%_78%)] line-through decoration-[hsl(0_60%_50%)]">
-            Built Redis caching that cut p99 latency by 42%.
-          </p>
-          <p className="mt-2 rounded border-l-2 border-primary bg-[hsl(173_40%_20%/0.35)] px-2 py-1.5 text-[hsl(173_45%_78%)]">
-            Engineered Redis caching for peak traffic, cutting p99 latency by{" "}
-            <span className="text-white">42%</span> — metric sourced from your resume.
-          </p>
-          <p className="mt-4 text-[10px] text-[hsl(173_40%_55%)]">
-            ✓ Ground-truth whitelist matched
-          </p>
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-resume">
+        <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-border" />
+          <span className="h-2.5 w-2.5 rounded-full bg-border" />
+          <span className="h-2.5 w-2.5 rounded-full bg-border" />
+          <span className="ml-2 truncate font-mono text-[11px] text-muted-foreground">
+            aurabio · {slide.label}
+          </span>
+          <Badge variant="muted" className="ml-auto hidden font-mono sm:inline-flex">
+            Live product tour
+          </Badge>
         </div>
-        <div className="flex flex-col bg-white p-5 text-[hsl(220_23%_13%)] lg:p-6">
-          <div className="border-b border-[hsl(210_18%_81%)] pb-2 text-center">
-            <p className="font-display text-base font-semibold tracking-wide lg:text-lg">
-              Alex Rivera
-            </p>
-            <p className="mt-0.5 text-[9px] text-[hsl(219_12%_39%)] lg:text-[10px]">
-              alex@tech.dev · github.com/alexrivera
-            </p>
+
+        <div className="relative aspect-[16/10] w-full bg-muted/30">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={slide.id}
+              initial={{ opacity: 0, scale: 1.02 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.985 }}
+              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0"
+            >
+              <Image
+                src={slide.src}
+                alt={slide.alt}
+                fill
+                priority={index === 0}
+                sizes="(max-width: 1024px) 100vw, 720px"
+                className="object-cover object-top"
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background/70 via-background/15 to-transparent" />
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="absolute inset-y-0 left-0 flex items-center pl-2">
+            <button
+              type="button"
+              onClick={() => goTo(index - 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border/80 bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:bg-background"
+              aria-label="Previous slide"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
           </div>
-          <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-[hsl(173_80%_28%)]">
-            Experience
-          </p>
-          <div className="mt-1.5 flex justify-between text-[10px] font-semibold lg:text-[11px]">
-            <span>Backend Engineer</span>
-            <span className="font-normal text-[hsl(219_12%_39%)]">2022–Present</span>
+          <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+            <button
+              type="button"
+              onClick={() => goTo(index + 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border/80 bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:bg-background"
+              aria-label="Next slide"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
-          <p className="mt-2 rounded-sm border-l-2 border-primary bg-[hsl(173_40%_94%)] px-2 py-1.5 text-[9px] leading-snug lg:text-[10px]">
-            Engineered Redis caching for peak traffic, cutting p99 latency by 42% — metric sourced
-            from your resume.
-          </p>
-          <div className="mt-auto flex items-center justify-between border-t border-[hsl(210_18%_88%)] pt-3 text-[9px] text-[hsl(219_12%_39%)]">
-            <span className="inline-flex items-center gap-1 text-primary">
-              <Check className="h-3 w-3" /> SyncTeX mapped
-            </span>
-            <span className="font-mono">pdflatex</span>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">{slide.label}</p>
+            <p className="truncate text-xs text-muted-foreground">{slide.caption}</p>
           </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPaused((p) => !p)}
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground transition hover:text-foreground"
+              aria-label={paused ? "Play slideshow" : "Pause slideshow"}
+            >
+              {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+            </button>
+
+            <div className="flex items-center gap-1.5" role="tablist" aria-label="Product screenshots">
+              {HERO_SLIDES.map((item, i) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === index}
+                  onClick={() => setIndex(i)}
+                  aria-label={`Show ${item.label}`}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    i === index ? "w-6 bg-primary" : "w-1.5 bg-border hover:bg-muted-foreground/40",
+                  )}
+                />
+              ))}
+            </div>
+
+            <Button size="sm" variant="outline" asChild className="h-7 text-xs">
+              <Link href={slide.href}>
+                Open
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        <div className="h-0.5 w-full bg-muted">
+          {!paused && (
+            <motion.div
+              key={`progress-${slide.id}-${index}`}
+              className="h-full bg-primary"
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: SLIDE_INTERVAL_MS / 1000, ease: "linear" }}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -374,7 +475,7 @@ export function LandingPage() {
             transition={{ duration: 0.65, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
             className="relative lg:-mr-6 xl:-mr-10"
           >
-            <ProductMock />
+            <ProductShowcase />
           </motion.div>
         </div>
       </section>
