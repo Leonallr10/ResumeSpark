@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 
 const PdfTemplateEditor = dynamic(
@@ -14,6 +15,18 @@ const PdfTemplateEditor = dynamic(
   },
 );
 
+function PdfTemplateEditorFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+      Loading PDF Template Studio…
+    </div>
+  );
+}
+
 export function PdfTemplateLoader() {
-  return <PdfTemplateEditor />;
+  return (
+    <Suspense fallback={<PdfTemplateEditorFallback />}>
+      <PdfTemplateEditor />
+    </Suspense>
+  );
 }

@@ -56,7 +56,7 @@ export function PdfSuggestionDiffModal({
               <Button
                 size="sm"
                 onClick={() => onApplyAll(suggestions)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-8 px-3 gap-1.5"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs h-8 px-3 gap-1.5"
               >
                 <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Apply All ({suggestions.length})
               </Button>
@@ -125,7 +125,7 @@ export function PdfSuggestionDiffModal({
                     <Button
                       size="sm"
                       onClick={() => onApplySuggestion(sug)}
-                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 px-3"
+                      className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground gap-1 px-3"
                     >
                       <Check className="w-3.5 h-3.5" /> Accept Change
                     </Button>

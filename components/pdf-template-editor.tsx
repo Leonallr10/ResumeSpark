@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import {
   FileText,
@@ -61,10 +61,15 @@ const ACTIVE_FLOW_KEY = "resume_active_flow";
 
 export function PdfTemplateEditor() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const startOnGallery = searchParams.get("view") === "gallery";
 
   // State
   const [model, setModel] = useState<ResumeDocumentModel>(createSampleResumeTemplate1);
-  const [activeTab, setActiveTab] = useState<"editor" | "gallery">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "gallery">(
+    startOnGallery ? "gallery" : "editor",
+  );
   const [previewMode, setPreviewMode] = useState<"html" | "compiled">("html");
   const [pdfArrayBuffer, setPdfArrayBuffer] = useState<ArrayBuffer | null>(null);
   const [isCompilingPdf, setIsCompilingPdf] = useState(false);
@@ -98,6 +103,12 @@ export function PdfTemplateEditor() {
   }, [companyName]);
 
   // Sync projects from loaded model to project drafts if empty
+  useEffect(() => {
+    if (searchParams.get("view") === "gallery") {
+      setActiveTab("gallery");
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (model.projects && model.projects.length > 0 && projectDrafts.length === 0) {
       const drafts: ProjectDraft[] = model.projects.map((p) => ({
@@ -485,34 +496,44 @@ export function PdfTemplateEditor() {
   const renderedHtml = getTemplateRenderer(model.templateId)(model);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-slate-950 text-slate-100 print:h-auto print:overflow-visible print:bg-white print:text-black print:block print:p-0 print:m-0">
+    <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground print:h-auto print:overflow-visible print:bg-white print:text-black print:block print:p-0 print:m-0">
       <Toaster position="top-right" richColors />
 
       {/* Top Header */}
-      <header className="no-print print:hidden h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 flex items-center justify-between z-30 sticky top-0">
+      <header className="no-print print:hidden h-14 border-b border-border bg-card/90 backdrop-blur px-4 flex items-center justify-between z-30 sticky top-0">
         <div className="flex items-center gap-3">
           <StudioBackButton
-            href="/resume-generator"
-            label="Back"
-            title="Back to Resume Studio"
-            className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+            {...(activeTab === "editor"
+              ? {
+                  onClick: () => {
+                    setActiveTab("gallery");
+                    router.replace(`${pathname}?view=gallery`);
+                  },
+                  label: "Templates",
+                  title: "Back to template gallery",
+                }
+              : {
+                  href: "/resume-generator",
+                  label: "Back",
+                  title: "Back to Resume Studio",
+                })}
           />
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <div className="p-1.5 rounded-lg bg-primary/15 text-primary border border-primary/30">
               <FileText className="w-4 h-4" />
             </div>
-            <span className="font-bold text-sm tracking-tight text-white">AURABIO</span>
+            <span className="font-bold text-sm tracking-tight text-foreground">AURABIO</span>
           </div>
 
-          <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
+          <div className="h-4 w-px bg-muted mx-1 hidden sm:block" />
 
           {/* Template Selector dropdown */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 hidden sm:inline">Template:</span>
+            <span className="text-xs text-muted-foreground hidden sm:inline">Template:</span>
             <select
               value={model.templateId}
               onChange={(e) => saveModel({ ...model, templateId: e.target.value })}
-              className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded px-2.5 py-1 focus:ring-1 focus:ring-emerald-500 outline-none"
+              className="bg-muted border border-border text-foreground text-xs rounded px-2.5 py-1 focus:ring-1 focus:ring-ring outline-none"
             >
               {Object.values(TEMPLATE_REGISTRY).map((tpl) => (
                 <option key={tpl.id} value={tpl.id}>
@@ -525,34 +546,40 @@ export function PdfTemplateEditor() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          <ThemeToggle className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white" />
+          <ThemeToggle />
           {/* Mode Switch Tabs */}
-          <div className="bg-slate-800/80 p-0.5 rounded-lg border border-slate-700 flex items-center text-xs">
+          <div className="bg-muted p-0.5 rounded-lg border border-border flex items-center text-xs">
             <button
-              onClick={() => setActiveTab("editor")}
-              className={`px-3 py-1 rounded-md transition-all ${activeTab === "editor" ? "bg-emerald-600 text-white font-medium" : "text-slate-400 hover:text-slate-200"
+              onClick={() => {
+                setActiveTab("editor");
+                router.replace(pathname);
+              }}
+              className={`px-3 py-1 rounded-md transition-all ${activeTab === "editor" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <Edit3 className="w-3.5 h-3.5 inline mr-1" /> Editor
             </button>
             <button
-              onClick={() => setActiveTab("gallery")}
-              className={`px-3 py-1 rounded-md transition-all ${activeTab === "gallery" ? "bg-emerald-600 text-white font-medium" : "text-slate-400 hover:text-slate-200"
+              onClick={() => {
+                setActiveTab("gallery");
+                router.replace(`${pathname}?view=gallery`);
+              }}
+              className={`px-3 py-1 rounded-md transition-all ${activeTab === "gallery" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <Layout className="w-3.5 h-3.5 inline mr-1" /> Templates
             </button>
           </div>
 
-          <div className="h-4 w-px bg-slate-800 mx-1 hidden md:block" />
+          <div className="h-4 w-px bg-muted mx-1 hidden md:block" />
 
           {/* Switch to LaTeX Editor Button */}
           <Button
             size="sm"
             onClick={handleSwitchToLatex}
-            className="h-8 text-xs bg-indigo-600/90 hover:bg-indigo-600 text-white gap-1.5 border border-indigo-500/40 shadow-sm"
+            className="h-8 text-xs bg-secondary text-secondary-foreground gap-1.5 border border-border hover:bg-secondary/85 shadow-sm"
           >
-            <Code2 className="w-3.5 h-3.5 text-indigo-200" /> Switch to LaTeX
+            <Code2 className="w-3.5 h-3.5 text-secondary-foreground" /> Switch to LaTeX
           </Button>
           {/*
           Upload Resume Button
@@ -568,29 +595,29 @@ export function PdfTemplateEditor() {
             }}
             className={`h-8 text-xs gap-1.5 shadow-sm border ${
               showUploadPanel && activeTab === "editor"
-                ? "bg-violet-600 hover:bg-violet-500 text-white border-violet-500/40"
-                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
+                ? "bg-primary hover:bg-primary/90 text-primary-foreground border-primary/40"
+                : "bg-muted hover:bg-muted border-border text-foreground"
             }`}
           >
-            <Upload className="w-3.5 h-3.5 text-violet-400" /> Upload Resume
+            <Upload className="w-3.5 h-3.5 text-primary" /> Upload Resume
           </Button> */}
 
           {/* AI Tailor Button */}
           <Button
             size="sm"
             onClick={() => setShowAiDrawer(true)}
-            className="h-8 text-xs bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white gap-1.5 shadow-sm"
+            className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 shadow-sm"
           >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-200" /> AI Tailor
+            <Sparkles className="w-3.5 h-3.5 text-primary-foreground/90" /> AI Tailor
           </Button>
 
           {/* PDF Download Button */}
           <Button
             size="sm"
             onClick={handleDownloadPdf}
-            className="h-8 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white gap-1.5"
+            className="h-8 text-xs bg-muted hover:bg-muted/80 border border-border text-foreground gap-1.5"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-400" /> Download PDF
+            <Download className="w-3.5 h-3.5 text-primary" /> Download PDF
           </Button>
         </div>
       </header>
@@ -603,15 +630,18 @@ export function PdfTemplateEditor() {
             onSelectTemplate={(tplId) => {
               saveModel({ ...model, templateId: tplId });
               setActiveTab("editor");
-              toast.success(`Switched to ${TEMPLATE_REGISTRY[tplId]?.name || "template"}`);
+              router.replace(pathname);
+              toast.success(`Opened ${TEMPLATE_REGISTRY[tplId]?.name || "template"} editor`);
             }}
             onUploadClick={() => {
               setActiveTab("editor");
+              router.replace(pathname);
               setShowUploadPanel(true);
             }}
             onUploadFile={(file) => {
               setUploadInitialFile(file);
               setActiveTab("editor");
+              router.replace(pathname);
               setShowUploadPanel(true);
             }}
           />
@@ -619,32 +649,32 @@ export function PdfTemplateEditor() {
       ) : (
         <div className="flex-1 flex overflow-hidden min-h-0 print:h-auto print:overflow-visible print:block print:p-0 print:m-0">
           {/* Left Panel: Structured Data Editor */}
-          <div className="no-print print:hidden w-full lg:w-[480px] xl:w-[520px] border-r border-slate-800 bg-slate-900/50 flex flex-col overflow-y-auto p-4 space-y-6">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+          <div className="no-print print:hidden w-full lg:w-[480px] xl:w-[520px] border-r border-border bg-muted/40 flex flex-col overflow-y-auto p-4 space-y-6">
+            <div className="flex items-center justify-between pb-2 border-b border-border">
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Structured Resume Data</span>
-                <p className="text-[11px] text-slate-500">Edit sections, customize headings, and add custom blocks.</p>
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground/80">Structured Resume Data</span>
+                <p className="text-[11px] text-muted-foreground">Edit sections, customize headings, and add custom blocks.</p>
               </div>
-              <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/20">
+              <Badge variant="outline" className="text-[10px] text-primary border-primary/20">
                 <ShieldCheck className="w-3 h-3 mr-1 inline" /> Auto-Saved
               </Badge>
             </div>
 
             {/* ─── Upload Resume Panel ──────────────────────────── */}
-            <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 overflow-hidden">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 overflow-hidden">
               <button
                 onClick={() => setShowUploadPanel((v) => !v)}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold text-violet-300 hover:bg-violet-500/10 transition-colors"
+                className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
               >
                 <span className="flex items-center gap-2">
                   <Upload className="w-3.5 h-3.5" />
                   Upload Resume (PDF, DOCX, Image)
-                  <span className="text-[10px] text-violet-400/60 font-normal">— fill from any template</span>
+                  <span className="text-[10px] text-primary/60 font-normal">— fill from any template</span>
                 </span>
                 {showUploadPanel ? (
-                  <ChevronUp className="w-3.5 h-3.5 text-violet-400" />
+                  <ChevronUp className="w-3.5 h-3.5 text-primary" />
                 ) : (
-                  <ChevronDown className="w-3.5 h-3.5 text-violet-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-primary" />
                 )}
               </button>
 
@@ -668,11 +698,11 @@ export function PdfTemplateEditor() {
             </div>
 
             {/* 1. Personal Info */}
-            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">1. Contact & Header</h4>
+            <div className="space-y-3 bg-card p-3.5 rounded-lg border border-border">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-primary">1. Contact & Header</h4>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <Label className="text-[11px] text-slate-400">Full Name</Label>
+                  <Label className="text-[11px] text-muted-foreground">Full Name</Label>
                   <Input
                     value={model.personalInfo.fullName}
                     onChange={(e) =>
@@ -681,11 +711,11 @@ export function PdfTemplateEditor() {
                         personalInfo: { ...model.personalInfo, fullName: e.target.value },
                       })
                     }
-                    className="h-8 text-xs bg-slate-950 border-slate-800 mt-1"
+                    className="h-8 text-xs bg-background border-border mt-1"
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-slate-400">Email</Label>
+                  <Label className="text-[11px] text-muted-foreground">Email</Label>
                   <Input
                     value={model.personalInfo.email}
                     onChange={(e) =>
@@ -694,11 +724,11 @@ export function PdfTemplateEditor() {
                         personalInfo: { ...model.personalInfo, email: e.target.value },
                       })
                     }
-                    className="h-8 text-xs bg-slate-950 border-slate-800 mt-1"
+                    className="h-8 text-xs bg-background border-border mt-1"
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-slate-400">Phone</Label>
+                  <Label className="text-[11px] text-muted-foreground">Phone</Label>
                   <Input
                     value={model.personalInfo.phone}
                     onChange={(e) =>
@@ -707,11 +737,11 @@ export function PdfTemplateEditor() {
                         personalInfo: { ...model.personalInfo, phone: e.target.value },
                       })
                     }
-                    className="h-8 text-xs bg-slate-950 border-slate-800 mt-1"
+                    className="h-8 text-xs bg-background border-border mt-1"
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-slate-400">Location</Label>
+                  <Label className="text-[11px] text-muted-foreground">Location</Label>
                   <Input
                     value={model.personalInfo.location}
                     onChange={(e) =>
@@ -720,11 +750,11 @@ export function PdfTemplateEditor() {
                         personalInfo: { ...model.personalInfo, location: e.target.value },
                       })
                     }
-                    className="h-8 text-xs bg-slate-950 border-slate-800 mt-1"
+                    className="h-8 text-xs bg-background border-border mt-1"
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-slate-400">LinkedIn</Label>
+                  <Label className="text-[11px] text-muted-foreground">LinkedIn</Label>
                   <Input
                     value={model.personalInfo.linkedin}
                     onChange={(e) =>
@@ -733,11 +763,11 @@ export function PdfTemplateEditor() {
                         personalInfo: { ...model.personalInfo, linkedin: e.target.value },
                       })
                     }
-                    className="h-8 text-xs bg-slate-950 border-slate-800 mt-1"
+                    className="h-8 text-xs bg-background border-border mt-1"
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-slate-400">GitHub</Label>
+                  <Label className="text-[11px] text-muted-foreground">GitHub</Label>
                   <Input
                     value={model.personalInfo.github}
                     onChange={(e) =>
@@ -746,17 +776,17 @@ export function PdfTemplateEditor() {
                         personalInfo: { ...model.personalInfo, github: e.target.value },
                       })
                     }
-                    className="h-8 text-xs bg-slate-950 border-slate-800 mt-1"
+                    className="h-8 text-xs bg-background border-border mt-1"
                   />
                 </div>
               </div>
             </div>
 
             {/* 2. Professional Summary */}
-            <div className="space-y-2.5 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+            <div className="space-y-2.5 bg-card p-3.5 rounded-lg border border-border">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-1">
-                  <span className="text-xs font-bold text-emerald-400">2.</span>
+                  <span className="text-xs font-bold text-primary">2.</span>
                   <Input
                     value={model.sectionTitles?.summary || "Professional Summary"}
                     onChange={(e) =>
@@ -775,26 +805,26 @@ export function PdfTemplateEditor() {
                         },
                       })
                     }
-                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-primary bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-background/60 rounded px-1"
                     title="Click to rename section heading"
                   />
                 </div>
-                <Edit3 className="w-3 h-3 text-slate-500" />
+                <Edit3 className="w-3 h-3 text-muted-foreground" />
               </div>
               <Textarea
                 rows={3}
                 value={model.summary}
                 onChange={(e) => saveModel({ ...model, summary: e.target.value })}
-                className="text-xs bg-slate-950 border-slate-800 leading-relaxed"
+                className="text-xs bg-background border-border leading-relaxed"
                 placeholder="Brief impact summary..."
               />
             </div>
 
             {/* 3. Work Experience */}
-            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+            <div className="space-y-3 bg-card p-3.5 rounded-lg border border-border">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-1">
-                  <span className="text-xs font-bold text-emerald-400">3.</span>
+                  <span className="text-xs font-bold text-primary">3.</span>
                   <Input
                     value={model.sectionTitles?.experience || "Work Experience"}
                     onChange={(e) =>
@@ -813,7 +843,7 @@ export function PdfTemplateEditor() {
                         },
                       })
                     }
-                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-primary bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-background/60 rounded px-1"
                     title="Click to rename section heading"
                   />
                 </div>
@@ -836,16 +866,16 @@ export function PdfTemplateEditor() {
                     ];
                     saveModel({ ...model, experience: nextExp });
                   }}
-                  className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                  className="h-6 text-[11px] text-primary hover:text-primary px-2"
                 >
                   <Plus className="w-3 h-3 mr-1" /> Add Role
                 </Button>
               </div>
 
               {model.experience.map((exp, idx) => (
-                <div key={exp.id || idx} className="p-3 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                <div key={exp.id || idx} className="p-3 bg-background rounded border border-border space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-200">{exp.company || `Role #${idx + 1}`}</span>
+                    <span className="font-semibold text-foreground">{exp.company || `Role #${idx + 1}`}</span>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -867,7 +897,7 @@ export function PdfTemplateEditor() {
                         copy[idx].company = e.target.value;
                         saveModel({ ...model, experience: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Role"
@@ -877,7 +907,7 @@ export function PdfTemplateEditor() {
                         copy[idx].role = e.target.value;
                         saveModel({ ...model, experience: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Start – End Date"
@@ -889,7 +919,7 @@ export function PdfTemplateEditor() {
                         copy[idx].endDate = parts[1]?.trim() || "";
                         saveModel({ ...model, experience: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Location"
@@ -899,16 +929,16 @@ export function PdfTemplateEditor() {
                         copy[idx].location = e.target.value;
                         saveModel({ ...model, experience: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                   </div>
 
                   {/* Bullets */}
                   <div className="space-y-1.5 pt-1">
-                    <Label className="text-[10px] text-slate-400">STAR Bullets ({exp.bullets.length})</Label>
+                    <Label className="text-[10px] text-muted-foreground">STAR Bullets ({exp.bullets.length})</Label>
                     {exp.bullets.map((bullet, bIdx) => (
                       <div key={bIdx} className="flex gap-1.5 items-start">
-                        <span className="text-emerald-500 mt-1">•</span>
+                        <span className="text-primary mt-1">•</span>
                         <Textarea
                           rows={2}
                           value={bullet}
@@ -917,7 +947,7 @@ export function PdfTemplateEditor() {
                             copy[idx].bullets[bIdx] = e.target.value;
                             saveModel({ ...model, experience: copy });
                           }}
-                          className="text-xs bg-slate-900 border-slate-800 flex-1 leading-relaxed"
+                          className="text-xs bg-card border-border flex-1 leading-relaxed"
                         />
                         <Button
                           size="icon"
@@ -927,7 +957,7 @@ export function PdfTemplateEditor() {
                             copy[idx].bullets.splice(bIdx, 1);
                             saveModel({ ...model, experience: copy });
                           }}
-                          className="h-6 w-6 text-slate-500 hover:text-red-400 mt-1"
+                          className="h-6 w-6 text-muted-foreground hover:text-red-400 mt-1"
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
@@ -941,7 +971,7 @@ export function PdfTemplateEditor() {
                         copy[idx].bullets.push("Built high-impact module improving performance.");
                         saveModel({ ...model, experience: copy });
                       }}
-                      className="h-5 text-[10px] text-slate-400 hover:text-emerald-400 px-1"
+                      className="h-5 text-[10px] text-muted-foreground hover:text-primary px-1"
                     >
                       + Add Bullet
                     </Button>
@@ -951,10 +981,10 @@ export function PdfTemplateEditor() {
             </div>
 
             {/* 4. Education */}
-            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+            <div className="space-y-3 bg-card p-3.5 rounded-lg border border-border">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-1">
-                  <span className="text-xs font-bold text-emerald-400">4.</span>
+                  <span className="text-xs font-bold text-primary">4.</span>
                   <Input
                     value={model.sectionTitles?.education || "Education"}
                     onChange={(e) =>
@@ -973,7 +1003,7 @@ export function PdfTemplateEditor() {
                         },
                       })
                     }
-                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-primary bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-background/60 rounded px-1"
                     title="Click to rename section heading"
                   />
                 </div>
@@ -996,16 +1026,16 @@ export function PdfTemplateEditor() {
                     ];
                     saveModel({ ...model, education: nextEdu });
                   }}
-                  className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                  className="h-6 text-[11px] text-primary hover:text-primary px-2"
                 >
                   <Plus className="w-3 h-3 mr-1" /> Add Degree
                 </Button>
               </div>
 
               {model.education.map((edu, idx) => (
-                <div key={edu.id || idx} className="p-3 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                <div key={edu.id || idx} className="p-3 bg-background rounded border border-border space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-200">{edu.institution || `Institution #${idx + 1}`}</span>
+                    <span className="font-semibold text-foreground">{edu.institution || `Institution #${idx + 1}`}</span>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -1027,7 +1057,7 @@ export function PdfTemplateEditor() {
                         copy[idx].institution = e.target.value;
                         saveModel({ ...model, education: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Degree / Major"
@@ -1037,7 +1067,7 @@ export function PdfTemplateEditor() {
                         copy[idx].degree = e.target.value;
                         saveModel({ ...model, education: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Field (Optional)"
@@ -1047,7 +1077,7 @@ export function PdfTemplateEditor() {
                         copy[idx].field = e.target.value;
                         saveModel({ ...model, education: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Dates (e.g. 2021 – 2025)"
@@ -1059,7 +1089,7 @@ export function PdfTemplateEditor() {
                         copy[idx].endDate = parts[1]?.trim() || "";
                         saveModel({ ...model, education: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Location"
@@ -1069,7 +1099,7 @@ export function PdfTemplateEditor() {
                         copy[idx].location = e.target.value;
                         saveModel({ ...model, education: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800 col-span-2"
+                      className="h-7 text-xs bg-card border-border col-span-2"
                     />
                   </div>
                 </div>
@@ -1077,10 +1107,10 @@ export function PdfTemplateEditor() {
             </div>
 
             {/* 5. Skills */}
-            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+            <div className="space-y-3 bg-card p-3.5 rounded-lg border border-border">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-1">
-                  <span className="text-xs font-bold text-emerald-400">5.</span>
+                  <span className="text-xs font-bold text-primary">5.</span>
                   <Input
                     value={model.sectionTitles?.skills || "Skills"}
                     onChange={(e) =>
@@ -1099,7 +1129,7 @@ export function PdfTemplateEditor() {
                         },
                       })
                     }
-                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-primary bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-background/60 rounded px-1"
                     title="Click to rename section heading (e.g. Skills, Technical Skills, Core Stack)"
                   />
                 </div>
@@ -1113,13 +1143,13 @@ export function PdfTemplateEditor() {
                     ];
                     saveModel({ ...model, skills: nextSkills });
                   }}
-                  className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                  className="h-6 text-[11px] text-primary hover:text-primary px-2"
                 >
                   <Plus className="w-3 h-3 mr-1" /> Add Category
                 </Button>
               </div>
               {model.skills.map((s, idx) => (
-                <div key={s.id || idx} className="p-2.5 bg-slate-950 rounded border border-slate-800 space-y-1.5">
+                <div key={s.id || idx} className="p-2.5 bg-background rounded border border-border space-y-1.5">
                   <div className="flex items-center gap-2">
                     <Input
                       value={s.category}
@@ -1128,7 +1158,7 @@ export function PdfTemplateEditor() {
                         copy[idx].category = e.target.value;
                         saveModel({ ...model, skills: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800 font-semibold w-2/5"
+                      className="h-7 text-xs bg-card border-border font-semibold w-2/5"
                     />
                     <Input
                       value={s.skills.join(", ")}
@@ -1137,7 +1167,7 @@ export function PdfTemplateEditor() {
                         copy[idx].skills = e.target.value.split(/,\s*/).filter(Boolean);
                         saveModel({ ...model, skills: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800 flex-1"
+                      className="h-7 text-xs bg-card border-border flex-1"
                       placeholder="Comma-separated skills"
                     />
                     <Button
@@ -1147,7 +1177,7 @@ export function PdfTemplateEditor() {
                         const filtered = model.skills.filter((_, i) => i !== idx);
                         saveModel({ ...model, skills: filtered });
                       }}
-                      className="h-6 w-6 text-slate-500 hover:text-red-400"
+                      className="h-6 w-6 text-muted-foreground hover:text-red-400"
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -1157,10 +1187,10 @@ export function PdfTemplateEditor() {
             </div>
 
             {/* 6. Projects */}
-            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+            <div className="space-y-3 bg-card p-3.5 rounded-lg border border-border">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-1">
-                  <span className="text-xs font-bold text-emerald-400">6.</span>
+                  <span className="text-xs font-bold text-primary">6.</span>
                   <Input
                     value={model.sectionTitles?.projects || "Projects"}
                     onChange={(e) =>
@@ -1179,7 +1209,7 @@ export function PdfTemplateEditor() {
                         },
                       })
                     }
-                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-primary bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-background/60 rounded px-1"
                     title="Click to rename section heading"
                   />
                 </div>
@@ -1202,16 +1232,16 @@ export function PdfTemplateEditor() {
                     ];
                     saveModel({ ...model, projects: nextProjects });
                   }}
-                  className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                  className="h-6 text-[11px] text-primary hover:text-primary px-2"
                 >
                   <Plus className="w-3 h-3 mr-1" /> Add Project
                 </Button>
               </div>
 
               {model.projects.map((proj, idx) => (
-                <div key={proj.id || idx} className="p-3 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                <div key={proj.id || idx} className="p-3 bg-background rounded border border-border space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-200">{proj.title || `Project #${idx + 1}`}</span>
+                    <span className="font-semibold text-foreground">{proj.title || `Project #${idx + 1}`}</span>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -1233,7 +1263,7 @@ export function PdfTemplateEditor() {
                         copy[idx].title = e.target.value;
                         saveModel({ ...model, projects: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Subtitle / Role / Stack"
@@ -1243,7 +1273,7 @@ export function PdfTemplateEditor() {
                         copy[idx].subtitle = e.target.value;
                         saveModel({ ...model, projects: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800"
+                      className="h-7 text-xs bg-card border-border"
                     />
                     <Input
                       placeholder="Dates (e.g. Jan 2026 – Mar 2026)"
@@ -1255,16 +1285,16 @@ export function PdfTemplateEditor() {
                         copy[idx].endDate = parts[1]?.trim() || "";
                         saveModel({ ...model, projects: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800 col-span-2"
+                      className="h-7 text-xs bg-card border-border col-span-2"
                     />
                   </div>
 
                   {/* Bullets */}
                   <div className="space-y-1.5 pt-1">
-                    <Label className="text-[10px] text-slate-400">Bullet Points</Label>
+                    <Label className="text-[10px] text-muted-foreground">Bullet Points</Label>
                     {proj.bullets.map((bullet, bIdx) => (
                       <div key={bIdx} className="flex gap-1.5 items-start">
-                        <span className="text-emerald-500 mt-1">•</span>
+                        <span className="text-primary mt-1">•</span>
                         <Textarea
                           rows={2}
                           value={bullet}
@@ -1273,7 +1303,7 @@ export function PdfTemplateEditor() {
                             copy[idx].bullets[bIdx] = e.target.value;
                             saveModel({ ...model, projects: copy });
                           }}
-                          className="text-xs bg-slate-900 border-slate-800 flex-1 leading-relaxed"
+                          className="text-xs bg-card border-border flex-1 leading-relaxed"
                         />
                         <Button
                           size="icon"
@@ -1283,7 +1313,7 @@ export function PdfTemplateEditor() {
                             copy[idx].bullets.splice(bIdx, 1);
                             saveModel({ ...model, projects: copy });
                           }}
-                          className="h-6 w-6 text-slate-500 hover:text-red-400 mt-1"
+                          className="h-6 w-6 text-muted-foreground hover:text-red-400 mt-1"
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
@@ -1297,7 +1327,7 @@ export function PdfTemplateEditor() {
                         copy[idx].bullets.push("Engineered core feature optimizing performance.");
                         saveModel({ ...model, projects: copy });
                       }}
-                      className="h-5 text-[10px] text-slate-400 hover:text-emerald-400 px-1"
+                      className="h-5 text-[10px] text-muted-foreground hover:text-primary px-1"
                     >
                       + Add Bullet
                     </Button>
@@ -1307,10 +1337,10 @@ export function PdfTemplateEditor() {
             </div>
 
             {/* 7. Achievements & Activities */}
-            <div className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+            <div className="space-y-3 bg-card p-3.5 rounded-lg border border-border">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-1">
-                  <span className="text-xs font-bold text-emerald-400">7.</span>
+                  <span className="text-xs font-bold text-primary">7.</span>
                   <Input
                     value={model.sectionTitles?.achievements || "Achievements and Activities"}
                     onChange={(e) =>
@@ -1329,7 +1359,7 @@ export function PdfTemplateEditor() {
                         },
                       })
                     }
-                    className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-slate-950/60 rounded px-1"
+                    className="h-6 text-xs font-bold uppercase tracking-wider text-primary bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:bg-background/60 rounded px-1"
                     title="Click to rename section heading"
                   />
                 </div>
@@ -1350,14 +1380,14 @@ export function PdfTemplateEditor() {
                     ];
                     saveModel({ ...model, achievements: nextAch });
                   }}
-                  className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                  className="h-6 text-[11px] text-primary hover:text-primary px-2"
                 >
                   <Plus className="w-3 h-3 mr-1" /> Add Entry
                 </Button>
               </div>
 
               {model.achievements.map((ach, idx) => (
-                <div key={ach.id || idx} className="p-2.5 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                <div key={ach.id || idx} className="p-2.5 bg-background rounded border border-border space-y-2 text-xs">
                   <div className="flex items-center gap-2">
                     <Input
                       placeholder="Title"
@@ -1367,7 +1397,7 @@ export function PdfTemplateEditor() {
                         copy[idx].title = e.target.value;
                         saveModel({ ...model, achievements: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800 flex-1 font-semibold"
+                      className="h-7 text-xs bg-card border-border flex-1 font-semibold"
                     />
                     <Input
                       placeholder="Subtitle (Optional)"
@@ -1377,7 +1407,7 @@ export function PdfTemplateEditor() {
                         copy[idx].subtitle = e.target.value;
                         saveModel({ ...model, achievements: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800 w-2/5"
+                      className="h-7 text-xs bg-card border-border w-2/5"
                     />
                     <Input
                       placeholder="Date"
@@ -1387,7 +1417,7 @@ export function PdfTemplateEditor() {
                         copy[idx].date = e.target.value;
                         saveModel({ ...model, achievements: copy });
                       }}
-                      className="h-7 text-xs bg-slate-900 border-slate-800 w-24"
+                      className="h-7 text-xs bg-card border-border w-24"
                     />
                     <Button
                       size="icon"
@@ -1396,7 +1426,7 @@ export function PdfTemplateEditor() {
                         const filtered = model.achievements.filter((_, i) => i !== idx);
                         saveModel({ ...model, achievements: filtered });
                       }}
-                      className="h-6 w-6 text-slate-500 hover:text-red-400"
+                      className="h-6 w-6 text-muted-foreground hover:text-red-400"
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -1407,10 +1437,10 @@ export function PdfTemplateEditor() {
 
             {/* 8. Custom Sections */}
             {(model.customSections || []).map((sec, sIdx) => (
-              <div key={sec.id || sIdx} className="space-y-3 bg-slate-900/80 p-3.5 rounded-lg border border-emerald-500/30">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
+              <div key={sec.id || sIdx} className="space-y-3 bg-card p-3.5 rounded-lg border border-primary/30">
+                <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
                   <div className="flex items-center gap-1.5 flex-1">
-                    <span className="text-xs font-bold text-emerald-400">{8 + sIdx}.</span>
+                    <span className="text-xs font-bold text-primary">{8 + sIdx}.</span>
                     <Input
                       value={sec.title}
                       onChange={(e) => {
@@ -1419,7 +1449,7 @@ export function PdfTemplateEditor() {
                         saveModel({ ...model, customSections: copy });
                       }}
                       placeholder="Section Title (e.g. Certifications, Publications)"
-                      className="h-6 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-slate-950/60 border-slate-800 px-2"
+                      className="h-6 text-xs font-bold uppercase tracking-wider text-primary bg-background/60 border-border px-2"
                     />
                   </div>
                   <div className="flex items-center gap-1">
@@ -1439,7 +1469,7 @@ export function PdfTemplateEditor() {
                         copy[sIdx].items = items;
                         saveModel({ ...model, customSections: copy });
                       }}
-                      className="h-6 text-[11px] text-emerald-400 hover:text-emerald-300 px-2"
+                      className="h-6 text-[11px] text-primary hover:text-primary px-2"
                     >
                       <Plus className="w-3 h-3 mr-1" /> Add Item
                     </Button>
@@ -1461,9 +1491,9 @@ export function PdfTemplateEditor() {
 
                 {/* Items within custom section */}
                 {((sec.items && sec.items.length > 0) ? sec.items : []).map((item, itemIdx) => (
-                  <div key={item.id || itemIdx} className="p-3 bg-slate-950 rounded border border-slate-800 space-y-2 text-xs">
+                  <div key={item.id || itemIdx} className="p-3 bg-background rounded border border-border space-y-2 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-200">{item.title || `Item #${itemIdx + 1}`}</span>
+                      <span className="font-semibold text-foreground">{item.title || `Item #${itemIdx + 1}`}</span>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -1488,7 +1518,7 @@ export function PdfTemplateEditor() {
                           copy[sIdx].items[itemIdx].title = e.target.value;
                           saveModel({ ...model, customSections: copy });
                         }}
-                        className="h-7 text-xs bg-slate-900 border-slate-800"
+                        className="h-7 text-xs bg-card border-border"
                       />
                       <Input
                         placeholder="Subtitle / Org (e.g. Amazon Web Services)"
@@ -1498,7 +1528,7 @@ export function PdfTemplateEditor() {
                           copy[sIdx].items[itemIdx].subtitle = e.target.value;
                           saveModel({ ...model, customSections: copy });
                         }}
-                        className="h-7 text-xs bg-slate-900 border-slate-800"
+                        className="h-7 text-xs bg-card border-border"
                       />
                       <Input
                         placeholder="Date (e.g. 2024 - Present)"
@@ -1508,16 +1538,16 @@ export function PdfTemplateEditor() {
                           copy[sIdx].items[itemIdx].date = e.target.value;
                           saveModel({ ...model, customSections: copy });
                         }}
-                        className="h-7 text-xs bg-slate-900 border-slate-800 col-span-2"
+                        className="h-7 text-xs bg-card border-border col-span-2"
                       />
                     </div>
 
                     {/* Heading points / Bullets */}
                     <div className="space-y-1.5 pt-1">
-                      <Label className="text-[10px] text-slate-400">Heading Points / Bullets ({(item.bullets || []).length})</Label>
+                      <Label className="text-[10px] text-muted-foreground">Heading Points / Bullets ({(item.bullets || []).length})</Label>
                       {(item.bullets || []).map((bullet, bIdx) => (
                         <div key={bIdx} className="flex gap-1.5 items-start">
-                          <span className="text-emerald-500 mt-1">•</span>
+                          <span className="text-primary mt-1">•</span>
                           <Textarea
                             rows={2}
                             value={bullet}
@@ -1526,7 +1556,7 @@ export function PdfTemplateEditor() {
                               copy[sIdx].items[itemIdx].bullets[bIdx] = e.target.value;
                               saveModel({ ...model, customSections: copy });
                             }}
-                            className="text-xs bg-slate-900 border-slate-800 flex-1 leading-relaxed"
+                            className="text-xs bg-card border-border flex-1 leading-relaxed"
                           />
                           <Button
                             size="icon"
@@ -1536,7 +1566,7 @@ export function PdfTemplateEditor() {
                               copy[sIdx].items[itemIdx].bullets.splice(bIdx, 1);
                               saveModel({ ...model, customSections: copy });
                             }}
-                            className="h-6 w-6 text-slate-500 hover:text-red-400 mt-1"
+                            className="h-6 w-6 text-muted-foreground hover:text-red-400 mt-1"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -1551,7 +1581,7 @@ export function PdfTemplateEditor() {
                           copy[sIdx].items[itemIdx].bullets.push("Added notable contribution / detail point.");
                           saveModel({ ...model, customSections: copy });
                         }}
-                        className="h-5 text-[10px] text-slate-400 hover:text-emerald-400 px-1"
+                        className="h-5 text-[10px] text-muted-foreground hover:text-primary px-1"
                       >
                         + Add Point
                       </Button>
@@ -1562,38 +1592,38 @@ export function PdfTemplateEditor() {
             ))}
 
             {/* Bottom Add Section Controls */}
-            <div className="pt-2 border-t border-slate-800/80 space-y-2">
-              <div className="text-[11px] font-semibold text-slate-400">Add New Section to Resume:</div>
+            <div className="pt-2 border-t border-border space-y-2">
+              <div className="text-[11px] font-semibold text-muted-foreground">Add New Section to Resume:</div>
               <div className="flex flex-wrap gap-1.5">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleAddCustomSection("Certifications & Licenses")}
-                  className="h-7 text-[11px] border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+                  className="h-7 text-[11px] border-border bg-card hover:bg-muted text-foreground/80"
                 >
-                  <Plus className="w-3 h-3 mr-1 text-emerald-400" /> Certifications
+                  <Plus className="w-3 h-3 mr-1 text-primary" /> Certifications
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleAddCustomSection("Publications & Research")}
-                  className="h-7 text-[11px] border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+                  className="h-7 text-[11px] border-border bg-card hover:bg-muted text-foreground/80"
                 >
-                  <Plus className="w-3 h-3 mr-1 text-emerald-400" /> Publications
+                  <Plus className="w-3 h-3 mr-1 text-primary" /> Publications
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleAddCustomSection("Leadership & Volunteering")}
-                  className="h-7 text-[11px] border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+                  className="h-7 text-[11px] border-border bg-card hover:bg-muted text-foreground/80"
                 >
-                  <Plus className="w-3 h-3 mr-1 text-emerald-400" /> Leadership
+                  <Plus className="w-3 h-3 mr-1 text-primary" /> Leadership
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleAddCustomSection("Custom Section")}
-                  className="h-7 text-[11px] border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300"
+                  className="h-7 text-[11px] border-primary/40 bg-primary/10 hover:bg-primary/15 text-primary"
                 >
                   <Plus className="w-3 h-3 mr-1" /> + Custom Section
                 </Button>
@@ -1604,28 +1634,28 @@ export function PdfTemplateEditor() {
           {/* Right Panel: High Fidelity Printable Canvas */}
           <div
             ref={previewPanelRef}
-            className="flex-1 bg-slate-950 flex flex-col overflow-hidden relative print:overflow-visible print:bg-white print:block print:w-full"
+            className="flex-1 bg-background flex flex-col overflow-hidden relative print:overflow-visible print:bg-white print:block print:w-full"
           >
             {/* Sticky zoom toolbar - hidden on print */}
-            <div className="no-print print:hidden shrink-0 flex items-center gap-2 px-4 py-2 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-sm">
-              <span className="text-[11px] text-slate-500 font-medium mr-1">Zoom</span>
+            <div className="no-print print:hidden shrink-0 flex items-center gap-2 px-4 py-2 border-b border-border bg-card backdrop-blur-sm">
+              <span className="text-[11px] text-muted-foreground font-medium mr-1">Zoom</span>
 
               <button
                 onClick={() => setZoomLevel((z) => Math.max(40, z - 10))}
                 title="Zoom Out (Ctrl + Scroll Down)"
-                className="flex items-center justify-center w-7 h-7 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-emerald-500/40 text-slate-300 hover:text-white transition-all"
+                className="flex items-center justify-center w-7 h-7 rounded bg-muted border border-border hover:bg-muted hover:border-primary/40 text-foreground/80 hover:text-foreground transition-all"
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
 
-              <span className="font-mono text-sm font-semibold text-slate-200 w-12 text-center tabular-nums">
+              <span className="font-mono text-sm font-semibold text-foreground w-12 text-center tabular-nums">
                 {zoomLevel}%
               </span>
 
               <button
                 onClick={() => setZoomLevel((z) => Math.min(200, z + 10))}
                 title="Zoom In (Ctrl + Scroll Up)"
-                className="flex items-center justify-center w-7 h-7 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-emerald-500/40 text-slate-300 hover:text-white transition-all"
+                className="flex items-center justify-center w-7 h-7 rounded bg-muted border border-border hover:bg-muted hover:border-primary/40 text-foreground/80 hover:text-foreground transition-all"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
               </button>
@@ -1633,20 +1663,20 @@ export function PdfTemplateEditor() {
               <button
                 onClick={() => setZoomLevel(100)}
                 title="Reset Zoom"
-                className="flex items-center justify-center w-7 h-7 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-500 hover:text-slate-300 transition-all"
+                className="flex items-center justify-center w-7 h-7 rounded bg-muted border border-border hover:bg-muted text-muted-foreground hover:text-foreground/80 transition-all"
               >
                 <RotateCcw className="w-3 h-3" />
               </button>
 
-              <div className="h-4 w-px bg-slate-800 mx-1" />
+              <div className="h-4 w-px bg-muted mx-1" />
 
               {/* View Switcher: Live HTML vs Exact Compiled PDF */}
-              <div className="flex items-center bg-slate-800/90 p-0.5 rounded-md border border-slate-700 text-xs">
+              <div className="flex items-center bg-muted/90 p-0.5 rounded-md border border-border text-xs">
                 <button
                   onClick={() => setPreviewMode("html")}
                   className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${previewMode === "html"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                   title="Interactive pure HTML/CSS live preview"
                 >
@@ -1662,15 +1692,15 @@ export function PdfTemplateEditor() {
                   }}
                   disabled={isCompilingPdf}
                   className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${previewMode === "compiled"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                   title="Exact compiled vector PDF from LaTeX engine"
                 >
                   {isCompilingPdf ? (
                     <RefreshCw className="w-3 h-3 inline mr-1 animate-spin" />
                   ) : (
-                    <FileText className="w-3 h-3 inline mr-1 text-emerald-400" />
+                    <FileText className="w-3 h-3 inline mr-1 text-primary" />
                   )}
                   Compiled PDF
                 </button> */}
@@ -1681,13 +1711,13 @@ export function PdfTemplateEditor() {
                 onClick={() => void handleCompileLatexPdf()}
                 disabled={isCompilingPdf}
                 title="Recompile LaTeX template to fresh vector PDF"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800/90 border border-slate-700 hover:bg-slate-700 text-slate-300 hover:text-emerald-400 text-[11px] font-medium transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted/90 border border-border hover:bg-muted text-foreground/80 hover:text-primary text-[11px] font-medium transition-all disabled:opacity-50"
               >
-                <RefreshCw className={`w-3 h-3 text-emerald-400 ${isCompilingPdf ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-3 h-3 text-primary ${isCompilingPdf ? "animate-spin" : ""}`} />
                 <span>{isCompilingPdf ? "Compiling..." : "Recompile"}</span>
               </button>
 
-              <span className="text-[10px] text-slate-600 hidden xl:inline">
+              <span className="text-[10px] text-muted-foreground hidden xl:inline">
                 Ctrl + Scroll to zoom
               </span>
 
@@ -1695,7 +1725,7 @@ export function PdfTemplateEditor() {
 
               <button
                 onClick={handlePrintPdf}
-                className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-emerald-400 transition-colors px-2 py-1 rounded hover:bg-slate-800"
+                className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded hover:bg-muted"
               >
                 <Printer className="w-3.5 h-3.5" /> Print
               </button>
@@ -1736,32 +1766,32 @@ export function PdfTemplateEditor() {
 
       {/* AI Tailoring Drawer / Modal */}
       {showAiDrawer && (
-        <div className="no-print print:hidden fixed inset-y-0 right-0 w-full sm:w-[480px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 p-5 flex flex-col justify-between overflow-y-auto space-y-4">
+        <div className="no-print print:hidden fixed inset-y-0 right-0 w-full sm:w-[480px] bg-card border-l border-border shadow-2xl z-40 p-5 flex flex-col justify-between overflow-y-auto space-y-4">
           <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                <div className="p-1.5 rounded-lg bg-primary/15 text-primary">
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">AI Resume Tailoring</h3>
-                  <p className="text-[11px] text-slate-400">Target role analysis &amp; guardrail tailoring</p>
+                  <h3 className="font-bold text-sm text-foreground">AI Resume Tailoring</h3>
+                  <p className="text-[11px] text-muted-foreground">Target role analysis &amp; guardrail tailoring</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAiDrawer(false)}
-                className="text-slate-400 hover:text-white text-xs p-1 rounded hover:bg-slate-800 transition-colors"
+                className="text-muted-foreground hover:text-foreground text-xs p-1 rounded hover:bg-muted transition-colors"
               >
                 ✕
               </button>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs text-slate-300">AI Provider</Label>
+              <Label className="text-xs text-foreground/80">AI Provider</Label>
               <select
                 value={llmProvider}
                 onChange={(e) => setLlmProvider(e.target.value as LlmProvider)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-background border border-border rounded-lg text-xs px-3 py-2 text-foreground focus:outline-none focus:border-primary"
               >
                 <option value="gemini">Google Gemini 2.5</option>
                 <option value="groq">Groq (Llama 3.3 70B Fast)</option>

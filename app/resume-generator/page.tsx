@@ -42,7 +42,7 @@ export default function ResumeGeneratorPage() {
     try {
       localStorage.setItem("resume_active_flow", flow);
     } catch {}
-    router.push(flow === "latex" ? "/edit-latex" : "/Edit-a-PDF");
+    router.push(flow === "latex" ? "/edit-latex" : "/Edit-a-PDF?view=gallery");
   };
 
   return (

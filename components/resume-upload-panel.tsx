@@ -332,7 +332,7 @@ export function ResumeUploadPanel({
         className={`
           relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed
           p-8 cursor-pointer transition-all duration-300
-          ${isDragging ? "border-emerald-400 bg-emerald-500/10 scale-[1.01]" : "border-slate-700 hover:border-emerald-600/60 hover:bg-slate-800/50"}
+          ${isDragging ? "border-primary bg-primary/10 scale-[1.01]" : "border-border hover:border-primary/60 hover:bg-muted/50"}
           ${isLoading ? "cursor-not-allowed opacity-80 pointer-events-none" : ""}
         `}
       >
@@ -346,15 +346,15 @@ export function ResumeUploadPanel({
         />
 
         {/* Icon */}
-        <div className={`p-3 rounded-full transition-colors ${isDragging ? "bg-emerald-500/20" : "bg-slate-800"}`}>
+        <div className={`p-3 rounded-full transition-colors ${isDragging ? "bg-primary/15" : "bg-muted"}`}>
           {isLoading ? (
-            <Loader2 className="w-7 h-7 text-emerald-400 animate-spin" />
+            <Loader2 className="w-7 h-7 text-primary animate-spin" />
           ) : isDone ? (
-            <CheckCircle className="w-7 h-7 text-emerald-400" />
+            <CheckCircle className="w-7 h-7 text-primary" />
           ) : isError ? (
             <AlertTriangle className="w-7 h-7 text-red-400" />
           ) : (
-            <Upload className="w-7 h-7 text-slate-400" />
+            <Upload className="w-7 h-7 text-muted-foreground" />
           )}
         </div>
 
@@ -362,28 +362,28 @@ export function ResumeUploadPanel({
         <div className="text-center">
           {isLoading ? (
             <>
-              <p className="text-sm font-semibold text-emerald-300 animate-pulse">
+              <p className="text-sm font-semibold text-primary animate-pulse">
                 {PHASE_LABELS[phase]}
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">{fileName}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{fileName}</p>
             </>
           ) : isDone ? (
             <>
-              <p className="text-sm font-semibold text-emerald-300">Resume loaded!</p>
-              <p className="text-xs text-slate-400 mt-0.5">{fileName}</p>
-              <p className="text-xs text-slate-500 mt-0.5">Click or drop to replace</p>
+              <p className="text-sm font-semibold text-primary">Resume loaded!</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{fileName}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Click or drop to replace</p>
             </>
           ) : isError ? (
             <>
               <p className="text-sm font-semibold text-red-400">{errorMsg}</p>
-              <p className="text-xs text-slate-500 mt-1">Click or drop a new resume to retry</p>
+              <p className="text-xs text-muted-foreground mt-1">Click or drop a new resume to retry</p>
             </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-slate-200">
+              <p className="text-sm font-semibold text-foreground">
                 {isDragging ? "Drop your resume here" : "Drop resume file here"}
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">or click to browse • PDF, DOCX, PNG, JPG • max 5 MB</p>
+              <p className="text-xs text-muted-foreground mt-0.5">or click to browse • PDF, DOCX, PNG, JPG • max 5 MB</p>
             </>
           )}
         </div>
@@ -391,35 +391,35 @@ export function ResumeUploadPanel({
         {/* Progress bar */}
         {isLoading && (
           <div className="w-full mt-1">
-            <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                className="h-full bg-primary rounded-full transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <p className="text-[10px] text-slate-600 text-center mt-1">{progressPercent}%</p>
+            <p className="text-[10px] text-muted-foreground text-center mt-1">{progressPercent}%</p>
           </div>
         )}
       </div>
 
       {/* Confidence Badge */}
       {isDone && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-slate-900 rounded-lg border border-slate-800">
+        <div className="flex items-center gap-2 px-3 py-2 bg-card rounded-lg border border-border">
           {usedLlm ? (
             <Brain className="w-4 h-4 text-indigo-400 shrink-0" />
           ) : (
-            <Zap className="w-4 h-4 text-emerald-400 shrink-0" />
+            <Zap className="w-4 h-4 text-primary shrink-0" />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="text-slate-400">Parse confidence</span>
-              <span className={`font-bold tabular-nums ${confidence >= 0.7 ? "text-emerald-400" : "text-yellow-400"}`}>
+              <span className="text-muted-foreground">Parse confidence</span>
+              <span className={`font-bold tabular-nums ${confidence >= 0.7 ? "text-primary" : "text-yellow-400"}`}>
                 {Math.round(confidence * 100)}%
               </span>
             </div>
-            <div className="h-1 mt-1 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-1 mt-1 w-full bg-muted rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${confidence >= 0.7 ? "bg-emerald-500" : "bg-yellow-500"}`}
+                className={`h-full rounded-full transition-all ${confidence >= 0.7 ? "bg-primary" : "bg-yellow-500"}`}
                 style={{ width: `${Math.round(confidence * 100)}%` }}
               />
             </div>
@@ -448,7 +448,7 @@ export function ResumeUploadPanel({
 
           {showUnassigned && (
             <div className="px-3 pb-3 space-y-2">
-              <p className="text-[10px] text-slate-500">
+              <p className="text-[10px] text-muted-foreground">
                 These lines couldn&apos;t be placed automatically. Drag them to a section below.
               </p>
 
@@ -459,9 +459,9 @@ export function ResumeUploadPanel({
                     key={idx}
                     draggable
                     onDragStart={() => handleDragLineStart(line)}
-                    className="flex items-start gap-1.5 px-2 py-1 bg-slate-900 rounded border border-slate-800 cursor-grab hover:border-yellow-500/40 transition-colors group text-xs text-slate-300"
+                    className="flex items-start gap-1.5 px-2 py-1 bg-card rounded border border-border cursor-grab hover:border-yellow-500/40 transition-colors group text-xs text-foreground/80"
                   >
-                    <GripVertical className="w-3 h-3 text-slate-600 mt-0.5 shrink-0 group-hover:text-yellow-500 transition-colors" />
+                    <GripVertical className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0 group-hover:text-yellow-500 transition-colors" />
                     <span className="truncate">{line.text}</span>
                   </div>
                 ))}
@@ -478,8 +478,8 @@ export function ResumeUploadPanel({
                     className={`
                       py-1.5 px-2 rounded border text-center text-[10px] font-medium transition-all
                       ${dragOverSection === sec.key
-                        ? "border-emerald-400 bg-emerald-500/20 text-emerald-300"
-                        : "border-slate-700 text-slate-500 hover:border-slate-600"}
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border text-muted-foreground hover:border-border"}
                     `}
                   >
                     {sec.label}
@@ -493,9 +493,9 @@ export function ResumeUploadPanel({
 
       {/* Footer tips */}
       {phase === "idle" && (
-        <div className="flex items-start gap-2 px-3 py-2 bg-slate-900/60 rounded-lg border border-slate-800/60">
-          <FileText className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
-          <p className="text-[10px] text-slate-500 leading-relaxed">
+        <div className="flex items-start gap-2 px-3 py-2 bg-card rounded-lg border border-border">
+          <FileText className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
             Works with any resume template. Content is extracted and mapped to the Classic Traditional template. Low-confidence fields will be highlighted for review.
           </p>
         </div>
@@ -507,7 +507,7 @@ export function ResumeUploadPanel({
           size="sm"
           variant="ghost"
           onClick={onClose}
-          className="self-end h-7 text-xs text-slate-400 hover:text-slate-200 gap-1"
+          className="self-end h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
         >
           <X className="w-3 h-3" /> Close panel
         </Button>
