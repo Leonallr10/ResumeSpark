@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     }
 
     let sourceText = "";
-    let imageParts: Array<{ mimeType: string; data: string }> = [];
+    const imageParts: Array<{ mimeType: string; data: string }> = [];
 
     // Step 1: Text extraction
     if (isImg) {

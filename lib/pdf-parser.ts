@@ -552,7 +552,7 @@ function parseEducation(lines: ParsedLine[]): ResumeDocumentModel["education"] {
       const { title, org, startDate, endDate, location, bullets } = parseGenericEntry(group);
       if (!org && !title) return null;
 
-      let institution = title;
+      const institution = title;
       let degree = org;
       let field = "";
 
