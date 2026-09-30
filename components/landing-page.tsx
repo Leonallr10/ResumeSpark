@@ -220,14 +220,14 @@ function ProductShowcase() {
           </Badge>
         </div>
 
-        <div className="relative aspect-[16/10] w-full bg-muted/30">
+        <div className="relative aspect-[16/9] w-full bg-[hsl(222_22%_8%)] dark:bg-black">
           <AnimatePresence mode="wait">
             <motion.div
               key={slide.id}
-              initial={{ opacity: 0, scale: 1.02 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.985 }}
-              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className="absolute inset-0"
             >
               <Image
@@ -235,28 +235,29 @@ function ProductShowcase() {
                 alt={slide.alt}
                 fill
                 priority={index === 0}
-                sizes="(max-width: 1024px) 100vw, 720px"
-                className="object-cover object-top"
+                quality={100}
+                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 70vw, 1100px"
+                className="object-contain object-center"
+                unoptimized
               />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background/70 via-background/15 to-transparent" />
             </motion.div>
           </AnimatePresence>
 
-          <div className="absolute inset-y-0 left-0 flex items-center pl-2">
+          <div className="absolute inset-y-0 left-0 z-10 flex items-center pl-2">
             <button
               type="button"
               onClick={() => goTo(index - 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border/80 bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:bg-background"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white shadow-sm backdrop-blur transition hover:bg-black/75"
               aria-label="Previous slide"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
           </div>
-          <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+          <div className="absolute inset-y-0 right-0 z-10 flex items-center pr-2">
             <button
               type="button"
               onClick={() => goTo(index + 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border/80 bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:bg-background"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white shadow-sm backdrop-blur transition hover:bg-black/75"
               aria-label="Next slide"
             >
               <ChevronRight className="h-4 w-4" />
